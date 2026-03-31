@@ -1,21 +1,80 @@
 import { ArrowLeft, Pause, Volume2, Shuffle, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const initialWords = [
-  { id: 1, word: "abandon", translation: "放弃；抛弃", count: 0, completed: false, showTranslation: false },
-  { id: 2, word: "ability", translation: "能力；才能", count: 0, completed: false, showTranslation: false },
-  { id: 3, word: "abroad", translation: "在国外；到国外", count: 0, completed: false, showTranslation: false },
-  { id: 4, word: "absolute", translation: "绝对的；完全的", count: 0, completed: false, showTranslation: false },
-  { id: 5, word: "abstract", translation: "抽象的；摘要", count: 0, completed: false, showTranslation: false },
-];
+type PracticeWord = {
+  id: number;
+  word: string;
+  translation: string;
+  count: number;
+  completed: boolean;
+  showTranslation: boolean;
+};
 
 export default function WordPractice() {
   const navigate = useNavigate();
-  const [words, setWords] = useState(initialWords);
+  const [words, setWords] = useState<PracticeWord[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [speed, setSpeed] = useState("1.0x");
   const [showPauseMenu, setShowPauseMenu] = useState(false);
+  const [frameIdx, setFrameIdx] = useState(0);
+  const [finished, setFinished] = useState(false);
+
+  const mode = useMemo(() => sessionStorage.getItem("lb_mode") || "study", []);
+
+  const handleBack = () => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate(mode === "review" ? "/anti-forgetting" : "/pre-training-check");
+  };
+
+  const batchIdx = useMemo(() => {
+    const key = mode === "review" ? "lb_review_batch_idx" : "lb_study_batch_idx";
+    return Number(sessionStorage.getItem(key) || 0);
+  }, [mode]);
+
+  useEffect(() => {
+    try {
+      const wordsKey = mode === "review" ? "lb_review_words" : "lb_study_words";
+      const raw = sessionStorage.getItem(wordsKey) || "[]";
+      const arr = JSON.parse(raw);
+      const all: any[] = Array.isArray(arr) ? arr : [];
+      const start = batchIdx * 5;
+      const slice = all.slice(start, start + 5);
+      const mapped: PracticeWord[] = slice.map((w: any) => ({
+        id: Number(w.id),
+        word: String(w.word || ""),
+        translation: String(w.translation || ""),
+        count: 0,
+        completed: false,
+        showTranslation: false,
+      }));
+      setWords(mapped);
+      setCurrentIndex(0);
+      setFrameIdx(0);
+      setFinished(false);
+    } catch {
+      // ignore
+    }
+  }, [batchIdx, mode]);
+
+  // LinguaStart memorize sequence: 1,2,1,2,3,1,2,3,4,1,2,3,4,5 (0-based)
+  const sequence = useMemo(() => {
+    const n = words.length;
+    if (n <= 0) return [] as number[];
+    const seq: number[] = [0];
+    for (let i = 1; i < n; i++) {
+      seq.push(i);
+      for (let j = 0; j <= i; j++) seq.push(j);
+    }
+    return seq;
+  }, [words]);
+
+  const activeIndex = sequence.length > 0 ? sequence[Math.min(frameIdx, sequence.length - 1)] : 0;
+
+  useEffect(() => {
+    if (words.length === 0) return;
+    setCurrentIndex(activeIndex);
+  }, [activeIndex, words.length]);
 
   const toggleTranslation = (id: number) => {
     setWords((prev) =>
@@ -26,36 +85,31 @@ export default function WordPractice() {
   };
 
   const handleCountClick = (id: number) => {
-    setWords((prev) =>
-      prev.map((word) => {
-        if (word.id === id) {
-          const newCount = word.count + 1;
-          if (newCount === 5) {
-            return { ...word, count: 5, completed: true };
-          } else if (newCount > 5) {
-            return { ...word, count: 0, completed: false };
-          } else {
-            return { ...word, count: newCount };
-          }
-        }
-        return word;
-      })
-    );
+    const idx = words.findIndex((w) => w.id === id);
+    if (idx !== activeIndex) return;
+
+    // advance one frame in the fixed sequence
+    if (sequence.length === 0) return;
+    if (frameIdx >= sequence.length - 1) {
+      setFinished(true);
+      return;
+    }
+    setFrameIdx((f) => f + 1);
   };
 
   const handleShuffle = () => {
     const shuffled = [...words].sort(() => Math.random() - 0.5);
     setWords(shuffled);
+    setCurrentIndex(0);
+    setFrameIdx(0);
+    setFinished(false);
   };
 
   const handleNext = () => {
-    const allCompleted = words.every((word) => word.completed);
-    if (allCompleted) {
-      navigate("/word-review");
-    }
+    navigate("/word-review");
   };
 
-  const allCompleted = words.every((word) => word.completed);
+  const allCompleted = finished;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -63,7 +117,7 @@ export default function WordPractice() {
       <div className="bg-white sticky top-0 z-10 shadow-sm">
         <div className="flex items-center justify-between px-4 py-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors"
           >
             <ArrowLeft size={24} className="text-[#2D3748]" />
@@ -107,30 +161,16 @@ export default function WordPractice() {
                   <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                     <Volume2 size={20} className="text-[#4ECDC4]" />
                   </button>
-                  {index === 0 && (
-                    <button
-                      onClick={() => handleCountClick(word.id)}
-                      className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold transition-colors ${
-                        word.completed
-                          ? "bg-[#66BB6A] text-white"
-                          : "bg-[#4ECDC4] text-white hover:bg-[#45b8b0]"
-                      }`}
-                    >
-                      {word.completed ? "✓" : word.count === 0 ? "1" : word.count}
-                    </button>
-                  )}
-                  {index !== 0 && (
-                    <button
-                      onClick={() => handleCountClick(word.id)}
-                      className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold transition-colors ${
-                        word.completed
-                          ? "bg-[#66BB6A] text-white"
-                          : "border-2 border-[#E2E8F0] text-[#718096] hover:bg-gray-50"
-                      }`}
-                    >
-                      {word.completed ? "✓" : word.count === 0 ? "" : word.count}
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleCountClick(word.id)}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold transition-colors ${
+                      index === activeIndex
+                        ? "bg-[#4ECDC4] text-white hover:bg-[#45b8b0]"
+                        : "bg-gray-100 text-[#A0AEC0] cursor-not-allowed"
+                    }`}
+                  >
+                    ✓
+                  </button>
                 </div>
               </div>
             </div>
@@ -161,12 +201,7 @@ export default function WordPractice() {
           </div>
           <button
             onClick={handleNext}
-            disabled={!allCompleted}
-            className={`p-3 rounded-full transition-colors ${
-              allCompleted
-                ? "bg-[#4ECDC4] text-white hover:bg-[#45b8b0]"
-                : "bg-gray-100 text-[#A0AEC0] cursor-not-allowed"
-            }`}
+            className="p-3 rounded-full transition-colors bg-[#4ECDC4] text-white hover:bg-[#45b8b0]"
           >
             <ArrowRight size={24} />
           </button>
@@ -200,16 +235,6 @@ export default function WordPractice() {
       )}
 
       {/* 右下角箭头按钮（仅在完成后显示） */}
-      {allCompleted && (
-        <div className="fixed bottom-28 right-6">
-          <button
-            onClick={handleNext}
-            className="p-4 bg-[#4ECDC4] text-white rounded-full shadow-lg hover:bg-[#45b8b0] transition-colors"
-          >
-            <ArrowRight size={24} />
-          </button>
-        </div>
-      )}
     </div>
   );
 }

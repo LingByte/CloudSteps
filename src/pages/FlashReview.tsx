@@ -1,21 +1,48 @@
 import { ArrowLeft, Pause, Volume2, Scissors, Check, X } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import confetti from "canvas-confetti";
 
-const initialWords = [
-  { id: 1, word: "abandon", translation: "放弃；抛弃", scissorCount: 0, status: null, showTranslation: false },
-  { id: 2, word: "ability", translation: "能力；才能", scissorCount: 0, status: null, showTranslation: false },
-  { id: 3, word: "abroad", translation: "在国外；到国外", scissorCount: 0, status: null, showTranslation: false },
-  { id: 4, word: "absolute", translation: "绝对的；完全的", scissorCount: 0, status: null, showTranslation: false },
-  { id: 5, word: "abstract", translation: "抽象的；摘要", scissorCount: 0, status: null, showTranslation: false },
-];
+type FlashWord = { id: number; word: string; translation: string; scissorCount: number; status: any; showTranslation: boolean };
 
 export default function FlashReview() {
   const navigate = useNavigate();
-  const [words, setWords] = useState(initialWords);
+  const [words, setWords] = useState<FlashWord[]>([]);
   const [currentGroup, setCurrentGroup] = useState(1);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+
+  const mode = useMemo(() => sessionStorage.getItem("lb_mode") || "study", []);
+  const batchIdx = useMemo(() => {
+    const key = mode === "review" ? "lb_review_batch_idx" : "lb_study_batch_idx";
+    return Number(sessionStorage.getItem(key) || 0);
+  }, [mode]);
+
+  const handleBack = () => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate("/word-review");
+  };
+
+  useEffect(() => {
+    try {
+      const wordsKey = mode === "review" ? "lb_review_words" : "lb_study_words";
+      const raw = sessionStorage.getItem(wordsKey) || "[]";
+      const arr = JSON.parse(raw);
+      const all: any[] = Array.isArray(arr) ? arr : [];
+      const start = batchIdx * 5;
+      const slice = all.slice(start, start + 5);
+      const mapped: FlashWord[] = slice.map((w: any) => ({
+        id: Number(w.id),
+        word: String(w.word || ""),
+        translation: String(w.translation || ""),
+        scissorCount: 0,
+        status: null,
+        showTranslation: false,
+      }));
+      setWords(mapped);
+    } catch {
+      // ignore
+    }
+  }, [batchIdx, mode]);
 
   const handleScissorClick = (id: number) => {
     setWords((prev) =>
@@ -34,7 +61,7 @@ export default function FlashReview() {
     );
   };
 
-  const allCut = words.every((word) => word.scissorCount >= 2);
+  const allCut = words.length > 0 && words.every((word) => word.scissorCount >= 2);
 
   const handleComplete = () => {
     confetti({
@@ -46,10 +73,10 @@ export default function FlashReview() {
   };
 
   useEffect(() => {
-    if (allCut) {
+    if (allCut && !showCompleteDialog) {
       handleComplete();
     }
-  }, [allCut]);
+  }, [allCut, showCompleteDialog]);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -57,7 +84,7 @@ export default function FlashReview() {
       <div className="bg-white sticky top-0 z-10 shadow-sm">
         <div className="flex items-center justify-between px-4 py-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors"
           >
             <ArrowLeft size={24} className="text-[#2D3748]" />

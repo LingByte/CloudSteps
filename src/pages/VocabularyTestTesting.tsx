@@ -1,54 +1,56 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { ChevronLeft, X, Volume2 } from "lucide-react";
 
-const testWords = [
-  {
-    word: "country",
-    options: [
-      { label: "声音", value: "sound" },
-      { label: "小的", value: "small" },
-      { label: "户外", value: "outdoor" },
-      { label: "桥", value: "bridge" },
-      { label: "国家", value: "country" },
-      { label: "不认识", value: "unknown" },
-    ],
-  },
-  {
-    word: "library",
-    options: [
-      { label: "图书馆", value: "library" },
-      { label: "学校", value: "school" },
-      { label: "医院", value: "hospital" },
-      { label: "公园", value: "park" },
-      { label: "商店", value: "store" },
-      { label: "不认识", value: "unknown" },
-    ],
-  },
-  {
-    word: "beautiful",
-    options: [
-      { label: "丑陋的", value: "ugly" },
-      { label: "美丽的", value: "beautiful" },
-      { label: "普通的", value: "normal" },
-      { label: "奇怪的", value: "strange" },
-      { label: "可爱的", value: "cute" },
-      { label: "不认识", value: "unknown" },
-    ],
-  },
-];
+import { getVocabNext, submitVocabTest } from "@/api/vocab";
+
+type ApiQuestion = {
+  id: number;
+  word: string;
+  options: string; // JSON string
+  correctAnswer: string;
+  level: string;
+  difficultyScore: number;
+};
+
+type OptionItem = { label: string; value: string };
+
+const parseOptions = (options: string): string[] => {
+  try {
+    const arr = JSON.parse(options);
+    return Array.isArray(arr) ? arr.map((s) => String(s)) : [];
+  } catch {
+    return [];
+  }
+};
 
 export default function VocabularyTestTesting() {
   const navigate = useNavigate();
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [correctCount, setCorrectCount] = useState(0);
   const [wrongCount, setWrongCount] = useState(0);
   const [timer, setTimer] = useState(8);
   const [showWarning, setShowWarning] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const currentWord = testWords[currentIndex];
-  const progress = ((currentIndex + 1) / testWords.length) * 100;
+  const [currentQuestion, setCurrentQuestion] = useState<ApiQuestion | null>(null);
+  const [answeredIds, setAnsweredIds] = useState<number[]>([]);
+  const [answers, setAnswers] = useState<{ questionId: number; answer: string }[]>([]);
+  const answersRef = useRef<{ questionId: number; answer: string }[]>([]);
+  const [currentDifficultyScore, setCurrentDifficultyScore] = useState(3);
+  const [lastQuestionId, setLastQuestionId] = useState(0);
+  const [finished, setFinished] = useState(false);
+
+	const WRONG_LIMIT = 5;
+
+  const options: OptionItem[] = useMemo(() => {
+    if (!currentQuestion) return [];
+    const opts = parseOptions(currentQuestion.options);
+    return [...opts, "不认识"].map((label) => ({ label, value: label }));
+  }, [currentQuestion]);
+
+  const currentIndex = answeredIds.length;
+  const progress = 0;
 
   // 计时器
   useEffect(() => {
@@ -62,33 +64,120 @@ export default function VocabularyTestTesting() {
     }
   }, [timer]);
 
-  const handleAnswerSelect = (value: string) => {
-    setSelectedAnswer(value);
-    
-    // 模拟答案检查
-    setTimeout(() => {
-      if (value === currentWord.word || value === "unknown") {
-        if (value !== "unknown") {
-          setCorrectCount((prev) => prev + 1);
-        }
-      } else {
-        setWrongCount((prev) => prev + 1);
-      }
-
-      // 进入下一题
-      if (currentIndex < testWords.length - 1) {
-        setCurrentIndex((prev) => prev + 1);
-        setSelectedAnswer(null);
-        setTimer(8);
-        setShowWarning(false);
-      } else {
-        // 测试完成
-        setTimeout(() => {
-          navigate("/");
-        }, 1000);
-      }
-    }, 300);
+  const fetchNext = async (params: { correct: boolean; lastQuestionId: number; answeredIds: number[]; currentDifficultyScore: number }) => {
+    const res = await getVocabNext({
+      lastQuestionId: params.lastQuestionId,
+      correct: params.correct,
+      currentDifficultyScore: params.currentDifficultyScore,
+      answeredIds: params.answeredIds,
+    });
+    if (res.code !== 200) throw new Error(res.msg || "获取题目失败");
+    const data = res.data;
+    if (data.finished) {
+      setFinished(true);
+      return;
+    }
+    setCurrentDifficultyScore(data.currentDifficultyScore ?? params.currentDifficultyScore);
+    setCurrentQuestion(data.question);
+    setLastQuestionId(data.question?.id ?? 0);
   };
+
+	const submitAndGoResult = async (payloadAnswers: { questionId: number; answer: string }[]) => {
+		if (!payloadAnswers || payloadAnswers.length === 0) {
+			throw new Error("答案不能为空");
+		}
+		const res = await submitVocabTest({ answers: payloadAnswers });
+		if (res.code !== 200) throw new Error(res.msg || "提交失败");
+		sessionStorage.setItem("vocabulary_test_result", JSON.stringify(res.data));
+		navigate("/vocabulary-test/result", { replace: true });
+	};
+
+  // 初始化：取第一题
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoading(true);
+        await fetchNext({ correct: true, lastQuestionId: 0, answeredIds: [], currentDifficultyScore: 3 });
+        if (!mounted) return;
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleAnswerSelect = async (value: string) => {
+    if (!currentQuestion || loading) return;
+    setSelectedAnswer(value);
+
+    const isUnknown = value === "不认识";
+    const isCorrect = !isUnknown && value === currentQuestion.correctAnswer;
+    if (isCorrect) setCorrectCount((prev) => prev + 1);
+    if (!isCorrect) setWrongCount((prev) => prev + 1);
+
+    const qid = currentQuestion.id;
+    const nextAnswers = [...answers, { questionId: qid, answer: value }];
+    setAnswers(nextAnswers);
+    answersRef.current = nextAnswers;
+    const nextAnsweredIds = [...answeredIds, qid];
+    setAnsweredIds(nextAnsweredIds);
+
+		// 错误超过 5 个：直接结算
+		const nextWrongCount = wrongCount + (isCorrect ? 0 : 1);
+		if (nextWrongCount > WRONG_LIMIT) {
+			try {
+				setLoading(true);
+				setFinished(true);
+				await submitAndGoResult(nextAnswers);
+			} catch (e) {
+				console.error(e);
+				navigate("/", { replace: true });
+			} finally {
+				setLoading(false);
+			}
+			return;
+		}
+
+    // 进入下一题
+    try {
+      setLoading(true);
+      await fetchNext({
+        correct: isCorrect,
+        lastQuestionId: qid,
+        answeredIds: nextAnsweredIds,
+        currentDifficultyScore,
+      });
+      setSelectedAnswer(null);
+      setTimer(8);
+      setShowWarning(false);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // finished 时提交结果并跳转
+  useEffect(() => {
+    if (!finished) return;
+    (async () => {
+      try {
+        // 若已被提前结算逻辑提交并跳转，这里不再重复提交
+        if (sessionStorage.getItem("vocabulary_test_result")) return;
+        await submitAndGoResult(answersRef.current);
+      } catch (e) {
+        console.error(e);
+        navigate("/", { replace: true });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finished]);
 
   return (
     <div className="min-h-screen bg-[#F7F9FC]">
@@ -123,7 +212,7 @@ export default function VocabularyTestTesting() {
         <div className="bg-white rounded-xl p-8 mb-8 text-center shadow-sm">
           <div className="flex items-center justify-center gap-4 mb-4">
             <h2 className="text-4xl font-bold text-[#2D3748]">
-              {currentWord.word}
+              {loading || !currentQuestion ? "加载中..." : currentQuestion.word}
             </h2>
             <button className="text-[#55A3FF] hover:text-[#4ECDC4] transition-colors">
               <Volume2 size={28} />
@@ -133,10 +222,11 @@ export default function VocabularyTestTesting() {
 
         {/* 选项 */}
         <div className="space-y-3 max-w-lg mx-auto">
-          {currentWord.options.map((option, index) => (
+          {options.map((option, index) => (
             <button
               key={index}
               onClick={() => handleAnswerSelect(option.value)}
+              disabled={loading || !currentQuestion}
               className={`w-full flex items-center justify-between px-6 py-4 rounded-xl text-left transition-all ${
                 option.label === "不认识"
                   ? "bg-[#E2E8F0] text-[#718096] hover:bg-[#D1D5DB]"
@@ -145,7 +235,7 @@ export default function VocabularyTestTesting() {
                 selectedAnswer === option.value
                   ? "ring-2 ring-[#4ECDC4] bg-[#4ECDC4]/10"
                   : ""
-              }`}
+              } ${loading ? "opacity-60 pointer-events-none" : ""}`}
             >
               <span className="text-base">{option.label}</span>
             </button>

@@ -1,22 +1,43 @@
-import { ArrowLeft, Volume2, Check, X, Shuffle } from "lucide-react";
+import { Volume2, Check, X, Shuffle } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const initialWords = [
-  { id: 1, word: "abandon", status: null },
-  { id: 2, word: "ability", status: null },
-  { id: 3, word: "abroad", status: null },
-  { id: 4, word: "absolute", status: null },
-  { id: 5, word: "abstract", status: null },
-  { id: 6, word: "academic", status: null },
-  { id: 7, word: "accept", status: null },
-  { id: 8, word: "access", status: null },
-];
+import { getStudyWords, startStudySession } from "@/api/study";
+import { TopBar } from "@/components/TopBar";
+
+type WordItem = { id: number; word: string; status: null | "correct" | "wrong" };
 
 export default function PreTrainingCheck() {
   const navigate = useNavigate();
-  const [words, setWords] = useState(initialWords);
+  const [words, setWords] = useState<WordItem[]>([]);
   const [selectedCount, setSelectedCount] = useState(0);
+
+  const handleBack = () => {
+    navigate("/word-training");
+  };
+
+  const wordBookId = useMemo(() => Number(sessionStorage.getItem("lb_wordbook_id") || 0), []);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!wordBookId) return;
+      try {
+        const res = await getStudyWords(wordBookId);
+        const list = res.data?.words;
+        const arr = Array.isArray(list) ? (list as Array<{ id: number; word: string }>) : [];
+        const mapped = arr.slice(0, 20).map((w) => ({ id: w.id, word: w.word, status: null as WordItem["status"] }));
+        if (!mounted) return;
+        setWords(mapped);
+        setSelectedCount(0);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [wordBookId]);
 
   const handleStatusClick = (id: number, newStatus: "correct" | "wrong") => {
     setWords((prev) =>
@@ -70,10 +91,29 @@ export default function PreTrainingCheck() {
     setSelectedCount(words.filter((w) => w.status !== null).length + Math.min(5, unselected.length));
   };
 
-  const handleStartLearning = () => {
+  const handleStartLearning = async () => {
     const selectedWords = words.filter((word) => word.status !== null);
     if (selectedWords.length === 0) return;
-    navigate("/word-practice");
+
+    const knownIds = selectedWords.filter((w) => w.status === "correct").map((w) => w.id);
+    const unknownIds = selectedWords.filter((w) => w.status === "wrong").map((w) => w.id);
+    try {
+      const res = await startStudySession({ wordBookId, knownIds, unknownIds });
+      const sessionId = res.data?.sessionId;
+      const sessionWords = res.data?.words;
+      if (sessionId) {
+        sessionStorage.setItem("lb_study_session_id", String(sessionId));
+      }
+      if (Array.isArray(sessionWords)) {
+        sessionStorage.setItem("lb_study_words", JSON.stringify(sessionWords));
+      }
+      sessionStorage.setItem("lb_mode", "study");
+      sessionStorage.setItem("lb_study_batch_idx", "0");
+      sessionStorage.removeItem("lb_study_batch_results");
+      navigate("/word-practice");
+    } catch {
+      // ignore
+    }
   };
 
   const correctCount = words.filter((word) => word.status === "correct").length;
@@ -81,20 +121,7 @@ export default function PreTrainingCheck() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
-      {/* 顶部栏 */}
-      <div className="bg-white sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center px-4 py-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <ArrowLeft size={24} className="text-[#2D3748]" />
-          </button>
-          <h1 className="flex-1 text-center text-lg font-semibold text-[#2D3748] -ml-10">
-            训前检测
-          </h1>
-        </div>
-      </div>
+      <TopBar title="训前检测" onBack={handleBack} />
 
       <div className="px-4 mt-6">
         {/* 提示文字 */}

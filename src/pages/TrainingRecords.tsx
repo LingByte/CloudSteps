@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Calendar, Clock, User, Users } from "lucide-react";
 import { CloudButton } from "@/components/cloudsteps";
+import { listTeacherRecords } from "@/api/teacher";
 
 const categories = [
   { id: "all", label: "全部" },
@@ -8,78 +9,82 @@ const categories = [
   { id: "completed", label: "已完成" },
 ];
 
-const trainingRecords = [
-  {
-    id: 1,
-    name: "雅思词汇训练",
-    appointmentTime: "2026-03-25 10:00",
-    duration: "30分钟",
-    coach: "张老师",
-    student: "王小明",
-    status: "未开始",
-    statusColor: "#FF6B6B",
-  },
-  {
-    id: 2,
-    name: "托福高频词汇 - 第三单元",
-    appointmentTime: "2026-03-24 14:00",
-    duration: "60分钟",
-    coach: "李老师",
-    student: "刘晓华",
-    status: "未开始",
-    statusColor: "#FF6B6B",
-  },
-  {
-    id: 3,
-    name: "四级核心词汇 - 第二单元",
-    appointmentTime: "2026-03-23 09:30",
-    duration: "30分钟",
-    coach: "陈老师",
-    student: "张伟",
-    status: "未开始",
-    statusColor: "#FF6B6B",
-  },
-  {
-    id: 4,
-    name: "高考核心词训练",
-    appointmentTime: "2026-03-20 15:00",
-    duration: "60分钟",
-    coach: "王老师",
-    student: "李娜",
-    status: "已完成",
-    statusColor: "#4ECDC4",
-  },
-  {
-    id: 5,
-    name: "考研英语词汇",
-    appointmentTime: "2026-03-19 11:00",
-    duration: "30分钟",
-    coach: "赵老师",
-    student: "陈明",
-    status: "已完成",
-    statusColor: "#4ECDC4",
-  },
-  {
-    id: 6,
-    name: "商务英语词汇包",
-    appointmentTime: "2026-03-18 10:00",
-    duration: "30分钟",
-    coach: "孙老师",
-    student: "周杰",
-    status: "已完成",
-    statusColor: "#4ECDC4",
-  },
-];
+type TrainingRecord = {
+  id: number;
+  name: string;
+  appointmentTime: string;
+  duration: string;
+  coach: string;
+  student: string;
+  status: string;
+};
+
+const statusColorMap: Record<string, string> = {
+  "未开始": "#FF6B6B",
+  "训练中": "#FFB020",
+  "已完成": "#4ECDC4",
+};
+
+const statusLabelMap: Record<string, string> = {
+  "not-started": "未开始",
+  "in_progress": "训练中",
+  completed: "已完成",
+};
 
 export default function TrainingRecords() {
   const [activeCategory, setActiveCategory] = useState("all");
+  const [records, setRecords] = useState<TrainingRecord[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(20);
+  const [total, setTotal] = useState(0);
 
-  // 根据分类过滤训练记录
-  const filteredRecords = trainingRecords.filter((record) => {
-    if (activeCategory === "all") return true;
-    if (activeCategory === "not-started") return record.status === "未开始";
-    if (activeCategory === "completed") return record.status === "已完成";
-    return true;
+  const statusQuery = useMemo(() => {
+    if (activeCategory === "not-started") return "not-started";
+    if (activeCategory === "completed") return "completed";
+    return "";
+  }, [activeCategory]);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    (async () => {
+      try {
+        const res = await listTeacherRecords({
+          page,
+          pageSize,
+          ...(statusQuery ? { status: statusQuery } : {}),
+        });
+        if (!mounted) return;
+        const list = Array.isArray(res.data?.records) ? (res.data.records as TrainingRecord[]) : [];
+        setRecords(list);
+        setTotal(Number(res.data?.total || 0));
+      } catch {
+        if (!mounted) return;
+        setRecords([]);
+        setTotal(0);
+      } finally {
+        if (!mounted) return;
+        setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [page, pageSize, statusQuery]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeCategory]);
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const filteredRecords = records.map((r) => {
+    const label = statusLabelMap[r.status] || r.status;
+    return {
+      ...r,
+      status: label,
+      statusColor: statusColorMap[label] || "#A0AEC0",
+    };
   });
 
   return (
@@ -115,7 +120,7 @@ export default function TrainingRecords() {
 
       {/* 训练列表 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredRecords.map((record) => (
+        {loading ? null : filteredRecords.map((record) => (
           <div
             key={record.id}
             className="bg-white rounded-xl p-4 md:p-6 hover:shadow-md transition-shadow"
@@ -176,21 +181,21 @@ export default function TrainingRecords() {
 
       {/* 分页 */}
       <div className="flex items-center justify-center gap-2 pt-4">
-        <CloudButton className="px-4 py-2 rounded-lg border border-[#E2E8F0] text-[#718096] hover:bg-[#F7F9FC] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+        <CloudButton
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          disabled={page <= 1}
+          className="px-4 py-2 rounded-lg border border-[#E2E8F0] text-[#718096] hover:bg-[#F7F9FC] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           上一页
         </CloudButton>
         <div className="flex gap-2">
-          <CloudButton className="w-10 h-10 rounded-lg bg-[#4ECDC4] text-white font-medium">
-            1
-          </CloudButton>
-          <CloudButton className="w-10 h-10 rounded-lg border border-[#E2E8F0] text-[#718096] hover:bg-[#F7F9FC] transition-colors">
-            2
-          </CloudButton>
-          <CloudButton className="w-10 h-10 rounded-lg border border-[#E2E8F0] text-[#718096] hover:bg-[#F7F9FC] transition-colors">
-            3
-          </CloudButton>
+          <CloudButton className="w-10 h-10 rounded-lg bg-[#4ECDC4] text-white font-medium">{page}</CloudButton>
         </div>
-        <CloudButton className="px-4 py-2 rounded-lg border border-[#E2E8F0] text-[#718096] hover:bg-[#F7F9FC] transition-colors">
+        <CloudButton
+          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          disabled={page >= totalPages}
+          className="px-4 py-2 rounded-lg border border-[#E2E8F0] text-[#718096] hover:bg-[#F7F9FC] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
           下一页
         </CloudButton>
       </div>

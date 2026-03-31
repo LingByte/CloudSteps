@@ -69,6 +69,22 @@ export default function CommissionCheck() {
 
   return (
     <div className="min-h-screen bg-[#F7F9FC] pb-6">
+      <div className="fixed inset-0 bg-black/40 z-[80] flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6">
+          <div className="text-lg font-semibold text-[#2D3748] text-center">暂未开放</div>
+          <div className="text-sm text-[#718096] text-center mt-2">该功能正在开发中，敬请期待。</div>
+          <button
+            onClick={() => {
+              if (window.history.length > 1) navigate(-1);
+              else navigate("/coach-center");
+            }}
+            className="w-full mt-6 py-3 bg-[#4ECDC4] text-white rounded-lg hover:bg-[#45b8b0] transition-colors"
+          >
+            返回
+          </button>
+        </div>
+      </div>
+
       {/* 顶部导航 */}
       <div className="bg-white border-b border-[#E2E8F0] mb-6">
         <div className="flex items-center h-14 px-4">

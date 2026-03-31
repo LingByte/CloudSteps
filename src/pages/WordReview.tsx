@@ -1,22 +1,51 @@
 import { ArrowLeft, Pause, Volume2, Shuffle, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const initialWords = [
-  { id: 1, word: "abandon", translation: "放弃；抛弃", showTranslation: false },
-  { id: 2, word: "ability", translation: "能力；才能", showTranslation: false },
-  { id: 3, word: "abroad", translation: "在国外；到国外", showTranslation: false },
-  { id: 4, word: "absolute", translation: "绝对的；完全的", showTranslation: false },
-  { id: 5, word: "abstract", translation: "抽象的；摘要", showTranslation: false },
-];
+type ReviewWord = { id: number; word: string; translation: string; showTranslation: boolean };
 
 export default function WordReview() {
   const navigate = useNavigate();
-  const [words, setWords] = useState(initialWords);
+  const [words, setWords] = useState<ReviewWord[]>([]);
   const [speed, setSpeed] = useState("1.0x");
   const [showPauseMenu, setShowPauseMenu] = useState(false);
+  const [touchedIds, setTouchedIds] = useState<Set<number>>(new Set());
+
+  const mode = useMemo(() => sessionStorage.getItem("lb_mode") || "study", []);
+
+  const batchIdx = useMemo(() => {
+    const key = mode === "review" ? "lb_review_batch_idx" : "lb_study_batch_idx";
+    return Number(sessionStorage.getItem(key) || 0);
+  }, [mode]);
+
+  const handleBack = () => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate("/word-practice");
+  };
+
+  useEffect(() => {
+    try {
+      const wordsKey = mode === "review" ? "lb_review_words" : "lb_study_words";
+      const raw = sessionStorage.getItem(wordsKey) || "[]";
+      const arr = JSON.parse(raw);
+      const all: any[] = Array.isArray(arr) ? arr : [];
+      const start = batchIdx * 5;
+      const slice = all.slice(start, start + 5);
+      const mapped: ReviewWord[] = slice.map((w: any) => ({
+        id: Number(w.id),
+        word: String(w.word || ""),
+        translation: String(w.translation || ""),
+        showTranslation: false,
+      }));
+      setWords(mapped);
+      setTouchedIds(new Set());
+    } catch {
+      // ignore
+    }
+  }, [batchIdx, mode]);
 
   const toggleTranslation = (id: number) => {
+    setTouchedIds((prev) => new Set(prev).add(id));
     setWords((prev) =>
       prev.map((word) =>
         word.id === id ? { ...word, showTranslation: !word.showTranslation } : word
@@ -30,7 +59,7 @@ export default function WordReview() {
   };
 
   const handleNext = () => {
-    navigate("/flash-review");
+    navigate("/listen-identify");
   };
 
   return (
@@ -39,7 +68,7 @@ export default function WordReview() {
       <div className="bg-white sticky top-0 z-10 shadow-sm">
         <div className="flex items-center justify-between px-4 py-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors"
           >
             <ArrowLeft size={24} className="text-[#2D3748]" />
@@ -111,7 +140,7 @@ export default function WordReview() {
           </div>
           <button
             onClick={handleNext}
-            className="p-3 bg-[#4ECDC4] text-white rounded-full hover:bg-[#45b8b0] transition-colors"
+            className="p-3 rounded-full transition-colors bg-[#4ECDC4] text-white hover:bg-[#45b8b0]"
           >
             <ArrowRight size={24} />
           </button>
@@ -143,16 +172,6 @@ export default function WordReview() {
           </div>
         </div>
       )}
-
-      {/* 右下角箭头按钮 */}
-      <div className="fixed bottom-28 right-6">
-        <button
-          onClick={handleNext}
-          className="p-4 bg-[#4ECDC4] text-white rounded-full shadow-lg hover:bg-[#45b8b0] transition-colors"
-        >
-          <ArrowRight size={24} />
-        </button>
-      </div>
     </div>
   );
 }

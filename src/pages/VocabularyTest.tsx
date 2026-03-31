@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, BookOpen } from "lucide-react";
 
 export default function VocabularyTest() {
   const navigate = useNavigate();
@@ -32,13 +32,13 @@ export default function VocabularyTest() {
           {/* 插图 */}
           <div className="mb-12 flex justify-center">
             <div className="w-72 h-72 bg-gradient-to-br from-[#4ECDC4]/10 to-[#55A3FF]/10 rounded-full flex items-center justify-center">
-              <div className="text-6xl">📚</div>
+              <BookOpen className="w-20 h-20 text-[#4ECDC4]" />
             </div>
           </div>
 
           {/* 开始测试按钮 */}
           <button
-            onClick={() => navigate("/vocabulary-test/testing")}
+            onClick={() => navigate("/vocabulary-test/testing?mode=adaptive")}
             className="w-full py-4 bg-[#4ECDC4] text-white rounded-full text-lg font-medium hover:bg-[#3DBCB4] transition-colors shadow-lg hover:shadow-xl"
           >
             开始测试

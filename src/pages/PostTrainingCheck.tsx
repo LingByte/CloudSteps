@@ -1,19 +1,49 @@
 import { ArrowLeft, Volume2, Check, X } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { completeStudySession } from "@/api/study";
+import { completeReviewSession } from "@/api/review";
 
-const initialWords = [
-  { id: 1, word: "abandon", status: null },
-  { id: 2, word: "ability", status: null },
-  { id: 3, word: "abroad", status: null },
-  { id: 4, word: "absolute", status: null },
-  { id: 5, word: "abstract", status: null },
-];
+type CheckWord = { id: number; word: string; status: null | "correct" | "wrong" };
 
 export default function PostTrainingCheck() {
   const navigate = useNavigate();
-  const [words, setWords] = useState(initialWords);
+  const [words, setWords] = useState<CheckWord[]>([]);
   const [showResultDialog, setShowResultDialog] = useState(false);
+
+  const mode = useMemo(() => sessionStorage.getItem("lb_mode") || "study", []);
+
+  const batchIdx = useMemo(() => {
+    const key = mode === "review" ? "lb_review_batch_idx" : "lb_study_batch_idx";
+    return Number(sessionStorage.getItem(key) || 0);
+  }, [mode]);
+  const sessionId = useMemo(() => {
+    const key = mode === "review" ? "lb_review_session_id" : "lb_study_session_id";
+    return Number(sessionStorage.getItem(key) || 0);
+  }, [mode]);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitDone, setSubmitDone] = useState(false);
+
+  const handleBack = () => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate("/flash-review");
+  };
+
+  useEffect(() => {
+    try {
+      const wordsKey = mode === "review" ? "lb_review_words" : "lb_study_words";
+      const raw = sessionStorage.getItem(wordsKey) || "[]";
+      const arr = JSON.parse(raw);
+      const all: any[] = Array.isArray(arr) ? arr : [];
+      const start = batchIdx * 5;
+      const slice = all.slice(start, start + 5);
+      const mapped: CheckWord[] = slice.map((w: any) => ({ id: Number(w.id), word: String(w.word || ""), status: null }));
+      setWords(mapped);
+      setSubmitDone(false);
+    } catch {
+      // ignore
+    }
+  }, [batchIdx, mode]);
 
   const handleStatusClick = (id: number, newStatus: "correct" | "wrong") => {
     setWords((prev) =>
@@ -29,7 +59,78 @@ export default function PostTrainingCheck() {
   const handleSubmit = () => {
     const hasSelection = words.some((word) => word.status !== null);
     if (!hasSelection) return;
-    setShowResultDialog(true);
+    (async () => {
+      setSubmitting(true);
+      try {
+        const results = words
+          .filter((w) => w.status !== null)
+          .map((w) => ({ wordId: w.id, remembered: w.status === "correct" }));
+
+        if (mode === "review") {
+          // accumulate results across batches
+          const rawAcc = sessionStorage.getItem("lb_review_results") || "{}";
+          const acc = (() => {
+            try {
+              const obj = JSON.parse(rawAcc);
+              return obj && typeof obj === "object" ? (obj as Record<string, boolean>) : {};
+            } catch {
+              return {} as Record<string, boolean>;
+            }
+          })();
+          for (const r of results) acc[String(r.wordId)] = !!r.remembered;
+          sessionStorage.setItem("lb_review_results", JSON.stringify(acc));
+
+          const wordsKey = "lb_review_words";
+          const allRaw = sessionStorage.getItem(wordsKey) || "[]";
+          const allArr = (() => {
+            try {
+              const a = JSON.parse(allRaw);
+              return Array.isArray(a) ? a : [];
+            } catch {
+              return [] as any[];
+            }
+          })();
+          const totalBatches = Math.ceil(allArr.length / 5);
+          const next = batchIdx + 1;
+
+          if (next < totalBatches) {
+            sessionStorage.setItem("lb_review_batch_idx", String(next));
+            setSubmitDone(true);
+            setShowResultDialog(true);
+            return;
+          }
+
+          if (!sessionId) {
+            setSubmitDone(true);
+            setShowResultDialog(true);
+            return;
+          }
+
+          const finalResults = Object.entries(acc).map(([wordId, remembered]) => ({
+            wordId: Number(wordId),
+            remembered: !!remembered,
+          }));
+          await completeReviewSession(sessionId, finalResults);
+          setSubmitDone(true);
+          setShowResultDialog(true);
+          return;
+        }
+
+        if (!sessionId) {
+          setShowResultDialog(true);
+          setSubmitDone(true);
+          return;
+        }
+
+        await completeStudySession(sessionId, results);
+        setSubmitDone(true);
+      } catch {
+        setSubmitDone(true);
+      } finally {
+        setSubmitting(false);
+        if (mode !== "review") setShowResultDialog(true);
+      }
+    })();
   };
 
   const correctCount = words.filter((word) => word.status === "correct").length;
@@ -41,7 +142,7 @@ export default function PostTrainingCheck() {
       <div className="bg-white sticky top-0 z-10 shadow-sm">
         <div className="flex items-center px-4 py-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors"
           >
             <ArrowLeft size={24} className="text-[#2D3748]" />
@@ -139,17 +240,46 @@ export default function PostTrainingCheck() {
               <button
                 onClick={() => {
                   setShowResultDialog(false);
-                  navigate("/pre-training-check");
+                  if (!submitDone) return;
+                  try {
+                    const wordsKey = mode === "review" ? "lb_review_words" : "lb_study_words";
+                    const raw = sessionStorage.getItem(wordsKey) || "[]";
+                    const arr = JSON.parse(raw);
+                    const total = Array.isArray(arr) ? arr.length : 0;
+                    const totalBatches = Math.ceil(total / 5);
+                    const next = batchIdx + 1;
+                    if (next < totalBatches) {
+                      if (mode === "review") {
+                        sessionStorage.setItem("lb_review_batch_idx", String(next));
+                      } else {
+                        sessionStorage.setItem("lb_study_batch_idx", String(next));
+                      }
+                      navigate("/word-practice", { replace: true });
+                    } else {
+                      if (mode === "review") {
+                        sessionStorage.removeItem("lb_review_results");
+                        navigate("/anti-forgetting");
+                      } else {
+                        navigate("/pre-training-check");
+                      }
+                    }
+                  } catch {
+                    if (mode === "review") navigate("/anti-forgetting");
+                    else navigate("/pre-training-check");
+                  }
                 }}
                 className="w-full py-3 text-[#718096] rounded-lg hover:bg-gray-50 transition-colors"
               >
-                继续练习
+                {mode === "review" ? "继续复习" : "继续练习"}
               </button>
               <button
-                onClick={() => navigate("/create-anti-forgetting")}
+                onClick={() => {
+                  if (mode === "review") navigate("/anti-forgetting");
+                  else navigate("/create-anti-forgetting");
+                }}
                 className="w-full py-3 bg-[#4ECDC4] text-white rounded-lg hover:bg-[#45b8b0] transition-colors"
               >
-                结束本次训练，并创建单词抗遗忘
+                {mode === "review" ? "结束本次复习" : "结束本次训练，并创建单词抗遗忘"}
               </button>
             </div>
           </div>

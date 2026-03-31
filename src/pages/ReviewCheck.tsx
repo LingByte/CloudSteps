@@ -1,19 +1,42 @@
 import { ArrowLeft, Volume2, Check, X, Shuffle } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const initialWords = [
-  { id: 1, word: "abandon", status: null },
-  { id: 2, word: "ability", status: null },
-  { id: 3, word: "abroad", status: null },
-  { id: 4, word: "absolute", status: null },
-  { id: 5, word: "abstract", status: null },
-];
+import { completeReviewSession, startReviewSession } from "@/api/review";
+
+type ReviewWord = { id: number; word: string; status: null | "correct" | "wrong" };
 
 export default function ReviewCheck() {
   const navigate = useNavigate();
-  const [words, setWords] = useState(initialWords);
+  const [words, setWords] = useState<ReviewWord[]>([]);
   const [showResultDialog, setShowResultDialog] = useState(false);
+
+  const handleBack = () => {
+    if (window.history.length > 1) navigate(-1);
+    else navigate("/word-training");
+  };
+
+  const wordBookId = useMemo(() => Number(sessionStorage.getItem("lb_wordbook_id") || 0), []);
+  const [sessionId, setSessionId] = useState<number>(0);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await startReviewSession({ wordBookId });
+        const sid = Number(res.data?.sessionId || 0);
+        const ws = Array.isArray(res.data?.words) ? (res.data.words as Array<{ id: number; word: string }>) : [];
+        if (!mounted) return;
+        setSessionId(sid);
+        setWords(ws.map((w) => ({ id: w.id, word: w.word, status: null })));
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [wordBookId]);
 
   const handleStatusClick = (id: number, newStatus: "correct" | "wrong") => {
     setWords((prev) =>
@@ -46,6 +69,22 @@ export default function ReviewCheck() {
     setShowResultDialog(true);
   };
 
+  const handleConfirmSubmit = async () => {
+    try {
+      if (sessionId) {
+        await completeReviewSession(
+          sessionId,
+          words.filter((w) => w.status !== null).map((w) => ({ wordId: w.id, remembered: w.status === "correct" }))
+        );
+      }
+    } catch {
+      // ignore
+    } finally {
+      setShowResultDialog(false);
+      navigate("/word-training");
+    }
+  };
+
   const correctCount = words.filter((word) => word.status === "correct").length;
   const wrongCount = words.filter((word) => word.status === "wrong").length;
 
@@ -55,7 +94,7 @@ export default function ReviewCheck() {
       <div className="bg-white sticky top-0 z-10 shadow-sm">
         <div className="flex items-center px-4 py-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBack}
             className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors"
           >
             <ArrowLeft size={24} className="text-[#2D3748]" />
@@ -169,8 +208,7 @@ export default function ReviewCheck() {
             </div>
             <button
               onClick={() => {
-                setShowResultDialog(false);
-                navigate("/word-training");
+                void handleConfirmSubmit();
               }}
               className="w-full py-3 bg-[#4ECDC4] text-white rounded-full font-medium hover:bg-[#45b8b0] transition-colors"
             >

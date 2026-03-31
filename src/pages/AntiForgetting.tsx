@@ -1,70 +1,65 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Calendar, Clock, User, Eye, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router";
+import { listReviewBooks } from "@/api/review";
 
-const reviewTasksData = {
-  "2026-03-19": [
-    {
-      id: 1,
-      time: "08:00",
-      student: "王诗涵",
-      vocabularyPack: "四六级词汇复习",
-      trainingTime: "30分钟",
-      status: "pending",
-    },
-    {
-      id: 2,
-      time: "14:00",
-      student: "李明",
-      vocabularyPack: "考研单词复习",
-      trainingTime: "60分钟",
-      status: "completed",
-    },
-  ],
-  "2026-03-20": [
-    {
-      id: 3,
-      time: "09:00",
-      student: "张小雨",
-      vocabularyPack: "雅思词汇复习",
-      trainingTime: "30分钟",
-      status: "pending",
-    },
-    {
-      id: 4,
-      time: "16:00",
-      student: "赵阳",
-      vocabularyPack: "高考核心词复习",
-      trainingTime: "60分钟",
-      status: "completed",
-    },
-  ],
-  "2026-03-21": [
-    {
-      id: 5,
-      time: "10:00",
-      student: "陈雪",
-      vocabularyPack: "托福词汇复习",
-      trainingTime: "30分钟",
-      status: "pending",
-    },
-    {
-      id: 6,
-      time: "15:00",
-      student: "刘浩",
-      vocabularyPack: "英语高频词复习",
-      trainingTime: "60分钟",
-      status: "completed",
-    },
-  ],
+type ReviewBookStat = { wordBookId: number; cnt: number; name: string; level: string };
+
+type ReviewTask = {
+  id: number;
+  time: string;
+  student: string;
+  vocabularyPack: string;
+  trainingTime: string;
+  status: "pending" | "completed";
+  wordBookId: number;
+  count: number;
 };
 
+function toDateInputValue(d: Date) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export default function AntiForgetting() {
-  const [selectedDate, setSelectedDate] = useState("2026-03-21");
+  const [selectedDate, setSelectedDate] = useState(() => toDateInputValue(new Date()));
   const navigate = useNavigate();
 
+  const [bookStats, setBookStats] = useState<ReviewBookStat[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await listReviewBooks();
+        const arr = Array.isArray(res.data) ? (res.data as ReviewBookStat[]) : [];
+        if (mounted) setBookStats(arr);
+      } catch {
+        if (mounted) setBookStats([]);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   // 获取选中日期的任务
-  const reviewTasks = reviewTasksData[selectedDate as keyof typeof reviewTasksData] || [];
+  const reviewTasks = useMemo<ReviewTask[]>(() => {
+    const student = sessionStorage.getItem("lb_user_name") || "当前用户";
+    const times = ["08:00", "10:00", "14:00", "16:00", "18:00"]; 
+    return bookStats.map((b, idx) => ({
+      id: idx + 1,
+      time: times[idx % times.length],
+      student,
+      vocabularyPack: b.name,
+      trainingTime: `${Math.min(60, Math.max(10, Math.ceil(b.cnt / 20) * 10))}分钟`,
+      status: "pending",
+      wordBookId: b.wordBookId,
+      count: b.cnt,
+    }));
+  }, [bookStats]);
 
   // 按学员分组
   const groupedByStudent: { [key: string]: typeof reviewTasks } = {};
@@ -74,6 +69,18 @@ export default function AntiForgetting() {
     }
     groupedByStudent[task.student].push(task);
   });
+
+  const shiftDate = (deltaDays: number) => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + deltaDays);
+    setSelectedDate(toDateInputValue(d));
+  };
+
+  const handleOpenTask = (task: ReviewTask) => {
+    sessionStorage.setItem("lb_review_wordbook_id", String(task.wordBookId));
+    sessionStorage.setItem("lb_review_wordbook_name", task.vocabularyPack);
+    navigate(`/review-word-list?wordBookId=${task.wordBookId}`);
+  };
 
   return (
     <div className="space-y-6">
@@ -90,7 +97,10 @@ export default function AntiForgetting() {
       {/* 日期筛选器 */}
       <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm">
         <div className="flex items-center justify-between gap-4">
-          <button className="p-2 hover:bg-[#F7F9FC] rounded-lg transition-colors">
+          <button
+            onClick={() => shiftDate(-1)}
+            className="p-2 hover:bg-[#F7F9FC] rounded-lg transition-colors"
+          >
             <ChevronLeft size={20} className="text-[#718096]" />
           </button>
           <div className="flex items-center gap-3">
@@ -102,7 +112,10 @@ export default function AntiForgetting() {
               className="text-[#2D3748] font-medium text-base md:text-lg border-none outline-none cursor-pointer"
             />
           </div>
-          <button className="p-2 hover:bg-[#F7F9FC] rounded-lg transition-colors">
+          <button
+            onClick={() => shiftDate(1)}
+            className="p-2 hover:bg-[#F7F9FC] rounded-lg transition-colors"
+          >
             <ChevronRight size={20} className="text-[#718096]" />
           </button>
         </div>
@@ -149,7 +162,7 @@ export default function AntiForgetting() {
                       </span>
                     )}
                     <button
-                      onClick={() => navigate("/review-word-list")}
+                      onClick={() => handleOpenTask(task)}
                       className="px-4 py-2 bg-[#4ECDC4] text-white rounded-lg hover:bg-[#3DBCB4] transition-colors flex items-center gap-2"
                     >
                       <Eye size={16} />
@@ -197,7 +210,7 @@ export default function AntiForgetting() {
               </div>
             </div>
             <button
-              onClick={() => navigate("/review-word-list")}
+              onClick={() => handleOpenTask(task)}
               className="w-full mt-4 px-4 py-2 bg-[#4ECDC4] text-white rounded-lg hover:bg-[#3DBCB4] transition-colors flex items-center justify-center gap-2"
             >
               <Eye size={16} />

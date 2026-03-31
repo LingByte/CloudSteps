@@ -8,59 +8,301 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CloudButton } from "@/components/cloudsteps";
+import { endTeacherSession, getStudentWeek, getTeacherWeek, startTeacherSession } from "@/api/teacher";
+import { useAuthStore } from "@/stores/authStore";
 
-const trainingData = [
-  {
-    id: 1,
-    name: "四级核心词汇 - 第一单元",
-    appointmentTime: "2026-03-20 10:00",
-    duration: "30分钟",
-    coach: "张老师",
-    student: "王小明",
-    status: "开始上课",
-    remainingTime: "25分钟",
-  },
-  {
-    id: 2,
-    name: "托福高频词汇 - 第三单元",
-    appointmentTime: "2026-03-21 14:00",
-    duration: "60分钟",
-    coach: "李老师",
-    student: "刘晓华",
-    status: "未开始",
-    remainingTime: "55分钟",
-  },
-  {
-    id: 3,
-    name: "雅思写作词汇包",
-    appointmentTime: "2026-03-22 09:30",
-    duration: "30分钟",
-    coach: "陈老师",
-    student: "张伟",
-    status: "未开始",
-    remainingTime: "30分钟",
-  },
-];
+type ApiUser = {
+  id: number;
+  email: string;
+  displayName?: string;
+};
+
+type ApiCourse = {
+  id: number;
+  name: string;
+  teacherId: number;
+};
+
+type ApiClassSession = {
+  id: number;
+  status: string;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  durationMinutes?: number;
+};
+
+type ApiSchedule = {
+  id: number;
+  title: string;
+  scheduledDate: string;
+  startTime: string;
+  endTime: string;
+  courseId: number;
+  course?: ApiCourse;
+};
+
+type TeacherWeekItem = {
+  id: number;
+  scheduledDate: string;
+  startTime: string;
+  endTime: string;
+  title: string;
+  course?: ApiCourse;
+  students?: string[];
+  status?: string;
+  session?: ApiClassSession | null;
+};
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const fmtYMD = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+const parseScheduleStart = (dateStr: string, timeStr: string) => {
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return null;
+  const [h, m] = String(timeStr || "").split(":").map((x) => Number(x));
+  d.setHours(Number.isFinite(h) ? h : 0, Number.isFinite(m) ? m : 0, 0, 0);
+  return d;
+};
+
+const parseScheduleEnd = (dateStr: string, startTimeStr: string, endTimeStr: string) => {
+  const base = new Date(dateStr);
+  if (Number.isNaN(base.getTime())) return null;
+
+  const end = new Date(base);
+  const [eh, em] = String(endTimeStr || "").split(":").map((x) => Number(x));
+  end.setHours(Number.isFinite(eh) ? eh : 0, Number.isFinite(em) ? em : 0, 0, 0);
+
+  const start = new Date(base);
+  const [sh, sm] = String(startTimeStr || "").split(":").map((x) => Number(x));
+  start.setHours(Number.isFinite(sh) ? sh : 0, Number.isFinite(sm) ? sm : 0, 0, 0);
+
+  // 跨天：endTime < startTime 视为次日结束
+  if (end.getTime() < start.getTime()) {
+    end.setDate(end.getDate() + 1);
+  }
+
+  return end;
+};
+
+const durationMinutes = (start: string, end: string) => {
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  if (!Number.isFinite(sh) || !Number.isFinite(sm) || !Number.isFinite(eh) || !Number.isFinite(em)) return 0;
+  return Math.max(0, (eh * 60 + em) - (sh * 60 + sm));
+};
+
+const fmtAppointment = (dateStr: string, timeStr: string) => {
+  const d = parseScheduleStart(dateStr, timeStr);
+  if (!d) return `${dateStr} ${timeStr}`;
+  return `${fmtYMD(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+};
 
 export default function Home() {
   const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [selectedTraining, setSelectedTraining] = useState<any>(null);
+
+  const [nowTs, setNowTs] = useState(() => Date.now());
+
+  const greetingText = useMemo(() => {
+    const hour = new Date(nowTs).getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+  }, [nowTs]);
+
+  const role = (user as any)?.role || "user";
+  const isStudent = role === "student";
+
+  const [loadingSchedules, setLoadingSchedules] = useState(true);
+  const [schedules, setSchedules] = useState<TeacherWeekItem[]>([]);
 
   const handleStartTraining = (training: any) => {
     setSelectedTraining(training);
     setShowConfirmDialog(true);
   };
 
-  const handleConfirm = () => {
-    setShowConfirmDialog(false);
-    navigate("/material-selection");
+  const handleConfirm = async () => {
+    try {
+      // 学员端目前没有 teacher session 的开始/结束概念
+      if (!isStudent && selectedTraining?.id) {
+        await startTeacherSession(Number(selectedTraining.id));
+        // 乐观更新：把该排课置为 in_progress
+        setSchedules((prev) =>
+          prev.map((s) =>
+            s.id === selectedTraining.id
+              ? {
+                  ...s,
+                  status: "in_progress",
+                  session: {
+                    id: (s.session as any)?.id || 0,
+                    status: "in_progress",
+                    startedAt: new Date().toISOString(),
+                    endedAt: null,
+                  },
+                }
+              : s,
+          ),
+        );
+      }
+    } finally {
+      setShowConfirmDialog(false);
+      navigate("/material-selection");
+    }
   };
+
+  const handleEndClass = async (scheduleId: number) => {
+    if (isStudent) return;
+    await endTeacherSession(scheduleId);
+    setSchedules((prev) =>
+      prev.map((s) =>
+        s.id === scheduleId
+          ? {
+              ...s,
+              status: "completed",
+              session: s.session
+                ? {
+                    ...s.session,
+                    status: "completed",
+                    endedAt: new Date().toISOString(),
+                  }
+                : {
+                    id: 0,
+                    status: "completed",
+                    startedAt: null,
+                    endedAt: new Date().toISOString(),
+                  },
+            }
+          : s,
+      ),
+    );
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setLoadingSchedules(true);
+        const today = new Date();
+        const date = fmtYMD(today);
+
+        // 老师看 teacher/week；学员看 student/week；其他角色默认 teacher/week
+        const res = role === "student" ? await getStudentWeek(date) : await getTeacherWeek(date);
+        const raw = res.data?.schedules || [];
+        const list: TeacherWeekItem[] = Array.isArray(raw) ? raw : [];
+        if (!mounted) return;
+        setSchedules(list);
+      } catch (e) {
+        console.error(e);
+        if (!mounted) return;
+        setSchedules([]);
+      } finally {
+        if (mounted) setLoadingSchedules(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      setNowTs(Date.now());
+    }, 60_000);
+    return () => window.clearInterval(t);
+  }, []);
+
+  // 前端兜底：如果已开始上课且超过排课 endTime，还没点下课则自动下课
+  useEffect(() => {
+    if (isStudent) return;
+    if (!schedules || schedules.length === 0) return;
+
+    const endedOnce = new Set<number>();
+    const timer = window.setInterval(() => {
+      const now = new Date();
+      schedules.forEach((s) => {
+        if (endedOnce.has(s.id)) return;
+        if ((s.status || s.session?.status) !== "in_progress") return;
+        const plannedEnd = parseScheduleEnd(s.scheduledDate, s.startTime, s.endTime);
+        if (!plannedEnd) return;
+        if (now.getTime() < plannedEnd.getTime()) return;
+
+        endedOnce.add(s.id);
+        handleEndClass(s.id).catch(() => {
+          endedOnce.delete(s.id);
+        });
+      });
+    }, 15_000);
+
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isStudent, schedules]);
+
+  const trainingData = useMemo(() => {
+    const now = new Date(nowTs);
+    const startWindow = new Date(now);
+    startWindow.setDate(startWindow.getDate() - 7);
+    const end = new Date(now);
+    end.setDate(end.getDate() + 7);
+
+    const items = schedules
+      .map((s) => {
+        const start = parseScheduleStart(s.scheduledDate, s.startTime);
+        if (!start) return null;
+        const endAt = parseScheduleEnd(s.scheduledDate, s.startTime, s.endTime);
+        if (!endAt) return null;
+        const mins = durationMinutes(s.startTime, s.endTime);
+        const rawCourseId = (s as any).courseId as number | undefined;
+        const title = s.title || s.course?.name || `课程#${s.course?.id || rawCourseId || s.id}`;
+
+        const teacherName = user?.displayName || user?.email || "-";
+        const studentNames = (s.students || []).filter(Boolean);
+        const studentLabel = studentNames.length > 0 ? studentNames.join("、") : "-";
+
+        const rawStatus = s.status || s.session?.status;
+        const isExpired = rawStatus !== "in_progress" && rawStatus !== "completed" && now.getTime() > endAt.getTime();
+        const status =
+          rawStatus === "in_progress"
+            ? "开始上课"
+            : rawStatus === "completed"
+              ? "已下课"
+              : isExpired
+                ? "已过期"
+                : "未开始";
+
+        return {
+          id: s.id,
+          name: title,
+          appointmentTime: fmtAppointment(s.scheduledDate, s.startTime),
+          duration: mins ? `${mins}分钟` : "-",
+          coach: teacherName,
+          student: studentLabel,
+          status,
+          remainingTime: mins ? `${mins}分钟` : "-",
+          _start: start.getTime(),
+          _end: endAt.getTime(),
+        };
+      })
+      .filter(Boolean) as any[];
+
+    return items
+      .filter((x) => x._start >= startWindow.getTime() && x._start < end.getTime())
+      .sort((a, b) => b._start - a._start)
+      .slice(0, 6);
+  }, [nowTs, schedules, user]);
 
   return (
     <div className="space-y-6">
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <div className="text-xs text-slate-500">{greetingText}</div>
+        <div className="text-lg font-semibold text-slate-900 mt-1">
+          欢迎回来，{user?.displayName || user?.email || "-"}
+        </div>
+      </div>
+
       {/* 数据卡片组 - 横向并列小框 */}
       <div className="flex gap-2">
         {/* 累计陪练卡片 - 浅湖蓝背景 */}
@@ -107,9 +349,12 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 学员管理 */}
+        {/* 管理入口：管理员=班级管理；老师=学员管理 */}
         <div
-          onClick={() => navigate("/student-management")}
+          onClick={() => {
+            const role = (user as any)?.role || "user";
+            navigate(role === "admin" ? "/class-management" : "/student-management");
+          }}
           className="bg-white rounded-xl p-6 hover:shadow-lg transition-shadow cursor-pointer group"
         >
           <div className="w-12 h-12 mb-4">
@@ -118,18 +363,29 @@ export default function Home() {
             </div>
           </div>
           <div className="text-[#2D3748] text-sm md:text-base font-medium">
-            学员管理
+            {(user as any)?.role === "admin" ? "班级管理" : "学员管理"}
           </div>
         </div>
       </div>
 
       {/* 预约训练列表 */}
       <div>
-        <h2 className="text-[20px] font-semibold text-[#2D3748] mb-4">
-          最近7天预约训练
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-[20px] font-semibold text-[#2D3748]">最近7天预约训练</h2>
+          <button
+            onClick={() => navigate("/training-records")}
+            className="text-sm text-[#4ECDC4] hover:text-[#45b8b0] transition-colors"
+          >
+            查看更多
+          </button>
+        </div>
         <div className="space-y-4">
-          {trainingData.map((item) => (
+          {loadingSchedules ? (
+            <div className="bg-white rounded-xl p-6 text-center text-[#718096]">加载中...</div>
+          ) : trainingData.length === 0 ? (
+            <div className="bg-white rounded-xl p-6 text-center text-[#718096]">暂无预约课程</div>
+          ) : (
+            trainingData.map((item) => (
             <div
               key={item.id}
               className="bg-white rounded-xl p-4 md:p-6 hover:shadow-md transition-shadow"
@@ -157,6 +413,11 @@ export default function Home() {
                       {item.status}
                     </span>
                   </div>
+                ) : item.status === "已过期" ? (
+                  <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-200 rounded-full">
+                    <div className="w-2 h-2 bg-slate-500 rounded-full" />
+                    <span className="text-xs text-slate-600 font-medium">已过期</span>
+                  </div>
                 ) : (
                   <div className="flex items-center gap-1.5 px-3 py-1 bg-[#FF6B6B] rounded-full">
                     <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
@@ -179,13 +440,21 @@ export default function Home() {
                     <span className="text-[#2D3748] font-medium">{item.student}</span>
                   </div>
                 </div>
-                {item.id === 1 ? (
-                  <CloudButton
-                    onClick={() => handleStartTraining(item)}
-                    className="px-6 py-2 bg-[#66BB6A] text-white rounded-full hover:bg-[#5ca860] transition-colors whitespace-nowrap"
-                  >
-                    开始训练
-                  </CloudButton>
+                {item.status === "已下课" || item.status === "已过期" ? null : item.status === "开始上课" && !isStudent ? (
+                  <div className="flex items-center gap-2">
+                    <CloudButton
+                      onClick={() => handleEndClass(item.id)}
+                      className="px-5 py-2 bg-[#FF6B6B] text-white rounded-full hover:bg-[#ff5252] transition-colors whitespace-nowrap"
+                    >
+                      下课
+                    </CloudButton>
+                    <CloudButton
+                      onClick={() => handleStartTraining(item)}
+                      className="px-5 py-2 bg-[#66BB6A] text-white rounded-full hover:bg-[#5ca860] transition-colors whitespace-nowrap"
+                    >
+                      开始训练
+                    </CloudButton>
+                  </div>
                 ) : (
                   <CloudButton
                     onClick={() => handleStartTraining(item)}
@@ -196,13 +465,14 @@ export default function Home() {
                 )}
               </div>
             </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
 
       {/* 核对信息弹窗 */}
       {showConfirmDialog && selectedTraining && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-auto">
             <h3 className="text-xl font-semibold text-[#2D3748] mb-4 text-center">
               核对信息

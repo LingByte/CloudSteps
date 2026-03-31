@@ -32,11 +32,11 @@ export default function MaterialSelection() {
         <div className="flex items-center px-4 py-4">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="relative z-10 p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors"
           >
             <ArrowLeft size={24} className="text-[#2D3748]" />
           </button>
-          <h1 className="flex-1 text-center text-lg font-semibold text-[#2D3748] -ml-10">
+          <h1 className="flex-1 text-center text-lg font-semibold text-[#2D3748] -ml-10 pointer-events-none">
             资料选择
           </h1>
         </div>
