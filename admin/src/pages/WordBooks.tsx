@@ -17,6 +17,12 @@ interface WordBook {
   isActive: boolean
   sortOrder: number
   createdAt: string
+  examTags?: string
+  cefrRange?: string
+  regionalVariant?: string
+  sourceName?: string
+  sourceUrl?: string
+  licenseNote?: string
 }
 
 const LEVELS = ['', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2']
@@ -37,7 +43,10 @@ function coverGradient(name: string) {
   return GRADIENTS[idx]
 }
 
-const emptyForm = { name: '', description: '', level: '', coverUrl: '', isActive: true, sortOrder: 0 }
+const emptyForm = {
+  name: '', description: '', level: '', coverUrl: '', isActive: true, sortOrder: 0,
+  examTags: '', cefrRange: '', regionalVariant: '', sourceName: '', sourceUrl: '', licenseNote: '',
+}
 
 export default function WordBooks() {
   const navigate = useNavigate()
@@ -79,7 +88,11 @@ export default function WordBooks() {
 
   const openEdit = (b: WordBook) => {
     setEditing(b)
-    setForm({ name: b.name, description: b.description, level: b.level, coverUrl: b.coverUrl, isActive: b.isActive, sortOrder: b.sortOrder })
+    setForm({
+      name: b.name, description: b.description, level: b.level, coverUrl: b.coverUrl, isActive: b.isActive, sortOrder: b.sortOrder,
+      examTags: b.examTags || '', cefrRange: b.cefrRange || '', regionalVariant: b.regionalVariant || '',
+      sourceName: b.sourceName || '', sourceUrl: b.sourceUrl || '', licenseNote: b.licenseNote || '',
+    })
     setShowModal(true)
   }
 
@@ -88,10 +101,10 @@ export default function WordBooks() {
     setSaving(true)
     try {
       if (editing) {
-        await put(`${getApiBaseURL()}/admin/wordbooks/${editing.id}`, form)
+        await put(`${getApiBaseURL()}/wordbooks/${editing.id}`, form)
         showAlert('更新成功', 'success')
       } else {
-        await post(`${getApiBaseURL()}/admin/wordbooks`, form)
+        await post(`${getApiBaseURL()}/wordbooks`, form)
         showAlert('创建成功', 'success')
       }
       setShowModal(false)
@@ -106,7 +119,7 @@ export default function WordBooks() {
   const handleDelete = async (b: WordBook) => {
     if (!confirm(`确定删除词库「${b.name}」？此操作不可恢复。`)) return
     try {
-      await del(`${getApiBaseURL()}/admin/wordbooks/${b.id}`)
+      await del(`${getApiBaseURL()}/wordbooks/${b.id}`)
       showAlert('删除成功', 'success')
       load()
     } catch (e: any) {
@@ -269,12 +282,12 @@ export default function WordBooks() {
       {/* 新建/编辑弹窗 */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700 shrink-0">
               <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{editing ? '编辑词库' : '新建词库'}</h2>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">词库名称 *</label>
                 <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
@@ -333,8 +346,46 @@ export default function WordBooks() {
                 <input type="checkbox" id="isActive" checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} className="rounded" />
                 <label htmlFor="isActive" className="text-sm text-slate-700 dark:text-slate-300">上架（用户可见）</label>
               </div>
+
+              <details className="rounded-lg border border-slate-200 dark:border-slate-600 p-3">
+                <summary className="text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">词库元数据（考试 / CEFR / 来源）</summary>
+                <div className="mt-4 space-y-3 pt-1">
+                  <div>
+                    <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">考试标签（JSON 数组，如 [&quot;CET-4&quot;,&quot;考研&quot;]）</label>
+                    <textarea value={form.examTags} onChange={e => setForm(f => ({ ...f, examTags: e.target.value }))} rows={2}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white font-mono resize-none focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">CEFR 区间</label>
+                      <input value={form.cefrRange} onChange={e => setForm(f => ({ ...f, cefrRange: e.target.value }))} placeholder="如 A2-B1"
+                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">变体</label>
+                      <input value={form.regionalVariant} onChange={e => setForm(f => ({ ...f, regionalVariant: e.target.value }))} placeholder="en-US / en-GB"
+                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">数据来源名称</label>
+                    <input value={form.sourceName} onChange={e => setForm(f => ({ ...f, sourceName: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">来源链接</label>
+                    <input value={form.sourceUrl} onChange={e => setForm(f => ({ ...f, sourceUrl: e.target.value }))}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 dark:text-slate-400 mb-1">授权 / 版权说明</label>
+                    <textarea value={form.licenseNote} onChange={e => setForm(f => ({ ...f, licenseNote: e.target.value }))} rows={2}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white resize-none focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                  </div>
+                </div>
+              </details>
             </div>
-            <div className="flex justify-end gap-3 p-6 border-t border-slate-200 dark:border-slate-700">
+            <div className="flex justify-end gap-3 p-6 border-t border-slate-200 dark:border-slate-700 shrink-0">
               <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700">取消</button>
               <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
                 {saving ? '保存中...' : '保存'}

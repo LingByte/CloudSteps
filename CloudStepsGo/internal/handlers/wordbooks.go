@@ -17,6 +17,96 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+// adminWordPayload 管理端创建/批量导入单词时的可写字段（不含学习进度类字段）
+type adminWordPayload struct {
+	Word             string `json:"word" binding:"required"`
+	Phonetic         string `json:"phonetic"`
+	PhoneticUS       string `json:"phoneticUs"`
+	PhoneticUK       string `json:"phoneticUk"`
+	Lemma            string `json:"lemma"`
+	Translation      string `json:"translation"`
+	ExampleSentence  string `json:"exampleSentence"`
+	ExampleSentences string `json:"exampleSentences"`
+	AudioURL         string `json:"audioUrl"`
+	ImageURL         string `json:"imageUrl"`
+	VideoURL         string `json:"videoUrl"`
+	Difficulty       int8   `json:"difficulty"`
+	SortOrder        int    `json:"sortOrder"`
+	PartOfSpeech     string `json:"partOfSpeech"`
+	Definition       string `json:"definition"`
+	Synonyms         string `json:"synonyms"`
+	Antonyms         string `json:"antonyms"`
+	WordFamily       string `json:"wordFamily"`
+	Collocations     string `json:"collocations"`
+	Frequency        int8   `json:"frequency"`
+	Importance       int8   `json:"importance"`
+	Tags             string `json:"tags"`
+	Notes            string `json:"notes"`
+	Syllables        string `json:"syllables"`
+	StressPattern    string `json:"stressPattern"`
+	CEFRLevel        string `json:"cefrLevel"`
+	Register         string `json:"register"`
+	Etymology        string `json:"etymology"`
+	Morphology       string `json:"morphology"`
+	Derivations      string `json:"derivations"`
+	Mnemonic         string `json:"mnemonic"`
+	Homophones       string `json:"homophones"`
+	UsageNotes       string `json:"usageNotes"`
+	GrammarPatterns  string `json:"grammarPatterns"`
+}
+
+func (p adminWordPayload) toWord(bookID uint) models.Word {
+	diff := p.Difficulty
+	if diff < 1 || diff > 5 {
+		diff = 1
+	}
+	freq := p.Frequency
+	if freq < 1 || freq > 5 {
+		freq = 1
+	}
+	imp := p.Importance
+	if imp < 1 || imp > 5 {
+		imp = 1
+	}
+	return models.Word{
+		WordBookID:       bookID,
+		Word:             p.Word,
+		Phonetic:         p.Phonetic,
+		PhoneticUS:       p.PhoneticUS,
+		PhoneticUK:       p.PhoneticUK,
+		Lemma:            p.Lemma,
+		Translation:      p.Translation,
+		ExampleSentence:  p.ExampleSentence,
+		ExampleSentences: p.ExampleSentences,
+		AudioURL:         p.AudioURL,
+		ImageURL:         p.ImageURL,
+		VideoURL:         p.VideoURL,
+		Difficulty:       diff,
+		SortOrder:        p.SortOrder,
+		PartOfSpeech:     p.PartOfSpeech,
+		Definition:       p.Definition,
+		Synonyms:         p.Synonyms,
+		Antonyms:         p.Antonyms,
+		WordFamily:       p.WordFamily,
+		Collocations:     p.Collocations,
+		Frequency:        freq,
+		Importance:       imp,
+		Tags:             p.Tags,
+		Notes:            p.Notes,
+		Syllables:        p.Syllables,
+		StressPattern:    p.StressPattern,
+		CEFRLevel:        p.CEFRLevel,
+		Register:         p.Register,
+		Etymology:        p.Etymology,
+		Morphology:       p.Morphology,
+		Derivations:      p.Derivations,
+		Mnemonic:         p.Mnemonic,
+		Homophones:       p.Homophones,
+		UsageNotes:       p.UsageNotes,
+		GrammarPatterns:  p.GrammarPatterns,
+	}
+}
+
 func (h *Handlers) registerWordBookRoutes(r *gin.RouterGroup) {
 	wb := r.Group("wordbooks")
 	wb.Use(models.AuthRequired)
@@ -328,12 +418,18 @@ func (h *Handlers) adminCreateWordBook(c *gin.Context) {
 	db := c.MustGet(constants.DbField).(*gorm.DB)
 	user := models.CurrentUser(c)
 	var body struct {
-		Name        string `json:"name" binding:"required"`
-		Description string `json:"description"`
-		Level       string `json:"level"`
-		CoverURL    string `json:"coverUrl"`
-		IsActive    *bool  `json:"isActive"`
-		SortOrder   int    `json:"sortOrder"`
+		Name            string `json:"name" binding:"required"`
+		Description     string `json:"description"`
+		Level           string `json:"level"`
+		CoverURL        string `json:"coverUrl"`
+		IsActive        *bool  `json:"isActive"`
+		SortOrder       int    `json:"sortOrder"`
+		ExamTags        string `json:"examTags"`
+		CEFRRange       string `json:"cefrRange"`
+		RegionalVariant string `json:"regionalVariant"`
+		SourceName      string `json:"sourceName"`
+		SourceURL       string `json:"sourceUrl"`
+		LicenseNote     string `json:"licenseNote"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, err)
@@ -344,12 +440,18 @@ func (h *Handlers) adminCreateWordBook(c *gin.Context) {
 		isActive = *body.IsActive
 	}
 	book := models.WordBook{
-		Name:        body.Name,
-		Description: body.Description,
-		Level:       body.Level,
-		CoverURL:    body.CoverURL,
-		IsActive:    isActive,
-		SortOrder:   body.SortOrder,
+		Name:            body.Name,
+		Description:     body.Description,
+		Level:           body.Level,
+		CoverURL:        body.CoverURL,
+		IsActive:        isActive,
+		SortOrder:       body.SortOrder,
+		ExamTags:        body.ExamTags,
+		CEFRRange:       body.CEFRRange,
+		RegionalVariant: body.RegionalVariant,
+		SourceName:      body.SourceName,
+		SourceURL:       body.SourceURL,
+		LicenseNote:     body.LicenseNote,
 	}
 	if user != nil {
 		operator := user.DisplayName
@@ -444,33 +546,12 @@ func (h *Handlers) adminCreateWord(c *gin.Context) {
 	db := c.MustGet(constants.DbField).(*gorm.DB)
 	user := models.CurrentUser(c)
 	id, _ := strconv.Atoi(c.Param("id"))
-	var body struct {
-		Word            string `json:"word" binding:"required"`
-		Phonetic        string `json:"phonetic"`
-		Translation     string `json:"translation"`
-		ExampleSentence string `json:"exampleSentence"`
-		AudioURL        string `json:"audioUrl"`
-		ImageURL        string `json:"imageUrl"`
-		Difficulty      int8   `json:"difficulty"`
-		SortOrder       int    `json:"sortOrder"`
-	}
+	var body adminWordPayload
 	if err := c.ShouldBindJSON(&body); err != nil {
 		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, err)
 		return
 	}
-	if body.Difficulty < 1 || body.Difficulty > 5 {
-		body.Difficulty = 1
-	}
-	word := models.Word{
-		WordBookID:      uint(id),
-		Word:            body.Word,
-		Phonetic:        body.Phonetic,
-		Translation:     body.Translation,
-		ExampleSentence: body.ExampleSentence,
-		AudioURL:        body.AudioURL,
-		Difficulty:      body.Difficulty,
-		SortOrder:       body.SortOrder,
-	}
+	word := body.toWord(uint(id))
 	if user != nil {
 		operator := user.DisplayName
 		if operator == "" {
@@ -569,15 +650,7 @@ func (h *Handlers) adminBatchCreateWords(c *gin.Context) {
 	user := models.CurrentUser(c)
 	id, _ := strconv.Atoi(c.Param("id"))
 	var body struct {
-		Words []struct {
-			Word            string `json:"word"`
-			Phonetic        string `json:"phonetic"`
-			Translation     string `json:"translation"`
-			ExampleSentence string `json:"exampleSentence"`
-			AudioURL        string `json:"audioUrl"`
-			Difficulty      int8   `json:"difficulty"`
-			SortOrder       int    `json:"sortOrder"`
-		} `json:"words"`
+		Words []adminWordPayload `json:"words"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil || len(body.Words) == 0 {
 		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, errors.New("参数错误"))
@@ -598,20 +671,8 @@ func (h *Handlers) adminBatchCreateWords(c *gin.Context) {
 		if strings.TrimSpace(w.Word) == "" {
 			continue
 		}
-		diff := w.Difficulty
-		if diff < 1 || diff > 5 {
-			diff = 1
-		}
-		word := models.Word{
-			WordBookID:      uint(id),
-			Word:            strings.TrimSpace(w.Word),
-			Phonetic:        w.Phonetic,
-			Translation:     w.Translation,
-			ExampleSentence: w.ExampleSentence,
-			AudioURL:        w.AudioURL,
-			Difficulty:      diff,
-			SortOrder:       w.SortOrder,
-		}
+		w.Word = strings.TrimSpace(w.Word)
+		word := w.toWord(uint(id))
 		if operator != "" {
 			word.SetCreateInfo(operator)
 		}

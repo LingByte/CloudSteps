@@ -27,6 +27,14 @@ type WordBook struct {
 	Version        string `json:"version" gorm:"size:20;default:'1.0';comment:版本号"`
 	ViewCount      int    `json:"viewCount" gorm:"default:0;comment:查看次数"`
 	LastStudyAt    *time.Time `json:"lastStudyAt" gorm:"comment:最后学习时间"`
+
+	// 词库元数据（非社交）：考试/难度区间、变体、数据来源标注
+	ExamTags         string `json:"examTags" gorm:"type:text;comment:考试标签 JSON 数组，如 CET-4/考研/IELTS"`
+	CEFRRange        string `json:"cefrRange" gorm:"size:32;comment:CEFR 覆盖区间，如 A2-B1"`
+	RegionalVariant  string `json:"regionalVariant" gorm:"size:16;comment:内容变体 en-US/en-GB 等"`
+	SourceName       string `json:"sourceName" gorm:"size:256;comment:数据来源名称（词典/开放数据集）"`
+	SourceURL        string `json:"sourceUrl" gorm:"size:512;comment:来源链接"`
+	LicenseNote      string `json:"licenseNote" gorm:"type:text;comment:授权/版权声明说明"`
 }
 
 func (WordBook) TableName() string { return constants.TABLE_WORD_BOOKS }
@@ -64,6 +72,22 @@ type Word struct {
 	LastReviewAt     *time.Time `json:"lastReviewAt" gorm:"comment:最后复习时间"`
 	NextReviewAt     *time.Time `json:"nextReviewAt" gorm:"index;comment:下次复习时间"`
 	StudyTime        int        `json:"studyTime" gorm:"default:0;comment:学习时长(秒)"`
+
+	// 词典型扩展（非社交）：音系、词源、语体、派生等，便于对接外部词典/语料
+	Lemma            string `json:"lemma" gorm:"size:128;index;comment:词元/原形（变形词时）"`
+	PhoneticUS       string `json:"phoneticUs" gorm:"size:128;comment:美式音标 IPA"`
+	PhoneticUK       string `json:"phoneticUk" gorm:"size:128;comment:英式音标 IPA"`
+	Syllables        string `json:"syllables" gorm:"size:128;comment:音节划分，如 ad-ver-tise"`
+	StressPattern    string `json:"stressPattern" gorm:"size:64;comment:重音模式说明"`
+	CEFRLevel        string `json:"cefrLevel" gorm:"size:8;index;comment:词条 CEFR 等级 A1-C2"`
+	Register         string `json:"register" gorm:"size:256;comment:语体/正式度 JSON 数组，如 formal,neutral,slang"`
+	Etymology        string `json:"etymology" gorm:"type:text;comment:词源简述"`
+	Morphology       string `json:"morphology" gorm:"type:text;comment:形态分析 JSON：词根/前后缀等"`
+	Derivations      string `json:"derivations" gorm:"type:text;comment:派生词 JSON 数组"`
+	Mnemonic         string `json:"mnemonic" gorm:"type:text;comment:联想/记忆提示"`
+	Homophones       string `json:"homophones" gorm:"type:text;comment:同音词 JSON 数组"`
+	UsageNotes       string `json:"usageNotes" gorm:"type:text;comment:用法辨析、易错点"`
+	GrammarPatterns  string `json:"grammarPatterns" gorm:"type:text;comment:常用结构/句型 JSON 数组"`
 }
 
 func (Word) TableName() string { return constants.TABLE_WORDS }
@@ -352,7 +376,10 @@ func ListWords(db *gorm.DB, wordBookID uint, keyword string, page, size int) ([]
 	q := db.Model(&Word{}).Where("word_book_id = ? AND is_deleted = ?", wordBookID, SoftDeleteStatusActive)
 	if keyword != "" {
 		like := "%" + keyword + "%"
-		q = q.Where("word LIKE ? OR translation LIKE ?", like, like)
+		q = q.Where(
+			"word LIKE ? OR translation LIKE ? OR lemma LIKE ? OR definition LIKE ? OR part_of_speech LIKE ?",
+			like, like, like, like, like,
+		)
 	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {

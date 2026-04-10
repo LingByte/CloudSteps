@@ -25,9 +25,42 @@ async function fetchTTS(text: string): Promise<string> {
 }
 
 interface Word {
-  id: number; wordBookId: number; word: string; phonetic: string
-  translation: string; exampleSentence: string; audioUrl: string
-  difficulty: number; sortOrder: number
+  id: number
+  wordBookId: number
+  word: string
+  phonetic: string
+  phoneticUs?: string
+  phoneticUk?: string
+  lemma?: string
+  translation: string
+  exampleSentence: string
+  exampleSentences?: string
+  audioUrl: string
+  imageUrl?: string
+  videoUrl?: string
+  difficulty: number
+  sortOrder: number
+  partOfSpeech?: string
+  definition?: string
+  synonyms?: string
+  antonyms?: string
+  wordFamily?: string
+  collocations?: string
+  frequency?: number
+  importance?: number
+  tags?: string
+  notes?: string
+  syllables?: string
+  stressPattern?: string
+  cefrLevel?: string
+  register?: string
+  etymology?: string
+  morphology?: string
+  derivations?: string
+  mnemonic?: string
+  homophones?: string
+  usageNotes?: string
+  grammarPatterns?: string
 }
 interface WordBook { id: number; name: string; wordCount: number; level: string }
 
@@ -37,7 +70,16 @@ interface ImportRow {
   isDuplicate: boolean; selected: boolean
 }
 
-const emptyForm = { word: '', phonetic: '', translation: '', exampleSentence: '', audioUrl: '', difficulty: 1, sortOrder: 0 }
+const emptyForm = (): Record<string, string | number> => ({
+  word: '', phonetic: '', phoneticUs: '', phoneticUk: '', lemma: '',
+  translation: '', exampleSentence: '', exampleSentences: '', audioUrl: '',
+  imageUrl: '', videoUrl: '', difficulty: 1, sortOrder: 0,
+  partOfSpeech: '', definition: '', synonyms: '', antonyms: '', wordFamily: '', collocations: '',
+  frequency: 1, importance: 1, tags: '', notes: '',
+  syllables: '', stressPattern: '', cefrLevel: '', register: '',
+  etymology: '', morphology: '', derivations: '', mnemonic: '', homophones: '',
+  usageNotes: '', grammarPatterns: '',
+})
 
 const splitAudioUrls = (audioUrl: string): [string, string, string] => {
   const parts = (audioUrl || '')
@@ -68,7 +110,7 @@ export default function WordBookWords() {
   // 新建/编辑弹窗
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Word | null>(null)
-  const [form, setForm] = useState({ ...emptyForm })
+  const [form, setForm] = useState(emptyForm())
   const [audioUrlParts, setAudioUrlParts] = useState<[string, string, string]>(['', '', ''])
   const [saving, setSaving] = useState(false)
 
@@ -99,23 +141,65 @@ export default function WordBookWords() {
 
   const openCreate = () => {
     setEditing(null)
-    setForm({ ...emptyForm })
+    setForm(emptyForm())
     setAudioUrlParts(['', '', ''])
     setShowModal(true)
   }
   const openEdit = (w: Word) => {
     setEditing(w)
-    setForm({ word: w.word, phonetic: w.phonetic, translation: w.translation, exampleSentence: w.exampleSentence, audioUrl: w.audioUrl, difficulty: w.difficulty, sortOrder: w.sortOrder })
+    setForm({
+      ...emptyForm(),
+      word: w.word,
+      phonetic: w.phonetic || '',
+      phoneticUs: w.phoneticUs || '',
+      phoneticUk: w.phoneticUk || '',
+      lemma: w.lemma || '',
+      translation: w.translation || '',
+      exampleSentence: w.exampleSentence || '',
+      exampleSentences: w.exampleSentences || '',
+      audioUrl: w.audioUrl || '',
+      imageUrl: w.imageUrl || '',
+      videoUrl: w.videoUrl || '',
+      difficulty: w.difficulty ?? 1,
+      sortOrder: w.sortOrder ?? 0,
+      partOfSpeech: w.partOfSpeech || '',
+      definition: w.definition || '',
+      synonyms: w.synonyms || '',
+      antonyms: w.antonyms || '',
+      wordFamily: w.wordFamily || '',
+      collocations: w.collocations || '',
+      frequency: w.frequency ?? 1,
+      importance: w.importance ?? 1,
+      tags: w.tags || '',
+      notes: w.notes || '',
+      syllables: w.syllables || '',
+      stressPattern: w.stressPattern || '',
+      cefrLevel: w.cefrLevel || '',
+      register: w.register || '',
+      etymology: w.etymology || '',
+      morphology: w.morphology || '',
+      derivations: w.derivations || '',
+      mnemonic: w.mnemonic || '',
+      homophones: w.homophones || '',
+      usageNotes: w.usageNotes || '',
+      grammarPatterns: w.grammarPatterns || '',
+    })
     setAudioUrlParts(splitAudioUrls(w.audioUrl))
     setShowModal(true)
   }
 
   const handleSave = async () => {
-    if (!form.word.trim()) { showAlert('请填写单词', 'error'); return }
     setSaving(true)
     try {
-      if (editing) { await put(`${getApiBaseURL()}/wordbooks/${id}/words/${editing.id}`, form); showAlert('更新成功', 'success') }
-      else { await post(`${getApiBaseURL()}/wordbooks/${id}/words`, form); showAlert('添加成功', 'success') }
+      const payload = {
+        ...form,
+        difficulty: Number(form.difficulty) || 1,
+        sortOrder: Number(form.sortOrder) || 0,
+        frequency: Number(form.frequency) || 1,
+        importance: Number(form.importance) || 1,
+      }
+      if (editing) { await put(`${getApiBaseURL()}/wordbooks/${id}/words/${editing.id}`, payload); showAlert('更新成功', 'success') }
+      else { await post(`${getApiBaseURL()}/wordbooks/${id}/words`, payload); showAlert('添加成功', 'success') }
       setShowModal(false); loadWords(); loadBook()
     } catch (e: any) { showAlert(e?.message || '操作失败', 'error') }
     finally { setSaving(false) }
@@ -322,21 +406,23 @@ export default function WordBookWords() {
                 <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400">单词</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400">音标</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400 max-w-xs">释义</th>
+                <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400 w-14">CEFR</th>
                 <th className="text-left px-4 py-3 font-medium text-slate-600 dark:text-slate-400">难度</th>
                 <th className="text-right px-4 py-3 font-medium text-slate-600 dark:text-slate-400">操作</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="text-center py-12 text-slate-400">加载中...</td></tr>
+                <tr><td colSpan={7} className="text-center py-12 text-slate-400">加载中...</td></tr>
               ) : words.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-12 text-slate-400">暂无单词</td></tr>
+                <tr><td colSpan={7} className="text-center py-12 text-slate-400">暂无单词</td></tr>
               ) : words.map((w, i) => (
                 <tr key={w.id} className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
                   <td className="px-4 py-3 text-slate-400 text-xs">{(page - 1) * pageSize + i + 1}</td>
                   <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-100">{w.word}</td>
                   <td className="px-4 py-3 text-slate-500 dark:text-slate-400 font-mono text-xs">{w.phonetic || '-'}</td>
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-300 max-w-xs truncate">{w.translation || '-'}</td>
+                  <td className="px-4 py-3 text-slate-500 text-xs font-medium">{w.cefrLevel || '—'}</td>
                   <td className="px-4 py-3">
                     <span className="flex gap-0.5">
                       {[1,2,3,4,5].map(n => <span key={n} className={`w-2 h-2 rounded-full ${n <= w.difficulty ? 'bg-blue-500' : 'bg-slate-200 dark:bg-slate-600'}`} />)}
@@ -454,31 +540,158 @@ export default function WordBookWords() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">单词 *</label>
-                      <input value={form.word} onChange={e => setForm(f => ({ ...f, word: e.target.value }))} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <input value={String(form.word)} onChange={e => setForm(f => ({ ...f, word: e.target.value }))} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">音标</label>
-                      <input value={form.phonetic} onChange={e => setForm(f => ({ ...f, phonetic: e.target.value }))} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">词元 (lemma)</label>
+                      <input value={String(form.lemma)} onChange={e => setForm(f => ({ ...f, lemma: e.target.value }))} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">音标（通用）</label>
+                      <input value={String(form.phonetic)} onChange={e => setForm(f => ({ ...f, phonetic: e.target.value }))} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">美音 IPA</label>
+                      <input value={String(form.phoneticUs)} onChange={e => setForm(f => ({ ...f, phoneticUs: e.target.value }))} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">英音 IPA</label>
+                      <input value={String(form.phoneticUk)} onChange={e => setForm(f => ({ ...f, phoneticUk: e.target.value }))} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">词性</label>
+                      <input value={String(form.partOfSpeech)} onChange={e => setForm(f => ({ ...f, partOfSpeech: e.target.value }))} placeholder="noun / verb …" className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">CEFR</label>
+                      <input value={String(form.cefrLevel)} onChange={e => setForm(f => ({ ...f, cefrLevel: e.target.value }))} placeholder="A1–C2" className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">音节 / 重音</label>
+                      <div className="flex gap-2">
+                        <input value={String(form.syllables)} onChange={e => setForm(f => ({ ...f, syllables: e.target.value }))} placeholder="音节" className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        <input value={String(form.stressPattern)} onChange={e => setForm(f => ({ ...f, stressPattern: e.target.value }))} placeholder="重音" className="flex-1 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">释义（JSON 数组或文本）</label>
-                    <textarea value={form.translation} onChange={e => setForm(f => ({ ...f, translation: e.target.value }))} rows={6} placeholder='如: ["n. 苹果"]' className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono" />
+                    <textarea value={String(form.translation)} onChange={e => setForm(f => ({ ...f, translation: e.target.value }))} rows={6} placeholder='如: ["n. 苹果"]' className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">英文释义</label>
+                    <textarea value={String(form.definition)} onChange={e => setForm(f => ({ ...f, definition: e.target.value }))} rows={3} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">例句</label>
-                    <textarea value={form.exampleSentence} onChange={e => setForm(f => ({ ...f, exampleSentence: e.target.value }))} rows={5} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+                    <textarea value={String(form.exampleSentence)} onChange={e => setForm(f => ({ ...f, exampleSentence: e.target.value }))} rows={4} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">多例句（JSON 数组）</label>
+                    <textarea value={String(form.exampleSentences)} onChange={e => setForm(f => ({ ...f, exampleSentences: e.target.value }))} rows={3} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">难度 (1-5)</label>
-                      <input type="number" min={1} max={5} value={form.difficulty} onChange={e => setForm(f => ({ ...f, difficulty: Number(e.target.value) }))} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <input type="number" min={1} max={5} value={form.difficulty as number} onChange={e => setForm(f => ({ ...f, difficulty: Number(e.target.value) }))} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">排序权重</label>
-                      <input type="number" value={form.sortOrder} onChange={e => setForm(f => ({ ...f, sortOrder: Number(e.target.value) }))} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <input type="number" value={form.sortOrder as number} onChange={e => setForm(f => ({ ...f, sortOrder: Number(e.target.value) }))} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                   </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">频率 1–5</label>
+                      <input type="number" min={1} max={5} value={form.frequency as number} onChange={e => setForm(f => ({ ...f, frequency: Number(e.target.value) }))} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">重要度 1–5</label>
+                      <input type="number" min={1} max={5} value={form.importance as number} onChange={e => setForm(f => ({ ...f, importance: Number(e.target.value) }))} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                  </div>
+
+                  <details className="rounded-lg border border-slate-200 dark:border-slate-600 p-3">
+                    <summary className="text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">更多词典字段（语体、词源、搭配、JSON 列表）</summary>
+                    <div className="mt-4 space-y-3">
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">语体 register（JSON 数组）</label>
+                        <input value={String(form.register)} onChange={e => setForm(f => ({ ...f, register: e.target.value }))} placeholder='如 ["neutral","informal"]' className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white font-mono" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">词源</label>
+                        <textarea value={String(form.etymology)} onChange={e => setForm(f => ({ ...f, etymology: e.target.value }))} rows={2} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white resize-none" />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-1">形态 morphology（JSON）</label>
+                          <textarea value={String(form.morphology)} onChange={e => setForm(f => ({ ...f, morphology: e.target.value }))} rows={2} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white font-mono resize-none" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-1">派生 derivations（JSON 数组）</label>
+                          <textarea value={String(form.derivations)} onChange={e => setForm(f => ({ ...f, derivations: e.target.value }))} rows={2} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white font-mono resize-none" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">联想记忆</label>
+                        <textarea value={String(form.mnemonic)} onChange={e => setForm(f => ({ ...f, mnemonic: e.target.value }))} rows={2} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white resize-none" />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-1">同义词 synonyms（JSON）</label>
+                          <textarea value={String(form.synonyms)} onChange={e => setForm(f => ({ ...f, synonyms: e.target.value }))} rows={2} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white font-mono resize-none" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-1">反义词 antonyms（JSON）</label>
+                          <textarea value={String(form.antonyms)} onChange={e => setForm(f => ({ ...f, antonyms: e.target.value }))} rows={2} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white font-mono resize-none" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">搭配 collocations（JSON）</label>
+                        <textarea value={String(form.collocations)} onChange={e => setForm(f => ({ ...f, collocations: e.target.value }))} rows={2} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white font-mono resize-none" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">词族 wordFamily（JSON）</label>
+                        <textarea value={String(form.wordFamily)} onChange={e => setForm(f => ({ ...f, wordFamily: e.target.value }))} rows={2} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white font-mono resize-none" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">同音词 homophones（JSON）</label>
+                        <textarea value={String(form.homophones)} onChange={e => setForm(f => ({ ...f, homophones: e.target.value }))} rows={2} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white font-mono resize-none" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">用法辨析</label>
+                        <textarea value={String(form.usageNotes)} onChange={e => setForm(f => ({ ...f, usageNotes: e.target.value }))} rows={2} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white resize-none" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">常用结构 grammarPatterns（JSON 数组）</label>
+                        <textarea value={String(form.grammarPatterns)} onChange={e => setForm(f => ({ ...f, grammarPatterns: e.target.value }))} rows={2} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white font-mono resize-none" />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-1">标签 tags（JSON）</label>
+                          <textarea value={String(form.tags)} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} rows={2} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white font-mono resize-none" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-1">备注 notes</label>
+                          <textarea value={String(form.notes)} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white resize-none" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-1">配图 imageUrl</label>
+                          <input value={String(form.imageUrl)} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-slate-500 mb-1">视频 videoUrl</label>
+                          <input value={String(form.videoUrl)} onChange={e => setForm(f => ({ ...f, videoUrl: e.target.value }))} className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm dark:bg-slate-700 dark:text-white" />
+                        </div>
+                      </div>
+                    </div>
+                  </details>
                 </div>
 
                 <div className="space-y-4">
@@ -513,8 +726,8 @@ export default function WordBookWords() {
                   </div>
                   <div>
                     <LingechoTTS
-                      word={form.word}
-                      translation={form.translation}
+                      word={String(form.word)}
+                      translation={String(form.translation)}
                       onGenerated={url => {
                         setForm(f => ({ ...f, audioUrl: url }))
                         setAudioUrlParts(splitAudioUrls(url))
