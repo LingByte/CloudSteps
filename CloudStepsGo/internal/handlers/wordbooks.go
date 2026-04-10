@@ -354,7 +354,7 @@ func (h *Handlers) adminCreateWordBook(c *gin.Context) {
 	if user != nil {
 		operator := user.DisplayName
 		if operator == "" {
-			operator = user.Email
+			operator = user.Username
 		}
 		if operator == "" {
 			operator = fmt.Sprintf("%d", user.ID)
@@ -389,7 +389,7 @@ func (h *Handlers) adminUpdateWordBook(c *gin.Context) {
 	if user != nil {
 		operator := user.DisplayName
 		if operator == "" {
-			operator = user.Email
+			operator = user.Username
 		}
 		if operator == "" {
 			operator = fmt.Sprintf("%d", user.ID)
@@ -412,7 +412,7 @@ func (h *Handlers) adminDeleteWordBook(c *gin.Context) {
 	if user != nil {
 		operator = user.DisplayName
 		if operator == "" {
-			operator = user.Email
+			operator = user.Username
 		}
 		if operator == "" {
 			operator = fmt.Sprintf("%d", user.ID)
@@ -474,7 +474,7 @@ func (h *Handlers) adminCreateWord(c *gin.Context) {
 	if user != nil {
 		operator := user.DisplayName
 		if operator == "" {
-			operator = user.Email
+			operator = user.Username
 		}
 		if operator == "" {
 			operator = fmt.Sprintf("%d", user.ID)
@@ -509,7 +509,7 @@ func (h *Handlers) adminUpdateWord(c *gin.Context) {
 	if user != nil {
 		operator := user.DisplayName
 		if operator == "" {
-			operator = user.Email
+			operator = user.Username
 		}
 		if operator == "" {
 			operator = fmt.Sprintf("%d", user.ID)
@@ -532,7 +532,7 @@ func (h *Handlers) adminDeleteWord(c *gin.Context) {
 	if user != nil {
 		operator = user.DisplayName
 		if operator == "" {
-			operator = user.Email
+			operator = user.Username
 		}
 		if operator == "" {
 			operator = fmt.Sprintf("%d", user.ID)
@@ -588,7 +588,7 @@ func (h *Handlers) adminBatchCreateWords(c *gin.Context) {
 	if user != nil {
 		operator = user.DisplayName
 		if operator == "" {
-			operator = user.Email
+			operator = user.Username
 		}
 		if operator == "" {
 			operator = fmt.Sprintf("%d", user.ID)

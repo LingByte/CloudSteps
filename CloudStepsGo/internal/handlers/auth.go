@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -26,8 +25,6 @@ import (
 	"github.com/LingByte/CloudStepsGo/pkg/utils"
 	"github.com/LingByte/lingstorage-sdk-go"
 	"github.com/gin-gonic/gin"
-	"github.com/pquerna/otp/totp"
-	"github.com/skip2/go-qrcode"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -53,7 +50,7 @@ func (h *Handlers) registerAuthRoutes(r *gin.RouterGroup) {
 		auth.GET("/login", h.handleUserSigninPage)
 		auth.POST("/login", h.handleUserSignin)
 		auth.POST("/login/password", h.handleUserSigninByPassword)
-		auth.POST("/login/email", h.handleUserSigninByEmail)
+		auth.POST("/login/username", h.handleUserSigninByUsername)
 
 		// logout
 		auth.GET("/logout", models.AuthRequired, h.handleUserLogout)
@@ -90,12 +87,6 @@ func (h *Handlers) registerAuthRoutes(r *gin.RouterGroup) {
 
 		// avatar upload (replace existing avatar)
 		auth.POST("/avatar/upload", models.AuthRequired, h.handleUploadAvatar)
-
-		// two-factor authentication
-		auth.POST("/two-factor/setup", models.AuthRequired, h.handleTwoFactorSetup)
-		auth.POST("/two-factor/enable", models.AuthRequired, h.handleTwoFactorEnable)
-		auth.POST("/two-factor/disable", models.AuthRequired, h.handleTwoFactorDisable)
-		auth.GET("/two-factor/status", models.AuthRequired, h.handleTwoFactorStatus)
 
 		// user activity logs
 		auth.GET("/activity", models.AuthRequired, h.handleGetUserActivity)
@@ -156,9 +147,9 @@ func (h *Handlers) handleUserInfo(c *gin.Context) {
 	response.Success(c, "success", user)
 }
 
-// handleUserSigninByEmail handle user signin by email
-func (h *Handlers) handleUserSigninByEmail(c *gin.Context) {
-	var form models.EmailOperatorForm
+// handleUserSigninByUsername handle user signin by username
+func (h *Handlers) handleUserSigninByUsername(c *gin.Context) {
+	var form models.UserOperatorForm
 	if err := c.BindJSON(&form); err != nil {
 		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, err)
 		return
@@ -177,8 +168,8 @@ func (h *Handlers) handleUserSigninByEmail(c *gin.Context) {
 
 	// 2. 账号锁定检查
 	if utils.GlobalLoginSecurityManager != nil {
-		checkLockFunc := func(db *gorm.DB, email string, userID uint) (*utils.AccountLockInfo, error) {
-			lock, err := models.GetAccountLock(db, email, userID)
+		checkLockFunc := func(db *gorm.DB, username string, userID uint) (*utils.AccountLockInfo, error) {
+			lock, err := models.GetAccountLockByUsername(db, username, userID)
 			if err != nil {
 				return nil, err
 			}
@@ -190,7 +181,7 @@ func (h *Handlers) handleUserSigninByEmail(c *gin.Context) {
 				UnlockAt: lock.UnlockAt,
 			}, nil
 		}
-		if err := utils.GlobalLoginSecurityManager.CheckAccountLock(db, form.Email, 0, checkLockFunc); err != nil {
+		if err := utils.GlobalLoginSecurityManager.CheckAccountLock(db, form.Username, 0, checkLockFunc); err != nil {
 			CloudStepsGo.AbortWithJSONError(c, http.StatusForbidden, err)
 			return
 		}
@@ -206,32 +197,32 @@ func (h *Handlers) handleUserSigninByEmail(c *gin.Context) {
 		valid, err := captcha.GlobalCaptchaManager.Verify(form.CaptchaID, form.CaptchaCode)
 		if err != nil || !valid {
 			if utils.GlobalLoginSecurityManager != nil {
-				recordFunc := func(db *gorm.DB, email string, userID uint, ipAddress string, failedCount int) error {
-					_, err := models.CreateOrUpdateAccountLock(db, email, userID, ipAddress, failedCount)
+				recordFunc := func(db *gorm.DB, username string, userID uint, ipAddress string, failedCount int) error {
+					_, err := models.CreateOrUpdateAccountLockByUsername(db, username, userID, ipAddress, failedCount)
 					return err
 				}
-				utils.GlobalLoginSecurityManager.RecordFailedLogin(db, form.Email, 0, clientIP, recordFunc)
+				utils.GlobalLoginSecurityManager.RecordFailedLogin(db, form.Username, 0, clientIP, recordFunc)
 			}
 			CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, errors.New("invalid captcha code"))
 			return
 		}
 	}
 
-	// 检查邮箱是否为空
-	if form.Email == "" {
-		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, errors.New("email is required"))
+	// 检查用户名是否为空
+	if form.Username == "" {
+		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, errors.New("username is required"))
 		return
 	}
 
 	// 4. 获取用户
-	user, err := models.GetUserByEmail(db, form.Email)
+	user, err := models.GetUserByUsername(db, form.Username)
 	if err != nil {
 		if utils.GlobalLoginSecurityManager != nil {
-			recordFunc := func(db *gorm.DB, email string, userID uint, ipAddress string, failedCount int) error {
-				_, err := models.CreateOrUpdateAccountLock(db, email, userID, ipAddress, failedCount)
+			recordFunc := func(db *gorm.DB, username string, userID uint, ipAddress string, failedCount int) error {
+				_, err := models.CreateOrUpdateAccountLockByUsername(db, username, userID, ipAddress, failedCount)
 				return err
 			}
-			utils.GlobalLoginSecurityManager.RecordFailedLogin(db, form.Email, 0, clientIP, recordFunc)
+			utils.GlobalLoginSecurityManager.RecordFailedLogin(db, form.Username, 0, clientIP, recordFunc)
 		}
 		response.Fail(c, "user not exists", errors.New("user not exists"))
 		return
@@ -244,31 +235,31 @@ func (h *Handlers) handleUserSigninByEmail(c *gin.Context) {
 	}
 
 	// 从缓存中获取验证码
-	cachedCode, ok := utils.GlobalCache.Get(form.Email)
-	if !ok || cachedCode != form.Code {
+	cachedCode, exists := utils.GlobalCache.Get(form.Username)
+	if !exists || cachedCode != form.Code {
 		if utils.GlobalLoginSecurityManager != nil {
-			recordFunc := func(db *gorm.DB, email string, userID uint, ipAddress string, failedCount int) error {
-				_, err := models.CreateOrUpdateAccountLock(db, email, userID, ipAddress, failedCount)
+			recordFunc := func(db *gorm.DB, username string, userID uint, ipAddress string, failedCount int) error {
+				_, err := models.CreateOrUpdateAccountLockByUsername(db, username, userID, ipAddress, failedCount)
 				return err
 			}
-			utils.GlobalLoginSecurityManager.RecordFailedLogin(db, form.Email, user.ID, clientIP, recordFunc)
+			utils.GlobalLoginSecurityManager.RecordFailedLogin(db, form.Username, user.ID, clientIP, recordFunc)
 		}
 		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, errors.New("invalid verification code"))
 		return
 	}
 
 	// 清除已用验证码
-	utils.GlobalCache.Remove(form.Email)
+	utils.GlobalCache.Remove(form.Username)
 
 	// 6. 检查用户是否允许登录（激活、启用等）
 	err = models.CheckUserAllowLogin(db, user)
 	if err != nil {
 		if utils.GlobalLoginSecurityManager != nil {
-			recordFunc := func(db *gorm.DB, email string, userID uint, ipAddress string, failedCount int) error {
-				_, err := models.CreateOrUpdateAccountLock(db, email, userID, ipAddress, failedCount)
+			recordFunc := func(db *gorm.DB, username string, userID uint, ipAddress string, failedCount int) error {
+				_, err := models.CreateOrUpdateAccountLockByUsername(db, username, userID, ipAddress, failedCount)
 				return err
 			}
-			utils.GlobalLoginSecurityManager.RecordFailedLogin(db, form.Email, user.ID, clientIP, recordFunc)
+			utils.GlobalLoginSecurityManager.RecordFailedLogin(db, form.Username, user.ID, clientIP, recordFunc)
 		}
 		CloudStepsGo.AbortWithJSONError(c, http.StatusForbidden, err)
 		return
@@ -301,7 +292,7 @@ func (h *Handlers) handleUserSigninByEmail(c *gin.Context) {
 		if isSuspicious {
 			logger.Warn("Suspicious login detected",
 				zap.Uint("userID", user.ID),
-				zap.String("email", user.Email),
+				zap.String("email", user.Username),
 				zap.String("ip", clientIP),
 				zap.String("location", location))
 		}
@@ -317,14 +308,14 @@ func (h *Handlers) handleUserSigninByEmail(c *gin.Context) {
 	}
 
 	// 11. 记录登录历史
-	if err := models.RecordLoginHistory(db, user.ID, form.Email, clientIP, location, country, city, userAgent, deviceID, "email", true, "", isSuspicious); err != nil {
+	if err := models.RecordLoginHistory(db, user.ID, form.Username, clientIP, location, country, city, userAgent, deviceID, "email", true, "", isSuspicious); err != nil {
 		logger.Warn("Failed to record login history", zap.Error(err))
 	}
 
 	// 12. 发送新设备登录警告邮件（仅在可疑登录时）
 	if isSuspicious {
 		logger.Info("Sending new device login alert signal",
-			zap.String("email", user.Email),
+			zap.String("email", user.Username),
 			zap.String("deviceID", deviceID),
 			zap.Bool("isSuspicious", isSuspicious))
 
@@ -352,21 +343,16 @@ func (h *Handlers) handleUserSigninByEmail(c *gin.Context) {
 		} else {
 			logger.Info("Password login history reset after email verification",
 				zap.Uint("userID", user.ID),
-				zap.String("email", user.Email))
+				zap.String("email", user.Username))
 		}
 	}
 
 	// 15. 清除失败登录计数
 	if utils.GlobalLoginSecurityManager != nil {
-		utils.GlobalLoginSecurityManager.ClearFailedLoginCount(form.Email)
+		utils.GlobalLoginSecurityManager.ClearFailedLoginCount(form.Username)
 	}
 
-	// 设置时区（如果有的话）
-	if form.Timezone != "" {
-		models.InTimezone(c, form.Timezone)
-	}
-
-	// 登录用户，设置 Session
+	// 执行登录操作（设置session等）
 	models.Login(c, user)
 
 	// 检查是否被中止
@@ -398,9 +384,8 @@ func (h *Handlers) handleUserSigninByEmail(c *gin.Context) {
 		"token": user.AuthToken,
 		"user": gin.H{
 			"id":          user.ID,
-			"email":       user.Email,
+			"email":       user.Username,
 			"displayName": user.DisplayName,
-			"isStaff":     user.IsStaff,
 			"role":        user.Role,
 			"avatar":      user.Avatar,
 		},
@@ -420,6 +405,9 @@ func (h *Handlers) handleUserSigninByPassword(c *gin.Context) {
 		logger.Error("Failed to bind login form", zap.Error(err))
 		response.Fail(c, "login failed", err)
 		return
+	}
+	if form.Username == "" && form.Email != "" {
+		form.Username = form.Email
 	}
 
 	clientIP := c.ClientIP()
@@ -441,7 +429,7 @@ func (h *Handlers) handleUserSigninByPassword(c *gin.Context) {
 			logger.Warn("Failed to check proxy IP", zap.String("ip", clientIP), zap.Error(err))
 		}
 		if isProxy {
-			logger.Warn("Login attempt from proxy IP", zap.String("ip", clientIP), zap.String("email", form.Email))
+			logger.Warn("Login attempt from proxy IP", zap.String("ip", clientIP), zap.String("email", form.Username))
 		}
 	}
 
@@ -460,20 +448,20 @@ func (h *Handlers) handleUserSigninByPassword(c *gin.Context) {
 				UnlockAt: lock.UnlockAt,
 			}, nil
 		}
-		if err := utils.GlobalLoginSecurityManager.CheckAccountLock(db, form.Email, 0, checkLockFunc); err != nil {
+		if err := utils.GlobalLoginSecurityManager.CheckAccountLock(db, form.Username, 0, checkLockFunc); err != nil {
 			response.Fail(c, "account is locked", err)
 			return
 		}
 	}
 
-	if form.AuthToken == "" && form.Email == "" {
-		logger.Warn("Login attempt without email or token", zap.String("ip", clientIP))
-		response.Fail(c, "login failed", errors.New("email is required"))
+	if form.AuthToken == "" && form.Username == "" {
+		logger.Warn("Login attempt without username or token", zap.String("ip", clientIP))
+		response.Fail(c, "login failed", errors.New("username is required"))
 		return
 	}
 
 	if form.Password == "" && form.AuthToken == "" {
-		logger.Warn("Login attempt without password or token", zap.String("ip", clientIP), zap.String("email", form.Email))
+		logger.Warn("Login attempt without password or token", zap.String("ip", clientIP), zap.String("username", form.Username))
 		response.Fail(c, "login failed", errors.New("empty password"))
 		return
 	}
@@ -482,18 +470,18 @@ func (h *Handlers) handleUserSigninByPassword(c *gin.Context) {
 	var user *models.User
 	var err error
 	if form.Password != "" {
-		user, err = models.GetUserByEmail(db, form.Email)
+		user, err = models.GetUserByUsername(db, form.Username)
 		if err != nil {
-			logger.Warn("Login attempt with non-existent email", zap.String("email", form.Email), zap.String("ip", clientIP), zap.Error(err))
+			logger.Warn("Login attempt with non-existent email", zap.String("email", form.Username), zap.String("ip", clientIP), zap.Error(err))
 			// 记录失败登录
 			if utils.GlobalLoginSecurityManager != nil {
 				recordFunc := func(db *gorm.DB, email string, userID uint, ipAddress string, failedCount int) error {
 					_, err := models.CreateOrUpdateAccountLock(db, email, userID, ipAddress, failedCount)
 					return err
 				}
-				utils.GlobalLoginSecurityManager.RecordFailedLogin(db, form.Email, 0, clientIP, recordFunc)
+				utils.GlobalLoginSecurityManager.RecordFailedLogin(db, form.Username, 0, clientIP, recordFunc)
 			}
-			response.Fail(c, "用户不存在，请检查邮箱地址", nil)
+			response.Fail(c, "用户不存在，请检查用户名", nil)
 			return
 		}
 
@@ -523,7 +511,7 @@ func (h *Handlers) handleUserSigninByPassword(c *gin.Context) {
 					Count(&count).Error
 				return count, err
 			}
-			needsEmailVerification, err := utils.GlobalLoginSecurityManager.CheckPasswordLoginLimit(db, user.ID, form.Email, checkLimitFunc)
+			needsEmailVerification, err := utils.GlobalLoginSecurityManager.CheckPasswordLoginLimit(db, user.ID, form.Username, checkLimitFunc)
 			if err != nil {
 				logger.Warn("Failed to check password login limit", zap.Error(err))
 			}
@@ -533,20 +521,20 @@ func (h *Handlers) handleUserSigninByPassword(c *gin.Context) {
 		// 6. 图形验证码验证（密码登录需要）
 		if captcha.GlobalCaptchaManager != nil {
 			if form.CaptchaID == "" || form.CaptchaCode == "" {
-				logger.Warn("Login failed: captcha is required", zap.String("email", form.Email), zap.Uint("userID", user.ID), zap.String("ip", clientIP))
+				logger.Warn("Login failed: captcha is required", zap.String("email", form.Username), zap.Uint("userID", user.ID), zap.String("ip", clientIP))
 				response.Fail(c, "请输入图形验证码", nil)
 				return
 			}
 
 			valid, err := captcha.GlobalCaptchaManager.Verify(form.CaptchaID, form.CaptchaCode)
 			if err != nil || !valid {
-				logger.Warn("Login failed: invalid captcha code", zap.String("email", form.Email), zap.Uint("userID", user.ID), zap.String("ip", clientIP), zap.String("captchaID", form.CaptchaID), zap.Error(err))
+				logger.Warn("Login failed: invalid captcha code", zap.String("email", form.Username), zap.Uint("userID", user.ID), zap.String("ip", clientIP), zap.String("captchaID", form.CaptchaID), zap.Error(err))
 				if utils.GlobalLoginSecurityManager != nil {
 					recordFunc := func(db *gorm.DB, email string, userID uint, ipAddress string, failedCount int) error {
 						_, err := models.CreateOrUpdateAccountLock(db, email, userID, ipAddress, failedCount)
 						return err
 					}
-					utils.GlobalLoginSecurityManager.RecordFailedLogin(db, form.Email, user.ID, clientIP, recordFunc)
+					utils.GlobalLoginSecurityManager.RecordFailedLogin(db, form.Username, user.ID, clientIP, recordFunc)
 				}
 				response.Fail(c, "验证码错误，请重新输入", nil)
 				return
@@ -559,10 +547,10 @@ func (h *Handlers) handleUserSigninByPassword(c *gin.Context) {
 		if strings.Contains(form.Password, ":") && len(strings.Split(form.Password, ":")) == 4 {
 			// 加密密码验证
 			logger.Info("Verifying encrypted password",
-				zap.String("email", form.Email))
+				zap.String("email", form.Username))
 			passwordValid = models.VerifyEncryptedPassword(form.Password, user.Password)
 			logger.Info("Encrypted password verification result",
-				zap.String("email", form.Email),
+				zap.String("email", form.Username),
 				zap.Bool("valid", passwordValid))
 		} else {
 			// 明文密码（向后兼容）
@@ -570,14 +558,14 @@ func (h *Handlers) handleUserSigninByPassword(c *gin.Context) {
 		}
 
 		if !passwordValid {
-			logger.Warn("Login failed: incorrect password", zap.String("email", form.Email), zap.Uint("userID", user.ID), zap.String("ip", clientIP))
+			logger.Warn("Login failed: incorrect password", zap.String("email", form.Username), zap.Uint("userID", user.ID), zap.String("ip", clientIP))
 			// 记录失败登录
 			if utils.GlobalLoginSecurityManager != nil {
 				recordFunc := func(db *gorm.DB, email string, userID uint, ipAddress string, failedCount int) error {
 					_, err := models.CreateOrUpdateAccountLock(db, email, userID, ipAddress, failedCount)
 					return err
 				}
-				utils.GlobalLoginSecurityManager.RecordFailedLogin(db, form.Email, user.ID, clientIP, recordFunc)
+				utils.GlobalLoginSecurityManager.RecordFailedLogin(db, form.Username, user.ID, clientIP, recordFunc)
 			}
 			response.Fail(c, "密码错误，请检查后重试", nil)
 			return
@@ -593,7 +581,7 @@ func (h *Handlers) handleUserSigninByPassword(c *gin.Context) {
 
 	err = models.CheckUserAllowLogin(db, user)
 	if err != nil {
-		logger.Warn("Login failed: user not allowed to login", zap.String("email", form.Email), zap.Uint("userID", user.ID), zap.String("ip", clientIP), zap.Error(err))
+		logger.Warn("Login failed: user not allowed to login", zap.String("email", form.Username), zap.Uint("userID", user.ID), zap.String("ip", clientIP), zap.Error(err))
 		response.Fail(c, "user no authorization to login", err)
 		return
 	}
@@ -625,7 +613,7 @@ func (h *Handlers) handleUserSigninByPassword(c *gin.Context) {
 		if isSuspicious {
 			logger.Warn("Suspicious login detected",
 				zap.Uint("userID", user.ID),
-				zap.String("email", user.Email),
+				zap.String("email", user.Username),
 				zap.String("ip", clientIP),
 				zap.String("location", location))
 		}
@@ -641,14 +629,14 @@ func (h *Handlers) handleUserSigninByPassword(c *gin.Context) {
 	}
 
 	// 12. 记录登录历史
-	if err := models.RecordLoginHistory(db, user.ID, form.Email, clientIP, location, country, city, userAgent, deviceID, "password", true, "", isSuspicious); err != nil {
+	if err := models.RecordLoginHistory(db, user.ID, form.Username, clientIP, location, country, city, userAgent, deviceID, "password", true, "", isSuspicious); err != nil {
 		logger.Warn("Failed to record login history", zap.Error(err))
 	}
 
 	// 13. 发送新设备登录警告邮件（仅在可疑登录时）
 	if isSuspicious {
 		logger.Info("Sending new device login alert signal",
-			zap.String("email", user.Email),
+			zap.String("email", user.Username),
 			zap.String("deviceID", deviceID),
 			zap.Bool("isSuspicious", isSuspicious))
 		utils.Sig().Emit(constants.SigUserNewDeviceLogin, user, "", db)
@@ -656,30 +644,7 @@ func (h *Handlers) handleUserSigninByPassword(c *gin.Context) {
 
 	// 15. 清除失败登录计数
 	if utils.GlobalLoginSecurityManager != nil {
-		utils.GlobalLoginSecurityManager.ClearFailedLoginCount(form.Email)
-	}
-
-	// 16. 检查是否启用了两步验证
-	if user.TwoFactorEnabled {
-		// 如果提供了两步验证码，验证它
-		if form.TwoFactorCode != "" {
-			valid := totp.Validate(form.TwoFactorCode, user.TwoFactorSecret)
-			if !valid {
-				response.Fail(c, "Invalid two-factor authentication code", errors.New("invalid 2fa code"))
-				return
-			}
-		} else {
-			// 需要两步验证码
-			response.Success(c, "Two-factor authentication required", gin.H{
-				"requiresTwoFactor": true,
-				"message":           "Please enter your two-factor authentication code",
-			})
-			return
-		}
-	}
-
-	if form.Timezone != "" {
-		models.InTimezone(c, form.Timezone)
+		utils.GlobalLoginSecurityManager.ClearFailedLoginCount(form.Username)
 	}
 
 	// 执行登录操作（设置session等）
@@ -687,7 +652,7 @@ func (h *Handlers) handleUserSigninByPassword(c *gin.Context) {
 
 	// 检查是否被中止（models.Login内部可能出错并中止请求）
 	if c.IsAborted() {
-		logger.Error("Login failed: models.Login aborted the request", zap.String("email", form.Email), zap.Uint("userID", user.ID), zap.String("ip", clientIP))
+		logger.Error("Login failed: models.Login aborted the request", zap.String("email", form.Username), zap.Uint("userID", user.ID), zap.String("ip", clientIP))
 		return
 	}
 	updatedUser, err := models.GetUserByUID(db, user.ID)
@@ -713,9 +678,8 @@ func (h *Handlers) handleUserSigninByPassword(c *gin.Context) {
 		"token": user.AuthToken,
 		"user": gin.H{
 			"id":          user.ID,
-			"email":       user.Email,
+			"email":       user.Username,
 			"displayName": user.DisplayName,
-			"isStaff":     user.IsStaff,
 			"role":        user.Role,
 			"avatar":      user.Avatar,
 		},
@@ -725,7 +689,7 @@ func (h *Handlers) handleUserSigninByPassword(c *gin.Context) {
 		responseData["message"] = "Login from new location detected. Please verify your identity."
 	}
 
-	logger.Info("Login successful", zap.String("email", form.Email), zap.Uint("userID", user.ID), zap.String("ip", clientIP))
+	logger.Info("Login successful", zap.String("email", form.Username), zap.Uint("userID", user.ID), zap.String("ip", clientIP))
 	response.Success(c, "login successful", responseData)
 }
 
@@ -737,8 +701,8 @@ func (h *Handlers) handleUserSignin(c *gin.Context) {
 		return
 	}
 
-	if form.AuthToken == "" && form.Email == "" {
-		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, errors.New("email is required"))
+	if form.AuthToken == "" && form.Username == "" {
+		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, errors.New("username is required"))
 		return
 	}
 
@@ -751,7 +715,7 @@ func (h *Handlers) handleUserSignin(c *gin.Context) {
 	var user *models.User
 	var err error
 	if form.Password != "" {
-		user, err = models.GetUserByEmail(db, form.Email)
+		user, err = models.GetUserByUsername(db, form.Username)
 		if err != nil {
 			CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, errors.New("user not exists"))
 			return
@@ -772,33 +736,6 @@ func (h *Handlers) handleUserSignin(c *gin.Context) {
 	if err != nil {
 		CloudStepsGo.AbortWithJSONError(c, http.StatusForbidden, err)
 		return
-	}
-
-	// 检查是否启用了两步验证
-	if user.TwoFactorEnabled {
-		// 如果提供了两步验证码，验证它
-		if form.TwoFactorCode != "" {
-			valid := totp.Validate(form.TwoFactorCode, user.TwoFactorSecret)
-			if !valid {
-				CloudStepsGo.AbortWithJSONError(c, http.StatusUnauthorized, errors.New("invalid 2fa code"))
-				return
-			}
-		} else {
-			// 需要两步验证码
-			c.JSON(http.StatusOK, gin.H{
-				"code": 200,
-				"msg":  "Two-factor authentication required",
-				"data": gin.H{
-					"requiresTwoFactor": true,
-					"message":           "Please enter your two-factor authentication code",
-				},
-			})
-			return
-		}
-	}
-
-	if form.Timezone != "" {
-		models.InTimezone(c, form.Timezone)
 	}
 
 	models.Login(c, user)
@@ -827,7 +764,7 @@ func (h *Handlers) handleUserSignup(c *gin.Context) {
 
 	// 1. 输入清理和验证
 	var err error
-	form.Email, err = utils.SanitizeAndValidate(form.Email, "email")
+	form.Username, err = utils.SanitizeAndValidate(form.Username, "email")
 	if err != nil {
 		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, err)
 		return
@@ -859,7 +796,7 @@ func (h *Handlers) handleUserSignup(c *gin.Context) {
 
 		// 准备表单数据用于分析
 		formData := map[string]string{
-			"email":       form.Email,
+			"email":       form.Username,
 			"displayName": form.DisplayName,
 			"firstName":   form.FirstName,
 			"lastName":    form.LastName,
@@ -873,10 +810,10 @@ func (h *Handlers) handleUserSignup(c *gin.Context) {
 			formData,
 		); err != nil {
 			if utils.GlobalRegistrationGuard != nil {
-				utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Email, false, "intelligent risk control blocked")
+				utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, false, "intelligent risk control blocked")
 			}
 			logger.Warn("Registration blocked by intelligent risk control",
-				zap.String("email", form.Email),
+				zap.String("email", form.Username),
 				zap.String("ip", clientIP),
 				zap.Error(err))
 			CloudStepsGo.AbortWithJSONError(c, http.StatusForbidden, errors.New("registration blocked due to suspicious behavior"))
@@ -888,7 +825,7 @@ func (h *Handlers) handleUserSignup(c *gin.Context) {
 	if captcha.GlobalCaptchaManager != nil {
 		if form.CaptchaID == "" || form.CaptchaCode == "" {
 			if utils.GlobalRegistrationGuard != nil {
-				utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Email, false, "captcha required")
+				utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, false, "captcha required")
 			}
 			CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, errors.New("captcha is required"))
 			return
@@ -897,7 +834,7 @@ func (h *Handlers) handleUserSignup(c *gin.Context) {
 		valid, err := captcha.GlobalCaptchaManager.Verify(form.CaptchaID, form.CaptchaCode)
 		if err != nil || !valid {
 			if utils.GlobalRegistrationGuard != nil {
-				utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Email, false, "invalid captcha")
+				utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, false, "invalid captcha")
 			}
 			CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, errors.New("invalid captcha code"))
 			return
@@ -905,31 +842,31 @@ func (h *Handlers) handleUserSignup(c *gin.Context) {
 	}
 
 	// 4. 获取并发注册锁
-	lockAcquired, err := utils.AcquireRegistrationLock(form.Email)
+	lockAcquired, err := utils.AcquireRegistrationLock(form.Username)
 	if err != nil || !lockAcquired {
 		if utils.GlobalRegistrationGuard != nil {
-			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Email, false, "registration in progress")
+			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, false, "registration in progress")
 		}
 		CloudStepsGo.AbortWithJSONError(c, http.StatusConflict, errors.New("registration in progress for this email, please try again later"))
 		return
 	}
-	defer utils.ReleaseRegistrationLock(form.Email)
+	defer utils.ReleaseRegistrationLock(form.Username)
 
 	// 5. 注册防护检查
 	if utils.GlobalRegistrationGuard != nil {
-		if err := utils.GlobalRegistrationGuard.CheckRegistrationAllowed(clientIP, form.Email, form.Password); err != nil {
-			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Email, false, err.Error())
+		if err := utils.GlobalRegistrationGuard.CheckRegistrationAllowed(clientIP, form.Username, form.Password); err != nil {
+			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, false, err.Error())
 			CloudStepsGo.AbortWithJSONError(c, http.StatusTooManyRequests, err)
 			return
 		}
 	}
 
 	db := c.MustGet(constants.DbField).(*gorm.DB)
-	if models.IsExistsByEmail(db, form.Email) {
+	if models.IsExistsByUsername(db, form.Username) {
 		if utils.GlobalRegistrationGuard != nil {
-			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Email, false, "email already exists")
+			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, false, "username already exists")
 		}
-		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, errors.New("email has exists"))
+		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, errors.New("username has exists"))
 		return
 	}
 
@@ -943,19 +880,19 @@ func (h *Handlers) handleUserSignup(c *gin.Context) {
 		passwordToStore = fmt.Sprintf("sha256$%s", passwordHash)
 	}
 
-	user, err := models.CreateUser(db, form.Email, passwordToStore)
+	user, err := models.CreateUser(db, form.Username, passwordToStore)
 	if err != nil {
 		if utils.GlobalRegistrationGuard != nil {
-			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Email, false, err.Error())
+			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, false, err.Error())
 		}
-		logger.Warn("create user failed", zap.Any("email", form.Email), zap.Error(err))
+		logger.Warn("create user failed", zap.Any("email", form.Username), zap.Error(err))
 		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, err)
 		return
 	}
 
 	// 记录成功注册
 	if utils.GlobalRegistrationGuard != nil {
-		utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Email, true, "registration successful")
+		utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, true, "registration successful")
 	}
 
 	vals := utils.StructAsMap(form, []string{
@@ -963,7 +900,6 @@ func (h *Handlers) handleUserSignup(c *gin.Context) {
 		"FirstName",
 		"LastName",
 		"Locale",
-		"Timezone",
 		"Source"})
 
 	n := time.Now().Truncate(1 * time.Second)
@@ -975,7 +911,6 @@ func (h *Handlers) handleUserSignup(c *gin.Context) {
 	user.LastName = form.LastName
 	user.Locale = form.Locale
 	user.Source = "ADMIN"
-	user.Timezone = form.Timezone
 	user.LastLogin = &n
 	user.LastLoginIP = c.ClientIP()
 
@@ -987,27 +922,21 @@ func (h *Handlers) handleUserSignup(c *gin.Context) {
 	utils.Sig().Emit(constants.SigUserCreate, user, c, db)
 
 	r := gin.H{
-		"email":      user.Email,
-		"activation": user.Activated,
+		"email": user.Username,
 	}
-	if !user.Activated && utils.GetBoolValue(db, constants.KEY_USER_ACTIVATED) {
-		sendHashMail(db, user, constants.SigUserVerifyEmail, constants.KEY_VERIFY_EMAIL_EXPIRED, "180d", c.ClientIP(), c.Request.UserAgent())
-		r["expired"] = "180d"
-	} else {
-		// Check if user is allowed to login before auto-login
-		err = models.CheckUserAllowLogin(db, user)
-		if err != nil {
-			CloudStepsGo.AbortWithJSONError(c, http.StatusForbidden, err)
-			return
-		}
-		models.Login(c, user) //Login now
+	// Check if user is allowed to login before auto-login
+	err = models.CheckUserAllowLogin(db, user)
+	if err != nil {
+		CloudStepsGo.AbortWithJSONError(c, http.StatusForbidden, err)
+		return
 	}
+	models.Login(c, user) //Login now
 	c.JSON(http.StatusOK, r)
 }
 
 // handleUserSignupByEmail email register email activation
 func (h *Handlers) handleUserSignupByEmail(c *gin.Context) {
-	var form models.EmailOperatorForm
+	var form models.UserOperatorForm
 	if err := c.BindJSON(&form); err != nil {
 		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, err)
 		return
@@ -1017,7 +946,7 @@ func (h *Handlers) handleUserSignupByEmail(c *gin.Context) {
 
 	// 1. 输入清理和验证
 	var err error
-	form.Email, err = utils.SanitizeAndValidate(form.Email, "email")
+	form.Username, err = utils.SanitizeAndValidate(form.Username, "email")
 	if err != nil {
 		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, err)
 		return
@@ -1049,7 +978,7 @@ func (h *Handlers) handleUserSignupByEmail(c *gin.Context) {
 	if captcha.GlobalCaptchaManager != nil {
 		if form.CaptchaID == "" || form.CaptchaCode == "" {
 			if utils.GlobalRegistrationGuard != nil {
-				utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Email, false, "captcha required")
+				utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, false, "captcha required")
 			}
 			CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, errors.New("captcha is required"))
 			return
@@ -1058,7 +987,7 @@ func (h *Handlers) handleUserSignupByEmail(c *gin.Context) {
 		valid, err := captcha.GlobalCaptchaManager.Verify(form.CaptchaID, form.CaptchaCode)
 		if err != nil || !valid {
 			if utils.GlobalRegistrationGuard != nil {
-				utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Email, false, "invalid captcha")
+				utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, false, "invalid captcha")
 			}
 			CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, errors.New("invalid captcha code"))
 			return
@@ -1066,45 +995,45 @@ func (h *Handlers) handleUserSignupByEmail(c *gin.Context) {
 	}
 
 	// 3. 获取并发注册锁
-	lockAcquired, err := utils.AcquireRegistrationLock(form.Email)
+	lockAcquired, err := utils.AcquireRegistrationLock(form.Username)
 	if err != nil || !lockAcquired {
 		if utils.GlobalRegistrationGuard != nil {
-			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Email, false, "registration in progress")
+			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, false, "registration in progress")
 		}
 		CloudStepsGo.AbortWithJSONError(c, http.StatusConflict, errors.New("registration in progress for this email, please try again later"))
 		return
 	}
-	defer utils.ReleaseRegistrationLock(form.Email)
+	defer utils.ReleaseRegistrationLock(form.Username)
 
 	// 4. 注册防护检查
 	if utils.GlobalRegistrationGuard != nil {
-		if err := utils.GlobalRegistrationGuard.CheckRegistrationAllowed(clientIP, form.Email, form.Password); err != nil {
-			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Email, false, err.Error())
+		if err := utils.GlobalRegistrationGuard.CheckRegistrationAllowed(clientIP, form.Username, form.Password); err != nil {
+			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, false, err.Error())
 			CloudStepsGo.AbortWithJSONError(c, http.StatusTooManyRequests, err)
 			return
 		}
 	}
 
 	db := c.MustGet(constants.DbField).(*gorm.DB)
-	if models.IsExistsByEmail(db, form.Email) {
+	if models.IsExistsByUsername(db, form.Username) {
 		if utils.GlobalRegistrationGuard != nil {
-			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Email, false, "email already exists")
+			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, false, "username already exists")
 		}
-		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, errors.New("email has exists"))
+		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, errors.New("username has exists"))
 		return
 	}
 	// 从缓存中获取验证码（假设你使用的是 util.GlobalCache）
-	cachedCode, ok := utils.GlobalCache.Get(form.Email)
+	cachedCode, ok := utils.GlobalCache.Get(form.Username)
 	if !ok || cachedCode != form.Code {
 		if utils.GlobalRegistrationGuard != nil {
-			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Email, false, "invalid verification code")
+			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, false, "invalid verification code")
 		}
 		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, errors.New("invalid verification code"))
 		return
 	}
 
 	// 清除已用验证码
-	utils.GlobalCache.Remove(form.Email)
+	utils.GlobalCache.Remove(form.Username)
 
 	// 处理加密密码：如果是加密格式，提取原始密码哈希
 	passwordToStore := form.Password
@@ -1116,29 +1045,27 @@ func (h *Handlers) handleUserSignupByEmail(c *gin.Context) {
 		passwordToStore = fmt.Sprintf("sha256$%s", passwordHash)
 	}
 
-	user, err := models.CreateUserByEmail(db, form.UserName, form.DisplayName, form.Email, passwordToStore)
+	user, err := models.CreateUserByUsername(db, form.UserName, form.DisplayName, passwordToStore)
 	if err != nil {
 		if utils.GlobalRegistrationGuard != nil {
-			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Email, false, err.Error())
+			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, false, err.Error())
 		}
-		logger.Warn("create user failed", zap.Any("email", form.Email), zap.Error(err))
+		logger.Warn("create user failed", zap.Any("email", form.Username), zap.Error(err))
 		CloudStepsGo.AbortWithJSONError(c, http.StatusBadRequest, err)
 		return
 	}
 
 	// 记录成功注册
 	if utils.GlobalRegistrationGuard != nil {
-		utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Email, true, "registration successful")
+		utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, true, "registration successful")
 	}
 	vals := utils.StructAsMap(form, []string{
 		"DisplayName",
 		"FirstName",
 		"LastName",
 		"Locale",
-		"Timezone",
 		"Source"})
 	user.Source = "ADMIN"
-	user.Timezone = form.Timezone
 	err = models.UpdateUserFields(db, user, vals)
 	if err != nil {
 		logger.Warn("update user fields fail id:", zap.Uint("userId", user.ID), zap.Any("vals", vals), zap.Error(err))
@@ -1159,8 +1086,8 @@ func (h *Handlers) handleUserUpdate(c *gin.Context) {
 	user := models.CurrentUser(c)
 	vals := make(map[string]interface{})
 
-	if req.Email != "" {
-		vals["email"] = req.Email
+	if req.Username != "" {
+		vals["username"] = req.Username
 	}
 	if req.Phone != "" {
 		vals["phone"] = req.Phone
@@ -1176,9 +1103,6 @@ func (h *Handlers) handleUserUpdate(c *gin.Context) {
 	}
 	if req.Locale != "" {
 		vals["locale"] = req.Locale
-	}
-	if req.Timezone != "" {
-		vals["timezone"] = req.Timezone
 	}
 	if req.Gender != "" {
 		vals["gender"] = req.Gender
@@ -1250,8 +1174,6 @@ func (h *Handlers) handleUserUpdateBasicInfo(c *gin.Context) {
 func (h *Handlers) handleUserUpdatePreferences(c *gin.Context) {
 	var preferences struct {
 		EmailNotifications    *bool `json:"emailNotifications"`
-		PushNotifications     *bool `json:"pushNotifications"`
-		SystemNotifications   *bool `json:"systemNotifications"`
 		AutoCleanUnreadEmails *bool `json:"autoCleanUnreadEmails"`
 	}
 	if err := c.ShouldBindJSON(&preferences); err != nil {
@@ -1262,12 +1184,6 @@ func (h *Handlers) handleUserUpdatePreferences(c *gin.Context) {
 	vals := make(map[string]any)
 	if preferences.EmailNotifications != nil {
 		vals["email_notifications"] = *preferences.EmailNotifications
-	}
-	if preferences.PushNotifications != nil {
-		vals["push_notifications"] = *preferences.PushNotifications
-	}
-	if preferences.SystemNotifications != nil {
-		vals["system_notifications"] = *preferences.SystemNotifications
 	}
 	if preferences.AutoCleanUnreadEmails != nil {
 		vals["auto_clean_unread_emails"] = *preferences.AutoCleanUnreadEmails
@@ -1341,10 +1257,10 @@ func (h *Handlers) handleChangePassword(c *gin.Context) {
 	response.Success(c, "Password changed successfully", map[string]any{"logout": true})
 }
 
-// handleChangePasswordByEmail 通过邮箱验证码修改密码
+// handleChangePasswordByUsername 通过用户名验证码修改密码
 func (h *Handlers) handleChangePasswordByEmail(c *gin.Context) {
 	var form struct {
-		EmailCode       string `json:"emailCode" binding:"required"`
+		UsernameCode    string `json:"usernameCode" binding:"required"`
 		NewPassword     string `json:"newPassword" binding:"required"`
 		ConfirmPassword string `json:"confirmPassword"`
 	}
@@ -1374,21 +1290,21 @@ func (h *Handlers) handleChangePasswordByEmail(c *gin.Context) {
 		return
 	}
 
-	// 验证邮箱验证码
-	if form.EmailCode == "" {
-		response.Fail(c, "邮箱验证码不能为空", errors.New("email code is required"))
+	// 验证用户名验证码
+	if form.UsernameCode == "" {
+		response.Fail(c, "用户名验证码不能为空", errors.New("username code is required"))
 		return
 	}
 
 	// 从缓存中获取验证码
-	cachedCode, ok := utils.GlobalCache.Get(user.Email)
-	if !ok || cachedCode != form.EmailCode {
-		response.Fail(c, "邮箱验证码无效或已过期", errors.New("invalid or expired email code"))
+	cachedCode, ok := utils.GlobalCache.Get(user.Username)
+	if !ok || cachedCode != form.UsernameCode {
+		response.Fail(c, "用户名验证码无效或已过期", errors.New("invalid or expired username code"))
 		return
 	}
 
 	// 清除已用验证码
-	utils.GlobalCache.Remove(user.Email)
+	utils.GlobalCache.Remove(user.Username)
 
 	// 设置新密码（不验证旧密码）
 	err := models.SetPassword(h.db, user, form.NewPassword)
@@ -1436,7 +1352,7 @@ func (h *Handlers) handleGetUserDevices(c *gin.Context) {
 // handleResetPassword 重置密码请求
 func (h *Handlers) handleResetPassword(c *gin.Context) {
 	var form struct {
-		Email string `json:"email" binding:"required,email"`
+		Username string `json:"username" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&form); err != nil {
@@ -1444,9 +1360,9 @@ func (h *Handlers) handleResetPassword(c *gin.Context) {
 		return
 	}
 
-	user, err := models.GetUserByEmail(h.db, form.Email)
+	user, err := models.GetUserByUsername(h.db, form.Username)
 	if err != nil {
-		response.Success(c, "If the email exists, a reset link has been sent", nil)
+		response.Success(c, "If the username exists, a reset link has been sent", nil)
 		return
 	}
 
@@ -1489,24 +1405,12 @@ func (h *Handlers) handleResetPasswordConfirm(c *gin.Context) {
 	response.Success(c, "Password reset successfully", nil)
 }
 
-// handleVerifyEmail 验证邮箱
+// handleVerifyEmail 验证邮箱 - 已移除邮箱功能
 func (h *Handlers) handleVerifyEmail(c *gin.Context) {
-	token := c.Query("token")
-	if token == "" {
-		response.Fail(c, "Token is required", errors.New("token is required"))
-		return
-	}
-
-	user, err := models.VerifyEmail(h.db, token)
-	if err != nil {
-		response.Fail(c, "Invalid or expired token", err)
-		return
-	}
-
-	response.Success(c, "Email verified successfully", user)
+	response.Fail(c, "Email verification has been disabled", errors.New("email verification is no longer supported"))
 }
 
-// handleSendEmailVerification 发送邮箱验证邮件
+// handleSendEmailVerification 发送邮箱验证邮件 - 已移除邮箱功能
 func (h *Handlers) handleSendEmailVerification(c *gin.Context) {
 	user := models.CurrentUser(c)
 	if user == nil {
@@ -1514,35 +1418,11 @@ func (h *Handlers) handleSendEmailVerification(c *gin.Context) {
 		return
 	}
 
-	logger.Info("Email verification request",
+	logger.Info("Email verification request - disabled",
 		zap.Uint("userId", user.ID),
-		zap.String("email", user.Email),
-		zap.Bool("emailVerified", user.EmailVerified))
+		zap.String("username", user.Username))
 
-	if user.EmailVerified {
-		response.Fail(c, "Email already verified", errors.New("email already verified"))
-		return
-	}
-
-	token, err := models.GenerateEmailVerifyToken(h.db, user)
-	if err != nil {
-		logger.Error("Failed to generate verification token", zap.Error(err))
-		response.Fail(c, "Failed to generate verification token", err)
-		return
-	}
-
-	logger.Info("Generated email verification token",
-		zap.String("token", token),
-		zap.String("email", user.Email))
-
-	// 发送邮箱验证邮件
-	utils.Sig().Emit(constants.SigUserVerifyEmail, user, token, c.ClientIP(), c.Request.UserAgent(), h.db)
-
-	logger.Info("Email verification signal emitted",
-		zap.String("email", user.Email),
-		zap.String("token", token))
-
-	response.Success(c, "Verification email sent", nil)
+	response.Fail(c, "Email verification has been disabled", errors.New("email verification is no longer supported"))
 }
 
 // handleVerifyPhone 验证手机
@@ -1684,18 +1564,9 @@ func (h *Handlers) handleGetUserStats(c *gin.Context) {
 		return
 	}
 
-	// 更新资料完整度
-	err := models.UpdateProfileComplete(h.db, user)
-	if err != nil {
-		logger.Warn("Failed to update profile complete", zap.Error(err))
-	}
-
 	stats := map[string]interface{}{
 		"loginCount":         user.LoginCount,
-		"profileComplete":    user.ProfileComplete,
-		"emailVerified":      user.EmailVerified,
 		"phoneVerified":      user.PhoneVerified,
-		"twoFactorEnabled":   user.TwoFactorEnabled,
 		"lastLogin":          user.LastLogin,
 		"lastPasswordChange": user.LastPasswordChange,
 		"createdAt":          user.CreatedAt,
@@ -1870,149 +1741,6 @@ func (h *Handlers) handleSendEmailCode(context *gin.Context) {
 	return
 }
 
-// handleTwoFactorSetup 设置两步验证
-func (h *Handlers) handleTwoFactorSetup(c *gin.Context) {
-	user := models.CurrentUser(c)
-	if user == nil {
-		response.Fail(c, "User not found", errors.New("user not found"))
-		return
-	}
-
-	// 如果已经启用两步验证，返回错误
-	if user.TwoFactorEnabled {
-		response.Fail(c, "Two-factor authentication is already enabled", errors.New("two-factor already enabled"))
-		return
-	}
-
-	// 生成新的密钥
-	key, err := totp.Generate(totp.GenerateOpts{
-		Issuer:      "CloudStepsGo",
-		AccountName: user.Email,
-		SecretSize:  32,
-	})
-	if err != nil {
-		response.Fail(c, "Failed to generate two-factor secret", err)
-		return
-	}
-
-	// 保存密钥到数据库（不启用）
-	err = models.UpdateUser(h.db, user, map[string]interface{}{
-		"two_factor_secret": key.Secret(),
-	})
-	if err != nil {
-		response.Fail(c, "Failed to save two-factor secret", err)
-		return
-	}
-
-	// 生成QR码
-	qrCode, err := qrcode.New(key.URL(), qrcode.Medium)
-	if err != nil {
-		response.Fail(c, "Failed to generate QR code", err)
-		return
-	}
-
-	// 将QR码转换为PNG图片的base64编码
-	png, err := qrCode.PNG(256)
-	if err != nil {
-		response.Fail(c, "Failed to generate QR code image", err)
-		return
-	}
-
-	// 转换为base64字符串
-	qrCodeBase64 := "data:image/png;base64," + base64.StdEncoding.EncodeToString(png)
-
-	response.Success(c, "Two-factor setup initiated", gin.H{
-		"secret": key.Secret(),
-		"qrCode": qrCodeBase64,
-		"url":    key.URL(),
-	})
-}
-
-// handleTwoFactorEnable 启用两步验证
-func (h *Handlers) handleTwoFactorEnable(c *gin.Context) {
-	var req struct {
-		Code string `json:"code" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, "Invalid request", err)
-		return
-	}
-
-	user := models.CurrentUser(c)
-	if user == nil {
-		response.Fail(c, "User not found", errors.New("user not found"))
-		return
-	}
-
-	// 验证TOTP代码
-	valid := totp.Validate(req.Code, user.TwoFactorSecret)
-	if !valid {
-		response.Fail(c, "Invalid verification code", errors.New("invalid code"))
-		return
-	}
-
-	// 启用两步验证
-	err := models.UpdateUser(h.db, user, map[string]interface{}{
-		"two_factor_enabled": true,
-	})
-	if err != nil {
-		response.Fail(c, "Failed to enable two-factor authentication", err)
-		return
-	}
-
-	response.Success(c, "Two-factor authentication enabled successfully", nil)
-}
-
-// handleTwoFactorDisable 禁用两步验证
-func (h *Handlers) handleTwoFactorDisable(c *gin.Context) {
-	var req struct {
-		Code string `json:"code" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Fail(c, "Invalid request", err)
-		return
-	}
-
-	user := models.CurrentUser(c)
-	if user == nil {
-		response.Fail(c, "User not found", errors.New("user not found"))
-		return
-	}
-
-	// 验证TOTP代码
-	valid := totp.Validate(req.Code, user.TwoFactorSecret)
-	if !valid {
-		response.Fail(c, "Invalid verification code", errors.New("invalid code"))
-		return
-	}
-
-	// 禁用两步验证并清除密钥
-	err := models.UpdateUser(h.db, user, map[string]interface{}{
-		"two_factor_enabled": false,
-		"two_factor_secret":  "",
-	})
-	if err != nil {
-		response.Fail(c, "Failed to disable two-factor authentication", err)
-		return
-	}
-
-	response.Success(c, "Two-factor authentication disabled successfully", nil)
-}
-
-// handleTwoFactorStatus 获取两步验证状态
-func (h *Handlers) handleTwoFactorStatus(c *gin.Context) {
-	user := models.CurrentUser(c)
-	if user == nil {
-		response.Fail(c, "User not found", errors.New("user not found"))
-		return
-	}
-
-	response.Success(c, "Two-factor status retrieved", gin.H{
-		"enabled":   user.TwoFactorEnabled,
-		"hasSecret": user.TwoFactorSecret != "",
-	})
-}
-
 // handleGetCaptcha 获取图形验证码
 func (h *Handlers) handleGetCaptcha(c *gin.Context) {
 	if captcha.GlobalCaptchaManager == nil {
@@ -2173,8 +1901,6 @@ func (h *Handlers) handleAdminListUsers(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
 	search := c.Query("search")
 	role := c.Query("role")
-	enabled := c.Query("enabled")
-	isStaff := c.Query("isStaff")
 
 	if page < 1 {
 		page = 1
@@ -2187,17 +1913,11 @@ func (h *Handlers) handleAdminListUsers(c *gin.Context) {
 
 	if search != "" {
 		like := "%" + search + "%"
-		query = query.Where("email LIKE ? OR display_name LIKE ? OR first_name LIKE ? OR last_name LIKE ?",
+		query = query.Where("username LIKE ? OR display_name LIKE ? OR first_name LIKE ? OR last_name LIKE ?",
 			like, like, like, like)
 	}
 	if role != "" {
 		query = query.Where("role = ?", role)
-	}
-	if enabled != "" {
-		query = query.Where("enabled = ?", enabled == "true")
-	}
-	if isStaff != "" {
-		query = query.Where("is_staff = ?", isStaff == "true")
 	}
 
 	var total int64
@@ -2245,15 +1965,12 @@ func (h *Handlers) handleAdminCreateUser(c *gin.Context) {
 	db := c.MustGet(constants.DbField).(*gorm.DB)
 
 	var req struct {
-		Email       string  `json:"email" binding:"required"`
+		Username    string  `json:"username" binding:"required"`
 		Password    *string `json:"password"`
 		DisplayName string  `json:"displayName"`
 		FirstName   string  `json:"firstName"`
 		LastName    string  `json:"lastName"`
 		Role        string  `json:"role"`
-		IsStaff     bool    `json:"isStaff"`
-		Enabled     *bool   `json:"enabled"`
-		Activated   *bool   `json:"activated"`
 		Phone       string  `json:"phone"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -2262,19 +1979,10 @@ func (h *Handlers) handleAdminCreateUser(c *gin.Context) {
 	}
 
 	var count int64
-	db.Model(&models.User{}).Where("email = ?", req.Email).Count(&count)
+	db.Model(&models.User{}).Where("username = ?", req.Username).Count(&count)
 	if count > 0 {
-		response.Fail(c, "邮箱已存在", errors.New("email already exists"))
+		response.Fail(c, "用户名已存在", errors.New("username already exists"))
 		return
-	}
-
-	enabled := true
-	if req.Enabled != nil {
-		enabled = *req.Enabled
-	}
-	activated := true
-	if req.Activated != nil {
-		activated = *req.Activated
 	}
 
 	role := req.Role
@@ -2292,15 +2000,12 @@ func (h *Handlers) handleAdminCreateUser(c *gin.Context) {
 	}
 
 	user := models.User{
-		Email:       req.Email,
+		Username:    req.Username,
 		Password:    models.HashPassword(rawPassword),
 		DisplayName: req.DisplayName,
 		FirstName:   req.FirstName,
 		LastName:    req.LastName,
 		Role:        role,
-		IsStaff:     req.IsStaff,
-		Enabled:     enabled,
-		Activated:   activated,
 		Phone:       req.Phone,
 		Source:      "admin",
 	}
@@ -2328,15 +2033,12 @@ func (h *Handlers) handleAdminUpdateUser(c *gin.Context) {
 	}
 
 	var req struct {
-		Email       *string `json:"email"`
+		Username    *string `json:"username"`
 		Password    *string `json:"password"`
 		DisplayName *string `json:"displayName"`
 		FirstName   *string `json:"firstName"`
 		LastName    *string `json:"lastName"`
 		Role        *string `json:"role"`
-		IsStaff     *bool   `json:"isStaff"`
-		Enabled     *bool   `json:"enabled"`
-		Activated   *bool   `json:"activated"`
 		Phone       *string `json:"phone"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -2345,8 +2047,8 @@ func (h *Handlers) handleAdminUpdateUser(c *gin.Context) {
 	}
 
 	updates := map[string]any{}
-	if req.Email != nil {
-		updates["email"] = *req.Email
+	if req.Username != nil {
+		updates["username"] = *req.Username
 	}
 	if req.Password != nil && *req.Password != "" {
 		updates["password"] = models.HashPassword(*req.Password)
@@ -2362,15 +2064,6 @@ func (h *Handlers) handleAdminUpdateUser(c *gin.Context) {
 	}
 	if req.Role != nil {
 		updates["role"] = *req.Role
-	}
-	if req.IsStaff != nil {
-		updates["is_staff"] = *req.IsStaff
-	}
-	if req.Enabled != nil {
-		updates["enabled"] = *req.Enabled
-	}
-	if req.Activated != nil {
-		updates["activated"] = *req.Activated
 	}
 	if req.Phone != nil {
 		updates["phone"] = *req.Phone
@@ -2427,17 +2120,13 @@ func serializeUser(u *models.User) gin.H {
 	}
 	return gin.H{
 		"id":          u.ID,
-		"email":       u.Email,
+		"username":    u.Username,
 		"displayName": u.DisplayName,
 		"firstName":   u.FirstName,
 		"lastName":    u.LastName,
 		"role":        u.Role,
-		"isStaff":     u.IsStaff,
-		"enabled":     u.Enabled,
-		"activated":   u.Activated,
 		"phone":       u.Phone,
 		"locale":      u.Locale,
-		"timezone":    u.Timezone,
 		"lastLogin":   lastLogin,
 		"loginCount":  u.LoginCount,
 		"source":      u.Source,

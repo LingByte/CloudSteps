@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/LingByte/CloudStepsGo/pkg/config"
 	"github.com/LingByte/CloudStepsGo/pkg/constants"
@@ -26,22 +25,19 @@ func (s *SeedService) SeedAll() error {
 }
 
 func (s *SeedService) seedUsers() error {
-	defaultAdminEmail := "admin@cloudstep.com"
-	defaultAdminPassword := "admin123"
+	defaultAdminUsername := "admin"
 	defaultPassword := "demo123"
 
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		// 1) admin
 		var count int64
-		tx.Model(&models.User{}).Where("email = ?", strings.ToLower(defaultAdminEmail)).Count(&count)
+		tx.Model(&models.User{}).Where("username = ?", defaultAdminUsername).Count(&count)
 		if count == 0 {
 			admin := models.User{
-				Email:       strings.ToLower(defaultAdminEmail),
-				Password:    models.HashPassword(defaultAdminPassword),
+				Username:    "admin",
+				Password:    models.HashPassword("admin123"),
 				DisplayName: "Admin",
 				Role:        models.RoleAdmin,
-				Enabled:     true,
-				Activated:   true,
 				Source:      "seed",
 			}
 			if err := tx.Create(&admin).Error; err != nil {
@@ -49,18 +45,17 @@ func (s *SeedService) seedUsers() error {
 			}
 		}
 
-		// 2) teachers (role=user)
+		// 2) teachers (role=teacher)
 		teachers := []models.User{
-			{Email: "teacher1@cloudstep.com", Password: models.HashPassword(defaultPassword), DisplayName: "Teacher 1", Role: models.RoleUser, Enabled: true, Activated: true, Source: "seed"},
-			{Email: "teacher2@cloudstep.com", Password: models.HashPassword(defaultPassword), DisplayName: "Teacher 2", Role: models.RoleUser, Enabled: true, Activated: true, Source: "seed"},
-			{Email: "teacher3@cloudstep.com", Password: models.HashPassword(defaultPassword), DisplayName: "Teacher 3", Role: models.RoleUser, Enabled: true, Activated: true, Source: "seed"},
+			{Username: "teacher1", Password: models.HashPassword(defaultPassword), DisplayName: "Teacher 1", Role: models.RoleTeacher, Source: "seed"},
+			{Username: "teacher2", Password: models.HashPassword(defaultPassword), DisplayName: "Teacher 2", Role: models.RoleTeacher, Source: "seed"},
+			{Username: "teacher3", Password: models.HashPassword(defaultPassword), DisplayName: "Teacher 3", Role: models.RoleTeacher, Source: "seed"},
 		}
 		for _, u := range teachers {
-			tx.Model(&models.User{}).Where("email = ?", strings.ToLower(u.Email)).Count(&count)
+			tx.Model(&models.User{}).Where("username = ?", u.Username).Count(&count)
 			if count > 0 {
 				continue
 			}
-			u.Email = strings.ToLower(u.Email)
 			if err := tx.Create(&u).Error; err != nil {
 				return err
 			}
@@ -68,19 +63,18 @@ func (s *SeedService) seedUsers() error {
 
 		// 3) demo students (role=student)
 		students := []models.User{
-			{Email: "student1@cloudstep.com", Password: models.HashPassword(defaultPassword), DisplayName: "Student 1", Role: models.RoleStudent, Enabled: true, Activated: true, Source: "seed"},
-			{Email: "student2@cloudstep.com", Password: models.HashPassword(defaultPassword), DisplayName: "Student 2", Role: models.RoleStudent, Enabled: true, Activated: true, Source: "seed"},
-			{Email: "student3@cloudstep.com", Password: models.HashPassword(defaultPassword), DisplayName: "Student 3", Role: models.RoleStudent, Enabled: true, Activated: true, Source: "seed"},
-			{Email: "student4@cloudstep.com", Password: models.HashPassword(defaultPassword), DisplayName: "Student 4", Role: models.RoleStudent, Enabled: true, Activated: true, Source: "seed"},
-			{Email: "student5@cloudstep.com", Password: models.HashPassword(defaultPassword), DisplayName: "Student 5", Role: models.RoleStudent, Enabled: true, Activated: true, Source: "seed"},
-			{Email: "student6@cloudstep.com", Password: models.HashPassword(defaultPassword), DisplayName: "Student 6", Role: models.RoleStudent, Enabled: true, Activated: true, Source: "seed"},
+			{Username: "student1", Password: models.HashPassword(defaultPassword), DisplayName: "Student 1", Role: models.RoleStudent, Source: "seed"},
+			{Username: "student2", Password: models.HashPassword(defaultPassword), DisplayName: "Student 2", Role: models.RoleStudent, Source: "seed"},
+			{Username: "student3", Password: models.HashPassword(defaultPassword), DisplayName: "Student 3", Role: models.RoleStudent, Source: "seed"},
+			{Username: "student4", Password: models.HashPassword(defaultPassword), DisplayName: "Student 4", Role: models.RoleStudent, Source: "seed"},
+			{Username: "student5", Password: models.HashPassword(defaultPassword), DisplayName: "Student 5", Role: models.RoleStudent, Source: "seed"},
+			{Username: "student6", Password: models.HashPassword(defaultPassword), DisplayName: "Student 6", Role: models.RoleStudent, Source: "seed"},
 		}
 		for _, u := range students {
-			tx.Model(&models.User{}).Where("email = ?", strings.ToLower(u.Email)).Count(&count)
+			tx.Model(&models.User{}).Where("username = ?", u.Username).Count(&count)
 			if count > 0 {
 				continue
 			}
-			u.Email = strings.ToLower(u.Email)
 			if err := tx.Create(&u).Error; err != nil {
 				return err
 			}

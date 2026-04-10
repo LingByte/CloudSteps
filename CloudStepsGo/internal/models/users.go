@@ -6,6 +6,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/LingByte/CloudStepsGo"
 	"github.com/LingByte/CloudStepsGo/pkg/config"
 	"github.com/LingByte/CloudStepsGo/pkg/constants"
@@ -16,15 +21,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
-	"net/http"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const (
 	RoleAdmin   = "admin"   // 管理员（排课、管理课程）
-	RoleUser    = "user"    // 普通用户 / 老师（授课计时）
+	RoleTeacher = "teacher" // 老师（授课计时）
 	RoleStudent = "student" // 学员（被分配到课程）
 )
 
@@ -42,7 +43,8 @@ type UserBasicInfoUpdate struct {
 }
 
 type LoginForm struct {
-	Email         string `json:"email" comment:"Email address"`
+	Username      string `json:"username" comment:"Username"`
+	Email         string `json:"email,omitempty"` // 兼容旧后台/前端把账号写在 email 字段
 	Password      string `json:"password,omitempty"`
 	Timezone      string `json:"timezone,omitempty"`
 	Remember      bool   `json:"remember,omitempty"`
@@ -52,10 +54,10 @@ type LoginForm struct {
 	CaptchaCode   string `json:"captchaCode,omitempty"`   // 图形验证码
 }
 
-type EmailOperatorForm struct {
+type UserOperatorForm struct {
 	UserName    string `json:"userName"`
 	DisplayName string `json:"displayName"`
-	Email       string `json:"email" comment:"Email address"`
+	Username    string `json:"username" comment:"Username"`
 	Code        string `json:"code"`
 	Password    string `json:"password"`
 	AuthToken   bool   `json:"AuthToken,omitempty"`
@@ -65,7 +67,7 @@ type EmailOperatorForm struct {
 }
 
 type RegisterUserForm struct {
-	Email            string `json:"email" binding:"required"`
+	Username         string `json:"username" binding:"required"`
 	Password         string `json:"password" binding:"required"`
 	DisplayName      string `json:"displayName"`
 	FirstName        string `json:"firstName"`
@@ -85,23 +87,22 @@ type ChangePasswordForm struct {
 }
 
 type ResetPasswordForm struct {
-	Email string `json:"email" binding:"required"`
+	Username string `json:"username" binding:"required"`
 }
 
 type ResetPasswordDoneForm struct {
 	Password string `json:"password" binding:"required"`
-	Email    string `json:"email" binding:"required"`
+	Username string `json:"username" binding:"required"`
 	Token    string `json:"token" binding:"required"`
 }
 
 type UpdateUserRequest struct {
-	Email       string `form:"email" json:"email"`
+	Username    string `form:"username" json:"username"`
 	Phone       string `form:"phone" json:"phone"`
 	FirstName   string `form:"firstName" json:"firstName"`
 	LastName    string `form:"lastName" json:"lastName"`
 	DisplayName string `form:"displayName" json:"displayName"`
 	Locale      string `form:"locale" json:"locale"`
-	Timezone    string `form:"timezone" json:"timezone"`
 	Gender      string `form:"gender" json:"gender"`
 	City        string `form:"city" json:"city"`
 	Region      string `form:"region" json:"region"`
@@ -111,42 +112,25 @@ type UpdateUserRequest struct {
 
 type User struct {
 	BaseModel
-	Email                 string     `json:"email" gorm:"size:128;uniqueIndex"`
+	Username              string     `json:"username" gorm:"size:128;uniqueIndex"`
 	Password              string     `json:"-" gorm:"size:128"`
 	Phone                 string     `json:"phone,omitempty" gorm:"size:64;index"`
 	FirstName             string     `json:"firstName,omitempty" gorm:"size:128"`
 	LastName              string     `json:"lastName,omitempty" gorm:"size:128"`
 	DisplayName           string     `json:"displayName,omitempty" gorm:"size:128"`
-	IsStaff               bool       `json:"isStaff,omitempty"`
-	Enabled               bool       `json:"-"`
-	Activated             bool       `json:"-"`
 	LastLogin             *time.Time `json:"lastLogin,omitempty"`
 	LastLoginIP           string     `json:"-" gorm:"size:128"`
 	Source                string     `json:"-" gorm:"size:64;index"`
 	Locale                string     `json:"locale,omitempty" gorm:"size:20"`
-	Timezone              string     `json:"timezone,omitempty" gorm:"size:200"`
 	AuthToken             string     `json:"token,omitempty" gorm:"-"`
 	Avatar                string     `json:"avatar,omitempty"`
 	Gender                string     `json:"gender,omitempty"`
 	City                  string     `json:"city,omitempty"`
 	Region                string     `json:"region,omitempty"`
-	EmailNotifications    bool       `json:"emailNotifications"`                           // 邮件通知
-	PushNotifications     bool       `json:"pushNotifications" gorm:"default:true"`        // 推送通知
-	SystemNotifications   bool       `json:"systemNotifications" gorm:"default:true"`      // 系统通知
-	AutoCleanUnreadEmails bool       `json:"autoCleanUnreadEmails" gorm:"default:false"`   // 自动清理七天未读邮件
-	EmailVerified         bool       `json:"emailVerified" gorm:"default:false"`           // 邮箱已验证
 	PhoneVerified         bool       `json:"phoneVerified" gorm:"default:false"`           // 手机已验证
-	TwoFactorEnabled      bool       `json:"twoFactorEnabled" gorm:"default:false"`        // 双因素认证
-	TwoFactorSecret       string     `json:"-" gorm:"size:128"`                            // 双因素认证密钥
-	EmailVerifyToken      string     `json:"-" gorm:"size:128"`                            // 邮箱验证令牌
-	PhoneVerifyToken      string     `json:"-" gorm:"size:128"`                            // 手机验证令牌
-	PasswordResetToken    string     `json:"-" gorm:"size:128"`                            // 密码重置令牌
-	PasswordResetExpires  *time.Time `json:"-"`                                            // 密码重置过期时间
-	EmailVerifyExpires    *time.Time `json:"-"`                                            // 邮箱验证过期时间
 	LoginCount            int        `json:"loginCount" gorm:"default:0"`                  // 登录次数
 	LastPasswordChange    *time.Time `json:"lastPasswordChange,omitempty"`                 // 最后密码修改时间
-	ProfileComplete       int        `json:"profileComplete" gorm:"default:0"`             // 资料完整度百分比
-	Role                  string     `json:"role,omitempty" gorm:"size:50;default:'user'"` // 用户角色
+	Role                  string     `json:"role,omitempty" gorm:"size:50;default:'teacher'"` // 用户角色
 	// 学习连续天数（每次完成 study_session 时维护，当天已学不变，隔天+1，断天归零）
 	StreakDays    int        `json:"streakDays" gorm:"default:0"` // 连续学习天数
 	LastStudyDate *time.Time `json:"lastStudyDate,omitempty"`     // 最后学习日期（精确到天）
@@ -345,13 +329,14 @@ func VerifyEncryptedPassword(encryptedPassword, storedPasswordHash string) bool 
 func GetUserByUID(db *gorm.DB, userID uint) (*User, error) {
 	var val User
 	start := time.Now()
-	result := db.Where("id", userID).Where("enabled", true).Take(&val)
+	// users 表无 enabled 列，使用 is_deleted 与主键查询（与全库软删约定一致）
+	result := db.Where("id = ? AND is_deleted = ?", userID, SoftDeleteStatusActive).Take(&val)
 	duration := time.Since(start)
 
 	// Record database query metrics (if monitoring system is available)
 	if monitor := metrics.GetGlobalMonitor(); monitor != nil {
-		monitor.RecordSQLQuery(context.Background(), "SELECT * FROM users WHERE id = ? AND enabled = ?",
-			[]interface{}{userID, true}, constants.USER_TABLE_NAME, "SELECT", duration, 1, result.Error)
+		monitor.RecordSQLQuery(context.Background(), "SELECT * FROM users WHERE id = ? AND is_deleted = ?",
+			[]interface{}{userID, SoftDeleteStatusActive}, constants.USER_TABLE_NAME, "SELECT", duration, 1, result.Error)
 	}
 
 	if result.Error != nil {
@@ -360,16 +345,16 @@ func GetUserByUID(db *gorm.DB, userID uint) (*User, error) {
 	return &val, nil
 }
 
-func GetUserByEmail(db *gorm.DB, email string) (user *User, err error) {
+func GetUserByUsername(db *gorm.DB, username string) (user *User, err error) {
 	var val User
 	start := time.Now()
-	result := db.Table(constants.USER_TABLE_NAME).Where("email", strings.ToLower(email)).Take(&val)
+	result := db.Table(constants.USER_TABLE_NAME).Where("username", username).Take(&val)
 	duration := time.Since(start)
 
 	// Record database query metrics (if monitoring system is available)
 	if monitor := metrics.GetGlobalMonitor(); monitor != nil {
-		monitor.RecordSQLQuery(context.Background(), "SELECT * FROM users WHERE email = ?",
-			[]interface{}{email}, constants.USER_TABLE_NAME, "SELECT", duration, 1, result.Error)
+		monitor.RecordSQLQuery(context.Background(), "SELECT * FROM users WHERE username = ?",
+			[]interface{}{username}, constants.USER_TABLE_NAME, "SELECT", duration, 1, result.Error)
 	}
 
 	if result.Error != nil {
@@ -378,12 +363,12 @@ func GetUserByEmail(db *gorm.DB, email string) (user *User, err error) {
 	return &val, nil
 }
 
-func IsExistsByEmail(db *gorm.DB, email string) bool {
-	_, err := GetUserByEmail(db, email)
+func IsExistsByUsername(db *gorm.DB, username string) bool {
+	_, err := GetUserByUsername(db, username)
 	return err == nil
 }
 
-func CreateUserByEmail(db *gorm.DB, username, display, email, password string) (*User, error) {
+func CreateUserByUsername(db *gorm.DB, username, display, password string) (*User, error) {
 	// Properly handle Unicode characters (including Chinese)
 	var firstName, lastName string
 	if username != "" {
@@ -400,32 +385,27 @@ func CreateUserByEmail(db *gorm.DB, username, display, email, password string) (
 		DisplayName:        display,
 		FirstName:          firstName,
 		LastName:           lastName,
-		Email:              email,
+		Username:           username,
 		Password:           HashPassword(password),
-		Enabled:            true,
-		Activated:          false,
-		EmailNotifications: true,
-		Role:               RoleUser, // Explicitly set default role
+		Role:               RoleTeacher, // Explicitly set default role
 	}
 	result := db.Create(&user)
 	return &user, result.Error
 }
 
-func CreateUser(db *gorm.DB, email, password string) (*User, error) {
+func CreateUser(db *gorm.DB, username, password string) (*User, error) {
 	user := User{
-		Email:     email,
-		Password:  HashPassword(password),
-		Enabled:   true,
-		Activated: false,
-		Role:      RoleUser, // Explicitly set default role
+		Username:            username,
+		Password:            HashPassword(password),
+		Role:                RoleTeacher, // Explicitly set default role
 	}
 
 	start := time.Now()
 	result := db.Create(&user)
 	duration := time.Since(start)
 	if monitor := metrics.GetGlobalMonitor(); monitor != nil {
-		monitor.RecordSQLQuery(context.Background(), "INSERT INTO users (email, password, enabled, activated) VALUES (?, ?, ?, ?)",
-			[]interface{}{email, user.Password, true, false}, constants.USER_TABLE_NAME, "INSERT", duration, 1, result.Error)
+		monitor.RecordSQLQuery(context.Background(), "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+			[]interface{}{username, user.Password, RoleTeacher}, constants.USER_TABLE_NAME, "INSERT", duration, 1, result.Error)
 	}
 	return &user, result.Error
 }
@@ -467,7 +447,7 @@ func EncodeHashToken(user *User, timestamp int64, useLastlogin bool) (hash strin
 	if useLastlogin && user.LastLogin != nil {
 		logintimestamp = fmt.Sprintf("%d", user.LastLogin.Unix())
 	}
-	t := fmt.Sprintf("%s$%d", user.Email, timestamp)
+	t := fmt.Sprintf("%s$%d", user.Username, timestamp)
 	hashVal := sha256.Sum256([]byte(logintimestamp + user.Password + t))
 	hash = base64.RawStdEncoding.EncodeToString([]byte(t)) + "-" + fmt.Sprintf("%x", hashVal)
 	return hash
@@ -497,7 +477,7 @@ func DecodeHashToken(db *gorm.DB, hash string, useLastLogin bool) (user *User, e
 		return nil, errors.New("token expired")
 	}
 
-	user, err = GetUserByEmail(db, vals[0])
+	user, err = GetUserByUsername(db, vals[0])
 	if err != nil {
 		return nil, errors.New("bad token")
 	}
@@ -509,19 +489,8 @@ func DecodeHashToken(db *gorm.DB, hash string, useLastLogin bool) (user *User, e
 }
 
 func CheckUserAllowLogin(db *gorm.DB, user *User) error {
-	if !user.Enabled {
-		return errors.New("user not allow login")
-	}
-
-	if utils.GetBoolValue(db, constants.KEY_USER_ACTIVATED) && !user.Activated {
-		return errors.New("waiting for activation")
-	}
-
-	// Role validation - ensure user has a valid role
-	if err := ValidateUserRole(user); err != nil {
-		return err
-	}
-
+	// 用户登录检查：只需要检查用户是否存在（通过 BaseModel 的 DeletedAt）
+	// 权限通过 role 字段判断
 	return nil
 }
 
@@ -532,7 +501,7 @@ func ValidateUserRole(user *User) error {
 	}
 
 	// Check if role is one of the valid roles
-	validRoles := []string{RoleAdmin, RoleUser, RoleStudent}
+	validRoles := []string{RoleAdmin, RoleTeacher, RoleStudent}
 	for _, validRole := range validRoles {
 		if user.Role == validRole {
 			return nil
@@ -597,178 +566,49 @@ func ResetPassword(db *gorm.DB, user *User, newPassword string) error {
 		return err
 	}
 
-	// 清除密码重置令牌
+	// 更新密码修改时间
 	err = UpdateUserFields(db, user, map[string]any{
-		"PasswordResetToken":   "",
-		"PasswordResetExpires": nil,
-		"LastPasswordChange":   time.Now(),
+		"LastPasswordChange": time.Now(),
 	})
 	if err != nil {
 		return err
 	}
 
-	user.PasswordResetToken = ""
-	user.PasswordResetExpires = nil
 	now := time.Now()
 	user.LastPasswordChange = &now
 	return nil
 }
 
-// GeneratePasswordResetToken 生成密码重置令牌
+// GeneratePasswordResetToken 生成密码重置令牌 - 已移除密码重置功能
 func GeneratePasswordResetToken(db *gorm.DB, user *User) (string, error) {
-	token := utils.RandString(32)
-	expires := time.Now().Add(24 * time.Hour) // 24小时过期
-
-	err := UpdateUserFields(db, user, map[string]any{
-		"PasswordResetToken":   token,
-		"PasswordResetExpires": &expires,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	user.PasswordResetToken = token
-	user.PasswordResetExpires = &expires
-	return token, nil
+	return "", errors.New("password reset functionality has been disabled")
 }
 
-// VerifyPasswordResetToken 验证密码重置令牌
+// VerifyPasswordResetToken 验证密码重置令牌 - 已移除密码重置功能
 func VerifyPasswordResetToken(db *gorm.DB, token string) (*User, error) {
-	var user User
-	err := db.Where("password_reset_token = ? AND password_reset_expires > ?", token, time.Now()).First(&user).Error
-	if err != nil {
-		return nil, errors.New("无效或过期的重置令牌")
-	}
-	return &user, nil
+	return nil, errors.New("password reset functionality has been disabled")
 }
 
-// GenerateEmailVerifyToken 生成邮箱验证令牌
-func GenerateEmailVerifyToken(db *gorm.DB, user *User) (string, error) {
-	token := utils.RandString(32)
-	expires := time.Now().Add(24 * time.Hour) // 24小时过期
-
-	err := UpdateUserFields(db, user, map[string]any{
-		"EmailVerifyToken":   token,
-		"EmailVerifyExpires": &expires,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	user.EmailVerifyToken = token
-	user.EmailVerifyExpires = &expires
-	return token, nil
-}
-
-// VerifyEmail 验证邮箱
-func VerifyEmail(db *gorm.DB, token string) (*User, error) {
-	var user User
-	err := db.Where("email_verify_token = ? AND email_verify_expires > ?", token, time.Now()).First(&user).Error
-	if err != nil {
-		return nil, errors.New("无效或过期的邮箱验证令牌")
-	}
-
-	// 更新邮箱验证状态
-	err = UpdateUserFields(db, &user, map[string]any{
-		"EmailVerified":      true,
-		"EmailVerifyToken":   "",
-		"EmailVerifyExpires": nil,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	user.EmailVerified = true
-	user.EmailVerifyToken = ""
-	user.EmailVerifyExpires = nil
-	return &user, nil
-}
-
-// GeneratePhoneVerifyToken 生成手机验证令牌
+// GeneratePhoneVerifyToken 生成手机验证令牌 - 已移除手机验证令牌功能
 func GeneratePhoneVerifyToken(db *gorm.DB, user *User) (string, error) {
-	token := utils.RandNumberText(6) // 6位数字验证码
-	err := UpdateUserFields(db, user, map[string]any{
-		"PhoneVerifyToken": token,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	user.PhoneVerifyToken = token
-	return token, nil
+	return "", errors.New("phone verify token functionality has been disabled")
 }
 
-// VerifyPhone 验证手机
+// VerifyPhone 验证手机 - 已移除手机验证令牌功能
 func VerifyPhone(db *gorm.DB, user *User, token string) error {
-	if user.PhoneVerifyToken != token {
-		return errors.New("验证码不正确")
-	}
-
-	// 更新手机验证状态
-	err := UpdateUserFields(db, user, map[string]any{
-		"PhoneVerified":    true,
-		"PhoneVerifyToken": "",
-	})
-	if err != nil {
-		return err
-	}
-
-	user.PhoneVerified = true
-	user.PhoneVerifyToken = ""
-	return nil
+	return errors.New("phone verify functionality has been disabled")
 }
 
-// UpdateNotificationSettings 更新通知设置
+// UpdateNotificationSettings 更新通知设置 - 已移除通知设置功能
 func UpdateNotificationSettings(db *gorm.DB, user *User, settings map[string]bool) error {
-	vals := make(map[string]any)
-
-	if emailNotif, ok := settings["emailNotifications"]; ok {
-		vals["email_notifications"] = emailNotif
-	}
-	if pushNotif, ok := settings["pushNotifications"]; ok {
-		vals["push_notifications"] = pushNotif
-	}
-	if systemNotif, ok := settings["systemNotifications"]; ok {
-		vals["system_notifications"] = systemNotif
-	}
-	if autoCleanUnreadEmails, ok := settings["autoCleanUnreadEmails"]; ok {
-		vals["auto_clean_unread_emails"] = autoCleanUnreadEmails
-	}
-
-	if len(vals) == 0 {
-		return nil
-	}
-
-	err := UpdateUserFields(db, user, vals)
-	if err != nil {
-		return err
-	}
-
-	// 更新用户对象
-	if emailNotif, ok := settings["emailNotifications"]; ok {
-		user.EmailNotifications = emailNotif
-	}
-	if pushNotif, ok := settings["pushNotifications"]; ok {
-		user.PushNotifications = pushNotif
-	}
-	if systemNotif, ok := settings["systemNotifications"]; ok {
-		user.SystemNotifications = systemNotif
-	}
-	if autoCleanUnreadEmails, ok := settings["autoCleanUnreadEmails"]; ok {
-		user.AutoCleanUnreadEmails = autoCleanUnreadEmails
-	}
-
-	return nil
+	return errors.New("notification settings functionality has been disabled")
 }
 
 // UpdatePreferences 更新用户偏好设置
-// 只处理实际使用的字段：timezone 和 locale
+// 只处理实际使用的字段：locale
 func UpdatePreferences(db *gorm.DB, user *User, preferences map[string]string) error {
 	vals := make(map[string]any)
 
-	if timezone, ok := preferences["timezone"]; ok {
-		vals["timezone"] = timezone
-	}
 	if locale, ok := preferences["locale"]; ok {
 		vals["locale"] = locale
 	}
@@ -783,9 +623,6 @@ func UpdatePreferences(db *gorm.DB, user *User, preferences map[string]string) e
 	}
 
 	// 更新用户对象
-	if timezone, ok := preferences["timezone"]; ok {
-		user.Timezone = timezone
-	}
 	if locale, ok := preferences["locale"]; ok {
 		user.Locale = locale
 	}
@@ -798,8 +635,8 @@ func CalculateProfileComplete(user *User) int {
 	complete := 0
 	total := 0
 
-	// 基本信息 (40%)
-	total += 4
+	// 基本信息 (60%)
+	total += 6
 	if user.DisplayName != "" {
 		complete++
 	}
@@ -812,16 +649,10 @@ func CalculateProfileComplete(user *User) int {
 	if user.Avatar != "" {
 		complete++
 	}
-
-	// 联系方式 (30%)
-	total += 3
-	if user.Email != "" {
+	if user.Username != "" {
 		complete++
 	}
 	if user.Phone != "" {
-		complete++
-	}
-	if user.EmailVerified {
 		complete++
 	}
 
@@ -836,7 +667,7 @@ func CalculateProfileComplete(user *User) int {
 
 	// 偏好设置 (10%)
 	total += 1
-	if user.Timezone != "" {
+	if user.Locale != "" {
 		complete++
 	}
 
@@ -848,17 +679,9 @@ func CalculateProfileComplete(user *User) int {
 	return percentage
 }
 
-// UpdateProfileComplete 更新资料完整度
+// UpdateProfileComplete 更新资料完整度 - 已移除资料完整度功能
 func UpdateProfileComplete(db *gorm.DB, user *User) error {
-	complete := CalculateProfileComplete(user)
-	err := UpdateUserFields(db, user, map[string]any{
-		"ProfileComplete": complete,
-	})
-	if err != nil {
-		return err
-	}
-
-	user.ProfileComplete = complete
+	// 资料完整度功能已禁用，直接返回成功
 	return nil
 }
 
@@ -880,9 +703,9 @@ func (u *User) IsAdmin() bool {
 	return u.Role == RoleAdmin
 }
 
-// IsTeacher 检查是否为老师（user role）
+// IsTeacher 检查是否为老师
 func (u *User) IsTeacher() bool {
-	return u.Role == RoleUser
+	return u.Role == RoleTeacher
 }
 
 // IsStudent 检查是否为学员

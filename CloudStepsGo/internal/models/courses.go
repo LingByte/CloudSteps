@@ -11,6 +11,8 @@ type Course struct {
 	BaseModel
 	Name        string `json:"name" gorm:"size:128;not null"`
 	Description string `json:"description" gorm:"size:512"`
+	// ClassType: group 一对多（默认）；one_on_one 一对一（同一排课最多一名学员）
+	ClassType   string `json:"classType" gorm:"size:20;default:'group'"`
 	WordBookID  uint   `json:"wordBookId" gorm:"index"`
 	TeacherID   uint   `json:"teacherId" gorm:"index"`   // user role
 	CreatedByID uint   `json:"createdById" gorm:"index"` // admin who created
@@ -65,6 +67,25 @@ type ClassSession struct {
 }
 
 func (ClassSession) TableName() string { return "class_sessions" }
+
+// StudentClassRecord 下课完成后，每位参课学员一条上课/训练记录（便于一对多分班统计）
+type StudentClassRecord struct {
+	BaseModel
+	ClassSessionID  uint       `json:"classSessionId" gorm:"index;not null"`
+	ScheduleID      uint       `json:"scheduleId" gorm:"index;not null"`
+	CourseID        uint       `json:"courseId" gorm:"index"`
+	StudentID       uint       `json:"studentId" gorm:"index;not null"`
+	TeacherID       uint       `json:"teacherId" gorm:"index;not null"`
+	StartedAt       *time.Time `json:"startedAt"`
+	EndedAt         *time.Time `json:"endedAt"`
+	DurationMinutes int        `json:"durationMinutes" gorm:"default:0"`
+	Status          string     `json:"status" gorm:"size:20;default:'completed'"`
+
+	Student *User `json:"student,omitempty" gorm:"foreignKey:StudentID"`
+	Course  *Course `json:"course,omitempty" gorm:"foreignKey:CourseID"`
+}
+
+func (StudentClassRecord) TableName() string { return "student_class_records" }
 
 func GetCoursesByTeacher(db *gorm.DB, teacherID uint) ([]Course, error) {
 	var courses []Course

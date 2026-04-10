@@ -99,7 +99,7 @@ func nextLevelOf(level string) string {
 // staffRequired 管理员中间件
 func staffRequired(c *gin.Context) {
 	user := models.CurrentUser(c)
-	if user == nil || !user.IsStaff {
+	if user == nil || user.Role != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"code": 403, "msg": "需要管理员权限"})
 		c.Abort()
 		return

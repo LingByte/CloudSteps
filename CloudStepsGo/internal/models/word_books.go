@@ -1,6 +1,7 @@
 package models
 
 import (
+	"time"
 	"github.com/LingByte/CloudStepsGo/pkg/constants"
 	"gorm.io/gorm"
 )
@@ -15,6 +16,17 @@ type WordBook struct {
 	CoverURL    string `json:"coverUrl" gorm:"size:512;comment:封面图URL"`
 	IsActive    bool   `json:"isActive" gorm:"default:true;comment:是否上架"`
 	SortOrder   int    `json:"sortOrder" gorm:"default:0;comment:排序权重"`
+	Category       string `json:"category" gorm:"size:64;index;comment:词库分类 (vocabulary/grammar/reading等)"`
+	Language       string `json:"language" gorm:"size:10;default:'en';comment:语言类型"`
+	TargetLanguage string `json:"targetLanguage" gorm:"size:10;default:'zh';comment:目标语言"`
+	Difficulty     int8   `json:"difficulty" gorm:"default:1;index;comment:整体难度 1-5"`
+	StudyHours     int    `json:"studyHours" gorm:"default:0;comment:建议学习时长(小时)"`
+	Tags           string `json:"tags" gorm:"type:text;comment:标签 JSON数组"`
+	Author         string `json:"author" gorm:"size:128;comment:作者/创建者"`
+	Publisher      string `json:"publisher" gorm:"size:128;comment:发布机构"`
+	Version        string `json:"version" gorm:"size:20;default:'1.0';comment:版本号"`
+	ViewCount      int    `json:"viewCount" gorm:"default:0;comment:查看次数"`
+	LastStudyAt    *time.Time `json:"lastStudyAt" gorm:"comment:最后学习时间"`
 }
 
 func (WordBook) TableName() string { return constants.TABLE_WORD_BOOKS }
@@ -30,9 +42,91 @@ type Word struct {
 	AudioURL        string `json:"audioUrl" gorm:"size:512;comment:发音音频URL"`
 	Difficulty      int8   `json:"difficulty" gorm:"default:1;comment:难度 1-5"`
 	SortOrder       int    `json:"sortOrder" gorm:"default:0;comment:词库内排序"`
+	
+	// 新增字段
+	PartOfSpeech     string     `json:"partOfSpeech" gorm:"size:50;comment:词性 (noun/verb/adjective等)"`
+	Definition       string     `json:"definition" gorm:"type:text;comment:英文释义"`
+	Synonyms         string     `json:"synonyms" gorm:"type:text;comment:同义词 JSON数组"`
+	Antonyms         string     `json:"antonyms" gorm:"type:text;comment:反义词 JSON数组"`
+	WordFamily       string     `json:"wordFamily" gorm:"type:text;comment:词族 JSON数组"`
+	Collocations     string     `json:"collocations" gorm:"type:text;comment:搭配 JSON数组"`
+	ExampleSentences string     `json:"exampleSentences" gorm:"type:text;comment:多个例句 JSON数组"`
+	ImageURL         string     `json:"imageUrl" gorm:"size:512;comment:图片URL"`
+	VideoURL         string     `json:"videoUrl" gorm:"size:512;comment:视频URL"`
+	Frequency        int8       `json:"frequency" gorm:"default:1;index;comment:使用频率 1-5"`
+	Importance       int8       `json:"importance" gorm:"default:1;comment:重要程度 1-5"`
+	Tags             string     `json:"tags" gorm:"type:text;comment:标签 JSON数组"`
+	Notes            string     `json:"notes" gorm:"type:text;comment:学习笔记"`
+	IsMemorized      bool       `json:"isMemorized" gorm:"default:false;comment:是否已掌握"`
+	MasteryLevel     int8       `json:"masteryLevel" gorm:"default:0;comment:掌握程度 0-5"`
+	ReviewCount      int        `json:"reviewCount" gorm:"default:0;comment:复习次数"`
+	CorrectCount     int        `json:"correctCount" gorm:"default:0;comment:答对次数"`
+	LastReviewAt     *time.Time `json:"lastReviewAt" gorm:"comment:最后复习时间"`
+	NextReviewAt     *time.Time `json:"nextReviewAt" gorm:"index;comment:下次复习时间"`
+	StudyTime        int        `json:"studyTime" gorm:"default:0;comment:学习时长(秒)"`
 }
 
 func (Word) TableName() string { return constants.TABLE_WORDS }
+
+// 词库相关常量
+const (
+	// 词库分类
+	CategoryVocabulary = "vocabulary"
+	CategoryGrammar    = "grammar"
+	CategoryReading    = "reading"
+	CategoryListening  = "listening"
+	CategorySpeaking   = "speaking"
+	CategoryWriting    = "writing"
+	
+	// 词性
+	PartOfSpeechNoun        = "noun"
+	PartOfSpeechVerb        = "verb"
+	PartOfSpeechAdjective   = "adjective"
+	PartOfSpeechAdverb      = "adverb"
+	PartOfSpeechPronoun     = "pronoun"
+	PartOfSpeechPreposition = "preposition"
+	PartOfSpeechConjunction = "conjunction"
+	PartOfSpeechInterjection = "interjection"
+)
+
+// WordBookProgress 词库学习进度
+type WordBookProgress struct {
+	BaseModel
+	UserID       uint       `json:"userId" gorm:"index;not null;comment:用户ID"`
+	WordBookID   uint       `json:"wordBookId" gorm:"index;not null;comment:词库ID"`
+	TotalWords   int        `json:"totalWords" gorm:"default:0;comment:总词数"`
+	LearnedWords int        `json:"learnedWords" gorm:"default:0;comment:已学词数"`
+	MasteredWords int       `json:"masteredWords" gorm:"default:0;comment:已掌握词数"`
+	Progress     float64    `json:"progress" gorm:"default:0;comment:学习进度百分比"`
+	StudyTime    int        `json:"studyTime" gorm:"default:0;comment:学习时长(秒)"`
+	LastStudyAt  *time.Time `json:"lastStudyAt" gorm:"comment:最后学习时间"`
+	IsCompleted  bool       `json:"isCompleted" gorm:"default:false;comment:是否完成"`
+	StartDate    *time.Time `json:"startDate" gorm:"comment:开始学习时间"`
+	CompletedAt  *time.Time `json:"completedAt" gorm:"comment:完成时间"`
+}
+
+func (WordBookProgress) TableName() string { return "word_book_progress" }
+
+// UserWordProgress 用户单词学习进度
+type UserWordProgress struct {
+	BaseModel
+	UserID        uint       `json:"userId" gorm:"index;not null;comment:用户ID"`
+	WordID        uint       `json:"wordId" gorm:"index;not null;comment:单词ID"`
+	WordBookID    uint       `json:"wordBookId" gorm:"index;not null;comment:词库ID"`
+	MasteryLevel  int8       `json:"masteryLevel" gorm:"default:0;comment:掌握程度 0-5"`
+	IsMemorized   bool       `json:"isMemorized" gorm:"default:false;comment:是否已掌握"`
+	StudyCount    int        `json:"studyCount" gorm:"default:0;comment:学习次数"`
+	ReviewCount   int        `json:"reviewCount" gorm:"default:0;comment:复习次数"`
+	CorrectCount  int        `json:"correctCount" gorm:"default:0;comment:答对次数"`
+	WrongCount    int        `json:"wrongCount" gorm:"default:0;comment:答错次数"`
+	StudyTime     int        `json:"studyTime" gorm:"default:0;comment:学习时长(秒)"`
+	LastStudyAt   *time.Time `json:"lastStudyAt" gorm:"comment:最后学习时间"`
+	NextReviewAt  *time.Time `json:"nextReviewAt" gorm:"index;comment:下次复习时间"`
+	Notes         string     `json:"notes" gorm:"type:text;comment:学习笔记"`
+	Difficulty    int8       `json:"difficulty" gorm:"default:1;comment:个人难度感受 1-5"`
+}
+
+func (UserWordProgress) TableName() string { return "user_word_progress" }
 
 // CreateWordBook 创建词库
 func CreateWordBook(db *gorm.DB, book *WordBook) error {
@@ -46,6 +140,123 @@ func GetWordBookByID(db *gorm.DB, id uint) (*WordBook, error) {
 		return nil, err
 	}
 	return &book, nil
+}
+
+// GetWordsByBookID 按词库ID查单词
+func GetWordsByBookID(db *gorm.DB, bookID uint, limit, offset int) ([]Word, error) {
+	var words []Word
+	query := db.Where("word_book_id = ?", bookID)
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	err := query.Order("sort_order ASC, id ASC").Find(&words).Error
+	return words, err
+}
+
+// GetWordProgress 获取用户词库学习进度
+func GetWordProgress(db *gorm.DB, userID, wordBookID uint) (*WordBookProgress, error) {
+	var progress WordBookProgress
+	err := db.Where("user_id = ? AND word_book_id = ?", userID, wordBookID).First(&progress).Error
+	if err != nil {
+		return nil, err
+	}
+	return &progress, nil
+}
+
+// UpdateWordProgress 更新词库学习进度
+func UpdateWordProgress(db *gorm.DB, userID, wordBookID uint, totalWords, learnedWords, masteredWords int) error {
+	var progress float64
+	if totalWords > 0 {
+		progress = float64(learnedWords) / float64(totalWords) * 100
+	}
+	
+	updates := map[string]interface{}{
+		"total_words":    totalWords,
+		"learned_words":  learnedWords,
+		"mastered_words": masteredWords,
+		"progress":       progress,
+		"last_study_at":  time.Now(),
+	}
+	
+	return db.Model(&WordBookProgress{}).
+		Where("user_id = ? AND word_book_id = ?", userID, wordBookID).
+		Updates(updates).Error
+}
+
+// GetUserWordProgress 获取用户单词学习进度
+func GetUserWordProgress(db *gorm.DB, userID, wordID uint) (*UserWordProgress, error) {
+	var progress UserWordProgress
+	err := db.Where("user_id = ? AND word_id = ?", userID, wordID).First(&progress).Error
+	if err != nil {
+		return nil, err
+	}
+	return &progress, nil
+}
+
+// UpdateUserWordProgress 更新用户单词学习进度
+func UpdateUserWordProgress(db *gorm.DB, userID, wordID uint, isCorrect bool, studyTime int) error {
+	var progress UserWordProgress
+	
+	// 先尝试获取现有进度
+	err := db.Where("user_id = ? AND word_id = ?", userID, wordID).First(&progress).Error
+	if err != nil {
+		// 如果不存在，创建新记录
+		progress = UserWordProgress{
+			UserID:      userID,
+			WordID:      wordID,
+			StudyCount:  1,
+			StudyTime:   studyTime,
+			LastStudyAt: &time.Time{},
+		}
+		if isCorrect {
+			progress.CorrectCount = 1
+		} else {
+			progress.WrongCount = 1
+		}
+		*progress.LastStudyAt = time.Now()
+		return db.Create(&progress).Error
+	}
+	
+	// 更新现有记录
+	updates := map[string]interface{}{
+		"study_count":   progress.StudyCount + 1,
+		"study_time":    progress.StudyTime + studyTime,
+		"last_study_at": time.Now(),
+	}
+	
+	if isCorrect {
+		updates["correct_count"] = progress.CorrectCount + 1
+	} else {
+		updates["wrong_count"] = progress.WrongCount + 1
+	}
+	
+	// 计算掌握程度
+	totalAttempts := progress.CorrectCount + progress.WrongCount + 1
+	if isCorrect {
+		totalAttempts++
+	}
+	correctRate := float64(progress.CorrectCount) / float64(totalAttempts)
+	
+	var masteryLevel int8
+	if correctRate >= 0.9 {
+		masteryLevel = 5
+	} else if correctRate >= 0.8 {
+		masteryLevel = 4
+	} else if correctRate >= 0.7 {
+		masteryLevel = 3
+	} else if correctRate >= 0.6 {
+		masteryLevel = 2
+	} else {
+		masteryLevel = 1
+	}
+	
+	updates["mastery_level"] = masteryLevel
+	updates["is_memorized"] = masteryLevel >= 4
+	
+	return db.Model(&progress).Updates(updates).Error
 }
 
 // ListWordBooks 分页查词库列表

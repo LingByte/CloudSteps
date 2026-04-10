@@ -37,7 +37,7 @@ func (h *Handlers) registerNotificationRoutes(r *gin.RouterGroup) {
 func (h *Handlers) handleUnReadNotificationCount(c *gin.Context) {
 	user := models.CurrentUser(c)
 
-	users, err := models.GetUserByEmail(h.db, user.Email)
+	users, err := models.GetUserByUsername(h.db, user.Username)
 	if err != nil {
 		response.AbortWithStatus(c, http.StatusUnauthorized)
 		return

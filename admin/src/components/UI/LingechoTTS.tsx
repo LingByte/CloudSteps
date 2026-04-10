@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Volume2, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 
-const LINGECHO_URL = 'https://lingecho.com/api/open/tts'
+const LINGECHO_URL = 'https://soulmy.top/api/open/tts'
 const API_KEY = import.meta.env.VITE_LINGECHO_API_KEY as string
 const API_SECRET = import.meta.env.VITE_LINGECHO_API_SECRET as string
 

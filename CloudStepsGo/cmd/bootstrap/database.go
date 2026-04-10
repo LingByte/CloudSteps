@@ -157,5 +157,6 @@ func RunMigrations(db *gorm.DB) error {
 		&models.Schedule{},
 		&models.ScheduleStudent{},
 		&models.ClassSession{},
+		&models.StudentClassRecord{},
 	})
 }

@@ -53,7 +53,8 @@ func (LoginHistory) TableName() string {
 type AccountLock struct {
 	BaseModel
 	UserID         uint      `gorm:"index;not null" json:"userId"`
-	Email          string    `gorm:"size:128;index;not null" json:"email"` // 邮箱（用于未登录时的锁定）
+	Email          string    `gorm:"size:128;index" json:"email"`           // 邮箱（用于未登录时的锁定）
+	Username       string    `gorm:"size:128;index" json:"username"`       // 用户名（用于未登录时的锁定）
 	IPAddress      string    `gorm:"size:128;index" json:"ipAddress"`      // 锁定IP
 	LockedAt       time.Time `gorm:"index" json:"lockedAt"`                // 锁定时间
 	UnlockAt       time.Time `gorm:"index" json:"unlockAt"`                // 解锁时间
@@ -107,6 +108,39 @@ func CreateOrUpdateAccountLock(db *gorm.DB, email string, userID uint, ipAddress
 	return &lock, err
 }
 
+// CreateOrUpdateAccountLockByUsername 根据用户名创建或更新账号锁定记录
+func CreateOrUpdateAccountLockByUsername(db *gorm.DB, username string, userID uint, ipAddress string, failedAttempts int) (*AccountLock, error) {
+	var lock AccountLock
+	query := db.Where("username = ? AND is_active = ?", username, true)
+	if userID > 0 {
+		query = query.Or("user_id = ? AND is_active = ?", userID, true)
+	}
+	err := query.First(&lock).Error
+	lockTime := 30 * time.Minute // 锁定30分钟
+	if err == gorm.ErrRecordNotFound {
+		lock = AccountLock{
+			Username:       username,
+			UserID:         userID,
+			IPAddress:      ipAddress,
+			LockedAt:       time.Now(),
+			UnlockAt:       time.Now().Add(lockTime),
+			FailedAttempts: failedAttempts,
+			Reason:         "Too many failed login attempts",
+			IsActive:       true,
+		}
+		err = db.Create(&lock).Error
+	} else if err == nil {
+		// 更新现有锁定记录
+		lock.FailedAttempts = failedAttempts
+		lock.UnlockAt = time.Now().Add(lockTime)
+		lock.IPAddress = ipAddress
+		lock.UpdatedAt = time.Now()
+		err = db.Save(&lock).Error
+	}
+
+	return &lock, err
+}
+
 // GetAccountLock 获取账号锁定记录
 func GetAccountLock(db *gorm.DB, email string, userID uint) (*AccountLock, error) {
 	var lock AccountLock
@@ -125,6 +159,29 @@ func GetAccountLock(db *gorm.DB, email string, userID uint) (*AccountLock, error
 	}
 
 	return &lock, err
+}
+
+// GetAccountLockByUsername 根据用户名获取账号锁定记录
+func GetAccountLockByUsername(db *gorm.DB, username string, userID uint) (*AccountLock, error) {
+	var lock AccountLock
+
+	query := db.Where("is_active = ?", true)
+	if username != "" {
+		query = query.Where("username = ?", username)
+	}
+	if userID > 0 {
+		query = query.Where("user_id = ?", userID)
+	}
+
+	err := query.First(&lock).Error
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &lock, nil
 }
 
 // UnlockAccount 解锁账号

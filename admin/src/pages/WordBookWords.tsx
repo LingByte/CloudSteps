@@ -9,7 +9,7 @@ import { Plus, Pencil, Trash2, Search, ChevronLeft, ChevronRight, ArrowLeft, Upl
 import LingechoTTS from '@/components/UI/LingechoTTS'
 import VoicePlayer from '@/components/VoicePlayer'
 
-const LINGECHO_URL = 'https://lingecho.com/api/open/tts'
+const LINGECHO_URL = 'https://soulmy.top/api/open/tts'
 const API_KEY = import.meta.env.VITE_LINGECHO_API_KEY as string
 const API_SECRET = import.meta.env.VITE_LINGECHO_API_SECRET as string
 

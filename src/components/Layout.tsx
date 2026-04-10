@@ -107,7 +107,7 @@ export function Layout() {
 
         {/* 移动端侧边栏（抽屉式） */}
         {mobileMenuMounted && (
-          <div className="lg:hidden fixed inset-0 z-40" style={{ top: "120px" }}>
+          <div className="lg:hidden fixed inset-0 z-[60]">
             <div
               className={
                 "absolute inset-0 bg-black/20 transition-opacity duration-300 ease-out " +

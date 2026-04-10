@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Mail, Eye, EyeOff, LogIn, Lock as LockIcon, Shield } from 'lucide-react'
+import { User, Eye, EyeOff, LogIn, Lock as LockIcon, Shield } from 'lucide-react'
 import Button from '@/components/UI/Button'
 import Input from '@/components/UI/Input'
 import Modal from '@/components/UI/Modal'
@@ -13,7 +13,7 @@ import { getApiBaseURL } from '@/config/apiConfig'
 import faviconUrl from '/favicon.png'
 
 const Login = () => {
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -36,7 +36,7 @@ const Login = () => {
     setLoading(true)
     try {
       const loginData: any = {
-        email,
+        username,
         password,
         captchaId: cId,
         captchaType: cType,
@@ -77,7 +77,7 @@ const Login = () => {
       await login(token, {
         id: userData.id,
         email: userData.email,
-        displayName: userData.displayName || email.split('@')[0],
+        displayName: userData.displayName || username,
         role: userData.role,
         avatar: userData.avatar,
         isStaff: userData.isStaff,
@@ -86,7 +86,7 @@ const Login = () => {
       showAlert('登录成功', 'success', '欢迎回来')
       navigate('/dashboard')
     } catch (error: any) {
-      showAlert(error?.msg || error?.message || '登录失败，请检查邮箱和密码', 'error', '登录失败')
+      showAlert(error?.msg || error?.message || '登录失败，请检查用户名和密码', 'error', '登录失败')
     } finally {
       setLoading(false)
     }
@@ -106,8 +106,8 @@ const Login = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email || !password) {
-      showAlert('请填写完整信息', 'error', '登录失败')
+    if (!username || !password) {
+      showAlert('请输入用户名和密码', 'error', '登录失败')
       return
     }
 
@@ -165,12 +165,12 @@ const Login = () => {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <Input
-              type="email"
-              label="邮箱"
-              placeholder="请输入邮箱"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              leftIcon={<Mail className="w-4 h-4" />}
+              type="text"
+              label="用户名"
+              placeholder="请输入用户名"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              leftIcon={<User className="w-4 h-4" />}
               size="lg"
               required
               disabled={loading}

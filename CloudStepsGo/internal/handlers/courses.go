@@ -57,6 +57,7 @@ func (h *Handlers) registerCourseRoutes(r *gin.RouterGroup) {
 	{
 		student.GET("/schedules", h.handleStudentSchedules)
 		student.GET("/week", h.handleStudentWeek) // 周视图
+		student.GET("/class-records", h.handleStudentClassRecords)
 	}
 }
 
@@ -86,6 +87,7 @@ func (h *Handlers) handleCreateCourse(c *gin.Context) {
 	var body struct {
 		Name        string `json:"name" binding:"required"`
 		Description string `json:"description"`
+		ClassType   string `json:"classType"` // group | one_on_one
 		WordBookID  uint   `json:"wordBookId"`
 		TeacherID   uint   `json:"teacherId" binding:"required"`
 	}
@@ -94,9 +96,14 @@ func (h *Handlers) handleCreateCourse(c *gin.Context) {
 		return
 	}
 
+	classType := body.ClassType
+	if classType != "one_on_one" {
+		classType = "group"
+	}
 	course := models.Course{
 		Name:        body.Name,
 		Description: body.Description,
+		ClassType:   classType,
 		WordBookID:  body.WordBookID,
 		TeacherID:   body.TeacherID,
 		CreatedByID: user.ID,
@@ -122,6 +129,7 @@ func (h *Handlers) handleUpdateCourse(c *gin.Context) {
 	var body struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		ClassType   string `json:"classType"`
 		WordBookID  uint   `json:"wordBookId"`
 		TeacherID   uint   `json:"teacherId"`
 	}
@@ -133,6 +141,9 @@ func (h *Handlers) handleUpdateCourse(c *gin.Context) {
 	}
 	if body.Description != "" {
 		vals["description"] = body.Description
+	}
+	if body.ClassType == "one_on_one" || body.ClassType == "group" {
+		vals["class_type"] = body.ClassType
 	}
 	if body.WordBookID > 0 {
 		vals["word_book_id"] = body.WordBookID
@@ -305,22 +316,22 @@ func (h *Handlers) handleSearchUsers(c *gin.Context) {
 	q := c.Query("q")
 	role := c.Query("role") // "user" or "student"
 
-	tx := db.Model(&models.User{}).Where("enabled = ?", true)
+	tx := db.Model(&models.User{})
 	if role != "" {
 		tx = tx.Where("role = ?", role)
 	}
 	if q != "" {
-		tx = tx.Where("email LIKE ? OR display_name LIKE ?", "%"+q+"%", "%"+q+"%")
+		tx = tx.Where("username LIKE ? OR display_name LIKE ?", "%"+q+"%", "%"+q+"%")
 	}
 
 	var users []struct {
 		ID          uint   `json:"id"`
-		Email       string `json:"email"`
+		Username    string `json:"username"`
 		DisplayName string `json:"displayName"`
 		Role        string `json:"role"`
 		Avatar      string `json:"avatar"`
 	}
-	tx.Limit(20).Find(&users)
+	tx.Select("id", "username", "display_name", "role", "avatar").Limit(20).Find(&users)
 	response.Success(c, "success", users)
 }
 
@@ -398,7 +409,7 @@ func (h *Handlers) handleTeacherToday(c *gin.Context) {
 					if ss.Student.DisplayName != "" {
 						students = append(students, ss.Student.DisplayName)
 					} else {
-						students = append(students, ss.Student.Email)
+						students = append(students, ss.Student.Username)
 					}
 				}
 			}
@@ -470,6 +481,8 @@ func (h *Handlers) handleTeacherTrainingRecords(c *gin.Context) {
 
 	type TrainingRecordItem struct {
 		ID              uint   `json:"id"`
+		RowKind         string `json:"rowKind"` // schedule | student_record
+		ScheduleID      uint   `json:"scheduleId,omitempty"`
 		Name            string `json:"name"`
 		AppointmentTime string `json:"appointmentTime"`
 		Duration        string `json:"duration"`
@@ -487,6 +500,12 @@ func (h *Handlers) handleTeacherTrainingRecords(c *gin.Context) {
 			Where("schedule_id = ?", s.ID).
 			Order("CASE WHEN status = 'in_progress' THEN 0 ELSE 1 END, created_at DESC").
 			First(&session).Error; err == nil {
+			if session.Status == "in_progress" {
+				plannedEnd, peErr := parsePlannedEndAt(s.ScheduledDate, s.StartTime, s.EndTime)
+				if peErr == nil && time.Now().After(plannedEnd) {
+					_ = endSessionAsCompleted(db, &session, time.Now())
+				}
+			}
 			sp = &session
 		}
 
@@ -498,19 +517,16 @@ func (h *Handlers) handleTeacherTrainingRecords(c *gin.Context) {
 			}
 		}
 		if statusQ != "" {
-			// support ui: not-started/completed/in-progress
 			if statusQ != status {
 				continue
 			}
 		}
 
-		// format coach
-		coach := user.Email
+		coach := user.Username
 		if user.DisplayName != "" {
 			coach = user.DisplayName
 		}
 
-		// format students
 		studentNames := make([]string, 0)
 		for _, ss := range s.Students {
 			if ss.Student == nil {
@@ -518,13 +534,12 @@ func (h *Handlers) handleTeacherTrainingRecords(c *gin.Context) {
 			}
 			if ss.Student.DisplayName != "" {
 				studentNames = append(studentNames, ss.Student.DisplayName)
-			} else if ss.Student.Email != "" {
-				studentNames = append(studentNames, ss.Student.Email)
+			} else if ss.Student.Username != "" {
+				studentNames = append(studentNames, ss.Student.Username)
 			}
 		}
-		student := strings.Join(studentNames, "、")
+		studentJoined := strings.Join(studentNames, "、")
 
-		// duration string
 		durMin := 0
 		if start, err := parseClock(s.ScheduledDate, s.StartTime); err == nil {
 			if end, err2 := parseClock(s.ScheduledDate, s.EndTime); err2 == nil {
@@ -547,13 +562,51 @@ func (h *Handlers) handleTeacherTrainingRecords(c *gin.Context) {
 			name = s.Course.Name
 		}
 
+		appt := s.ScheduledDate.Format("2006-01-02") + " " + s.StartTime
+
+		// 已下课：每人一条记录（一对多）
+		if sp != nil && sp.Status == "completed" {
+			var recs []models.StudentClassRecord
+			_ = db.Preload("Student").Where("class_session_id = ?", sp.ID).Order("id ASC").Find(&recs).Error
+			if len(recs) > 0 {
+				for _, r := range recs {
+					stName := ""
+					if r.Student != nil {
+						if r.Student.DisplayName != "" {
+							stName = r.Student.DisplayName
+						} else {
+							stName = r.Student.Username
+						}
+					}
+					durDone := durStr
+					if r.DurationMinutes > 0 {
+						durDone = strconv.Itoa(r.DurationMinutes) + "分钟"
+					}
+					records = append(records, TrainingRecordItem{
+						ID:              r.ID,
+						RowKind:         "student_record",
+						ScheduleID:      s.ID,
+						Name:            name,
+						AppointmentTime: appt,
+						Duration:        durDone,
+						Coach:           coach,
+						Student:         stName,
+						Status:          "completed",
+					})
+				}
+				continue
+			}
+		}
+
 		records = append(records, TrainingRecordItem{
 			ID:              s.ID,
+			RowKind:         "schedule",
+			ScheduleID:      s.ID,
 			Name:            name,
-			AppointmentTime: s.ScheduledDate.Format("2006-01-02") + " " + s.StartTime,
+			AppointmentTime: appt,
 			Duration:        durStr,
 			Coach:           coach,
-			Student:         student,
+			Student:         studentJoined,
 			Status:          status,
 		})
 	}
@@ -640,6 +693,11 @@ func (h *Handlers) handleEndClass(c *gin.Context) {
 	session.Status = "completed"
 	session.DurationMinutes = duration
 
+	if err := ensureStudentClassRecords(db, &session); err != nil {
+		response.Fail(c, "写入学员上课记录失败", err)
+		return
+	}
+
 	response.Success(c, "success", session)
 }
 
@@ -670,6 +728,104 @@ func (h *Handlers) handleStudentSchedules(c *gin.Context) {
 		return
 	}
 	response.Success(c, "success", schedules)
+}
+
+// handleStudentClassRecords GET /student/class-records?page=1&pageSize=20
+func (h *Handlers) handleStudentClassRecords(c *gin.Context) {
+	db := c.MustGet(constants.DbField).(*gorm.DB)
+	user := models.CurrentUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "msg": "authorization required"})
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page <= 0 {
+		page = 1
+	}
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	if pageSize > 50 {
+		pageSize = 50
+	}
+
+	tx := db.Model(&models.StudentClassRecord{}).Where("student_id = ?", user.ID)
+	var total int64
+	_ = tx.Count(&total).Error
+
+	var recs []models.StudentClassRecord
+	_ = tx.Preload("Course").
+		Preload("Student").
+		Order("ended_at DESC, id DESC").
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Find(&recs).Error
+
+	type Item struct {
+		ID              uint   `json:"id"`
+		Name            string `json:"name"`
+		AppointmentTime string `json:"appointmentTime"`
+		Duration        string `json:"duration"`
+		Coach           string `json:"coach"`
+		Student         string `json:"student"`
+		Status          string `json:"status"`
+		RowKind         string `json:"rowKind"`
+		ScheduleID      uint   `json:"scheduleId,omitempty"`
+	}
+	out := make([]Item, 0, len(recs))
+	for _, r := range recs {
+		var sched models.Schedule
+		appt := ""
+		_ = db.Select("scheduled_date", "start_time").Where("id = ?", r.ScheduleID).First(&sched).Error
+		if !sched.ScheduledDate.IsZero() {
+			appt = sched.ScheduledDate.Format("2006-01-02") + " " + sched.StartTime
+		}
+		name := ""
+		if r.Course != nil {
+			name = r.Course.Name
+		}
+		coach := ""
+		var tch models.User
+		if err := db.Select("username", "display_name").Where("id = ?", r.TeacherID).First(&tch).Error; err == nil {
+			if tch.DisplayName != "" {
+				coach = tch.DisplayName
+			} else {
+				coach = tch.Username
+			}
+		}
+		student := ""
+		if r.Student != nil {
+			if r.Student.DisplayName != "" {
+				student = r.Student.DisplayName
+			} else {
+				student = r.Student.Username
+			}
+		}
+		durStr := ""
+		if r.DurationMinutes > 0 {
+			durStr = strconv.Itoa(r.DurationMinutes) + "分钟"
+		}
+		out = append(out, Item{
+			ID:              r.ID,
+			Name:            name,
+			AppointmentTime: appt,
+			Duration:        durStr,
+			Coach:           coach,
+			Student:         student,
+			Status:          "completed",
+			RowKind:         "student_record",
+			ScheduleID:      r.ScheduleID,
+		})
+	}
+
+	response.Success(c, "success", gin.H{
+		"page":     page,
+		"pageSize": pageSize,
+		"total":    total,
+		"records":  out,
+	})
 }
 
 // handleTeacherWeek GET /teacher/week?date=2026-03-17
@@ -766,7 +922,7 @@ func (h *Handlers) handleTeacherWeek(c *gin.Context) {
 					if ss.Student.DisplayName != "" {
 						students = append(students, ss.Student.DisplayName)
 					} else {
-						students = append(students, ss.Student.Email)
+						students = append(students, ss.Student.Username)
 					}
 				}
 			}
@@ -842,6 +998,43 @@ func endSessionAsCompleted(db *gorm.DB, session *models.ClassSession, now time.T
 	session.EndedAt = &now
 	session.Status = "completed"
 	session.DurationMinutes = duration
+	return ensureStudentClassRecords(db, session)
+}
+
+// ensureStudentClassRecords 下课完成后为排课内每位学员各写一条记录（幂等）
+func ensureStudentClassRecords(db *gorm.DB, session *models.ClassSession) error {
+	var existingCnt int64
+	if err := db.Model(&models.StudentClassRecord{}).Where("class_session_id = ?", session.ID).Count(&existingCnt).Error; err != nil {
+		return err
+	}
+	if existingCnt > 0 {
+		return nil
+	}
+	var schedule models.Schedule
+	if err := db.Preload("Students").Where("id = ? AND is_deleted = 0", session.ScheduleID).First(&schedule).Error; err != nil {
+		return nil
+	}
+	if len(schedule.Students) == 0 {
+		return nil
+	}
+	duration := session.DurationMinutes
+	endAt := session.EndedAt
+	for _, st := range schedule.Students {
+		rec := models.StudentClassRecord{
+			ClassSessionID:  session.ID,
+			ScheduleID:      session.ScheduleID,
+			CourseID:        schedule.CourseID,
+			StudentID:       st.StudentID,
+			TeacherID:       session.TeacherID,
+			StartedAt:       session.StartedAt,
+			EndedAt:         endAt,
+			DurationMinutes: duration,
+			Status:          "completed",
+		}
+		if err := db.Create(&rec).Error; err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
