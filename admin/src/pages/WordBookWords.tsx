@@ -66,7 +66,8 @@ interface WordBook { id: number; name: string; wordCount: number; level: string 
 
 interface ImportRow {
   word: string; phonetic: string; translation: string; exampleSentence: string
-  audioUrl: string; difficulty: number; sortOrder: number
+  audioUrl: string; imageUrl: string
+  difficulty: number; sortOrder: number
   isDuplicate: boolean; selected: boolean
 }
 
@@ -131,7 +132,7 @@ export default function WordBookWords() {
   const loadWords = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await get<any>(`${getApiBaseURL()}/wordbooks/${id}/words?page=${page}&pageSize=${pageSize}&keyword=${keyword}`)
+      const res = await get<any>(`${getApiBaseURL()}/wordbooks/${id}/managed-words?page=${page}&pageSize=${pageSize}&keyword=${keyword}`)
       if (res.code === 200) { setWords(res.data.list || []); setTotal(res.data.total || 0) }
     } finally { setLoading(false) }
   }, [id, page, keyword])
@@ -220,7 +221,7 @@ export default function WordBookWords() {
 
   const handleBatchAudio = async () => {
     // 拉取全部无音频的单词（不受分页限制）
-    const res = await get<any>(`${getApiBaseURL()}/wordbooks/${id}/words?page=1&pageSize=9999`)
+    const res = await get<any>(`${getApiBaseURL()}/wordbooks/${id}/managed-words?page=1&pageSize=9999`)
     const allWords: Word[] = res.data?.list || []
     const targets = allWords.filter(w => !w.audioUrl)
     if (targets.length === 0) { showAlert('所有单词已有音频', 'success'); return }
@@ -282,19 +283,25 @@ export default function WordBookWords() {
       const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
       if (rows.length < 2) { showAlert('Excel 数据为空', 'error'); return }
 
+      const headerRow = (rows[0] || []).map((c: unknown) => String(c ?? '').trim().toLowerCase())
+      const headerHasImage = headerRow[5]?.includes('image') ?? false
       const parsed: Omit<ImportRow, 'isDuplicate' | 'selected'>[] = []
       for (const row of rows.slice(1)) {
         const word = String(row[0] ?? '').trim()
         if (!word) continue
-        const diff = Number(row[5])
+        const use8 = headerHasImage || (Array.isArray(row) && row.length >= 8)
+        const imageUrl = use8 ? String(row[5] ?? '').trim() : ''
+        const diff = Number(use8 ? row[6] : row[5])
+        const sortOrder = Number(use8 ? row[7] : row[6])
         parsed.push({
           word,
           phonetic: String(row[1] ?? '').trim(),
           translation: String(row[2] ?? '').trim(),
           exampleSentence: String(row[3] ?? '').trim(),
           audioUrl: String(row[4] ?? '').trim(),
+          imageUrl,
           difficulty: diff >= 1 && diff <= 5 ? diff : 1,
-          sortOrder: Number(row[6] ?? 0),
+          sortOrder,
         })
       }
       if (parsed.length === 0) { showAlert('没有可解析的数据', 'error'); return }

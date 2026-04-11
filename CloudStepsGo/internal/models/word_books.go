@@ -27,7 +27,6 @@ type WordBook struct {
 	Version        string `json:"version" gorm:"size:20;default:'1.0';comment:版本号"`
 	ViewCount      int    `json:"viewCount" gorm:"default:0;comment:查看次数"`
 	LastStudyAt    *time.Time `json:"lastStudyAt" gorm:"comment:最后学习时间"`
-
 	// 词库元数据（非社交）：考试/难度区间、变体、数据来源标注
 	ExamTags         string `json:"examTags" gorm:"type:text;comment:考试标签 JSON 数组，如 CET-4/考研/IELTS"`
 	CEFRRange        string `json:"cefrRange" gorm:"size:32;comment:CEFR 覆盖区间，如 A2-B1"`
@@ -72,7 +71,6 @@ type Word struct {
 	LastReviewAt     *time.Time `json:"lastReviewAt" gorm:"comment:最后复习时间"`
 	NextReviewAt     *time.Time `json:"nextReviewAt" gorm:"index;comment:下次复习时间"`
 	StudyTime        int        `json:"studyTime" gorm:"default:0;comment:学习时长(秒)"`
-
 	// 词典型扩展（非社交）：音系、词源、语体、派生等，便于对接外部词典/语料
 	Lemma            string `json:"lemma" gorm:"size:128;index;comment:词元/原形（变形词时）"`
 	PhoneticUS       string `json:"phoneticUs" gorm:"size:128;comment:美式音标 IPA"`

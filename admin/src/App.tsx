@@ -11,7 +11,6 @@ import { SiteConfigProvider } from '@/contexts/SiteConfigContext'
 import { useAuthStore } from '@/stores/authStore'
 
 const Login = lazy(() => import('@/pages/Login'))
-const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const Settings = lazy(() => import('@/pages/Settings'))
 const Profile = lazy(() => import('@/pages/Profile'))
 const Notifications = lazy(() => import('@/pages/Notifications'))
@@ -19,13 +18,11 @@ const Configs = lazy(() => import('@/pages/Configs'))
 const Users = lazy(() => import('@/pages/Users'))
 const OperationLogs = lazy(() => import('@/pages/OperationLogs'))
 const LoginHistory = lazy(() => import('@/pages/LoginHistory'))
-const Courses = lazy(() => import('@/pages/Courses'))
-const Schedules = lazy(() => import('@/pages/Schedules'))
-const Classes = lazy(() => import('@/pages/Classes'))
 const WordBooks = lazy(() => import('@/pages/WordBooks'))
 const WordBookWords = lazy(() => import('@/pages/WordBookWords'))
 const VocabQuestions = lazy(() => import('@/pages/VocabQuestions'))
 const VocabTestRecords = lazy(() => import('@/pages/VocabTestRecords'))
+const Coaching = lazy(() => import('@/pages/Coaching'))
 
 function App() {
   const { refreshUserInfo, isAuthenticated } = useAuthStore()
@@ -50,19 +47,11 @@ function App() {
             <Route
               path="/login"
               element={
-                isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />
+                isAuthenticated ? <Navigate to="/wordbooks" replace /> : <Login />
               }
             />
 
             {/* 受保护的路由 */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
             <Route
               path="/settings"
               element={
@@ -119,17 +108,15 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route path="/courses" element={<ProtectedRoute><Courses /></ProtectedRoute>} />
-            <Route path="/classes" element={<ProtectedRoute><Classes /></ProtectedRoute>} />
-            <Route path="/schedules" element={<ProtectedRoute><Schedules /></ProtectedRoute>} />
             <Route path="/wordbooks" element={<ProtectedRoute><WordBooks /></ProtectedRoute>} />
             <Route path="/wordbooks/:id" element={<ProtectedRoute><WordBookWords /></ProtectedRoute>} />
             <Route path="/vocab-questions" element={<ProtectedRoute><VocabQuestions /></ProtectedRoute>} />
             <Route path="/vocab-records" element={<ProtectedRoute><VocabTestRecords /></ProtectedRoute>} />
+            <Route path="/coaching" element={<ProtectedRoute><Coaching /></ProtectedRoute>} />
 
             {/* 默认重定向 */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<Navigate to="/wordbooks" replace />} />
+            <Route path="*" element={<Navigate to="/wordbooks" replace />} />
           </Routes>
           </Suspense>
 

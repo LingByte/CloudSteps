@@ -6,7 +6,7 @@ type AuthGuardProps = {
   children: React.ReactNode;
 };
 
-type Role = "user" | "admin" | "student";
+type Role = "user" | "admin" | "student" | "teacher";
 
 export function RequireAuth({ children }: AuthGuardProps) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);

@@ -5,57 +5,6 @@ import { handleConfigCacheUpdate } from '@/utils/siteConfigCache'
 // Use the API base URL directly (already includes /api prefix)
 const BACKEND_BASE = getApiBaseURL()
 
-// ==================== Dashboard API ====================
-export interface DashboardStats {
-  range?: {
-    type: string
-    start_date: string
-    end_date: string
-  }
-  daily?: Array<{
-    date: string
-    apiCalls: number
-    uploads: number
-    downloads: number
-    bandwidth: number
-    errorRate: number
-    successRate: number
-    avgLatency: number
-  }>
-  summary?: {
-    apiCalls: number
-    uploads: number
-    downloads: number
-    bandwidth: number
-    errorRate: number
-    successRate: number
-    avgLatency: number
-    storageUsed: number
-    concurrentRequests: number
-    totalUsers: number
-  }
-  recentActivities?: Array<{
-    id: number
-    type: string
-    title: string
-    content: string
-    createdAt: string
-  }>
-}
-
-export const getDashboardStats = async (params?: any) => {
-  const queryParams = new URLSearchParams()
-  if (params) {
-    if (params.range) queryParams.append('range', params.range)
-    if (params.start_date) queryParams.append('start_date', params.start_date)
-    if (params.end_date) queryParams.append('end_date', params.end_date)
-  }
-  const queryString = queryParams.toString()
-  const url = queryString ? `${BACKEND_BASE}/dashboard/metrics?${queryString}` : `${BACKEND_BASE}/dashboard/metrics`
-  const res = await get<DashboardStats>(url)
-  return res.data
-}
-
 // ==================== Users API ====================
 export interface User {
   id: number

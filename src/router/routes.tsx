@@ -1,15 +1,11 @@
 import { createBrowserRouter } from "react-router";
 import { Layout } from "@/components/Layout";
 import Home from "@/pages/Home";
-import TrainingRecords from "@/pages/TrainingRecords";
 import AntiForgetting from "@/pages/AntiForgetting";
 import CoachCenter from "@/pages/CoachCenter";
 import VocabularyTest from "@/pages/VocabularyTest";
 import VocabularyTestTesting from "@/pages/VocabularyTestTesting";
 import VocabularyTestResult from "@/pages/VocabularyTestResult";
-import StudentManagement from "@/pages/StudentManagement";
-import ClassManagement from "@/pages/ClassManagement";
-import TeacherStudentManagement from "@/pages/TeacherStudentManagement";
 import CommissionCheck from "@/pages/CommissionCheck";
 import TestRecords from "@/pages/TestRecords";
 import Settings from "@/pages/Settings";
@@ -33,6 +29,10 @@ import Terms from "@/pages/Terms";
 import Privacy from "@/pages/Privacy";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { PublicOnly, RequireAuth, RequireRole } from "@/components/AuthGuard";
+import MyStudents from "@/pages/MyStudents";
+import StudentTrainingRecords from "@/pages/StudentTrainingRecords";
+import WordBooks from "@/pages/WordBooks";
+import WordBookWords from "@/pages/WordBookWords";
 
 export const router = createBrowserRouter([
   {
@@ -45,7 +45,24 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorBoundary />,
     children: [
       { index: true, element: <Home /> },
-      { path: "training-records", element: <TrainingRecords /> },
+      {
+        path: "my-students",
+        element: (
+          <RequireRole roles={["user", "teacher", "admin"]}>
+            <MyStudents />
+          </RequireRole>
+        ),
+      },
+      {
+        path: "my-students/:studentId/training",
+        element: (
+          <RequireRole roles={["user", "teacher", "admin"]}>
+            <StudentTrainingRecords />
+          </RequireRole>
+        ),
+      },
+      { path: "word-books", element: <WordBooks /> },
+      { path: "word-books/:id", element: <WordBookWords /> },
       { path: "anti-forgetting", element: <AntiForgetting /> },
       { path: "coach-center", element: <CoachCenter /> },
       { path: "profile/edit", element: <ProfileEdit /> },
@@ -74,26 +91,6 @@ export const router = createBrowserRouter([
     element: (
       <RequireAuth>
         <VocabularyTestResult />
-      </RequireAuth>
-    ),
-  },
-  {
-    path: "/class-management",
-    element: (
-      <RequireAuth>
-        <RequireRole roles={["admin"]}>
-          <ClassManagement />
-        </RequireRole>
-      </RequireAuth>
-    ),
-  },
-  {
-    path: "/student-management",
-    element: (
-      <RequireAuth>
-        <RequireRole roles={["user"]}>
-          <TeacherStudentManagement />
-        </RequireRole>
       </RequireAuth>
     ),
   },

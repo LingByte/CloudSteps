@@ -84,7 +84,7 @@ const Login = () => {
       })
 
       showAlert('登录成功', 'success', '欢迎回来')
-      navigate('/dashboard')
+      navigate('/wordbooks')
     } catch (error: any) {
       showAlert(error?.msg || error?.message || '登录失败，请检查用户名和密码', 'error', '登录失败')
     } finally {

@@ -112,6 +112,7 @@ func (h *Handlers) registerWordBookRoutes(r *gin.RouterGroup) {
 	wb.Use(models.AuthRequired)
 	{
 		wb.GET("", h.handleListWordBooks)
+		wb.GET("/:id/words", h.handleListWordBookWords)
 		wb.GET("/:id", h.handleGetWordBook)
 		wb.POST("/:id/select", h.handleSelectWordBook)
 		wb.GET("/:id/progress", h.handleGetWordBookProgress)
@@ -126,7 +127,8 @@ func (h *Handlers) registerWordBookRoutes(r *gin.RouterGroup) {
 			admin.POST("", h.adminCreateWordBook)
 			admin.PUT("/:id", h.adminUpdateWordBook)
 			admin.DELETE("/:id", h.adminDeleteWordBook)
-			admin.GET("/:id/words", h.adminListWords)
+			// 与登录用户浏览 GET /wordbooks/:id/words 区分，避免同路径被 requireAdmin 覆盖
+			admin.GET("/:id/managed-words", h.adminListWords)
 			admin.POST("/:id/words", h.adminCreateWord)
 			admin.PUT("/:id/words/:wid", h.adminUpdateWord)
 			admin.DELETE("/:id/words/:wid", h.adminDeleteWord)
@@ -156,6 +158,50 @@ func (h *Handlers) handleGetWordBook(c *gin.Context) {
 		return
 	}
 	response.Success(c, "success", book)
+}
+
+// handleListWordBookWords GET /wordbooks/:id/words?page=&pageSize=&keyword=
+// 登录用户浏览词库单词（不含管理端编辑能力）
+func (h *Handlers) handleListWordBookWords(c *gin.Context) {
+	db := c.MustGet(constants.DbField).(*gorm.DB)
+	id, _ := strconv.Atoi(c.Param("id"))
+	if id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": "词库 ID 无效"})
+		return
+	}
+	book, err := models.GetWordBookByID(db, uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"code": 404, "msg": "词库不存在"})
+		return
+	}
+	if !book.IsActive {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": "词库已下架"})
+		return
+	}
+	page := 1
+	pageSize := 30
+	if p := c.Query("page"); p != "" {
+		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+			page = v
+		}
+	}
+	if s := c.Query("pageSize"); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v > 0 && v <= 100 {
+			pageSize = v
+		}
+	}
+	keyword := strings.TrimSpace(c.Query("keyword"))
+	words, total, err := models.ListWords(db, uint(id), keyword, page, pageSize)
+	if err != nil {
+		response.Fail(c, "查询失败", err)
+		return
+	}
+	response.Success(c, "success", gin.H{
+		"list":     words,
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
+	})
 }
 
 func (h *Handlers) handleSelectWordBook(c *gin.Context) {

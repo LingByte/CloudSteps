@@ -1,7 +1,6 @@
 import {
   DollarSign,
   ClipboardList,
-  Users,
   Settings2,
   ChevronRight,
   Award,
@@ -10,6 +9,7 @@ import {
   Phone,
   MapPin,
   Shield,
+  Users,
 } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { useNavigate } from "react-router";
@@ -21,10 +21,7 @@ const features = (role: string) => [
     ? []
     : [{ id: 1, icon: DollarSign, label: "佣金核对", color: "#4ECDC4", path: "/commission-check" }]),
   { id: 2, icon: ClipboardList, label: "词汇测试记录", color: "#55A3FF", path: "/test-records" },
-  role === "admin"
-    ? { id: 3, icon: Users, label: "班级管理", color: "#4ECDC4", path: "/class-management" }
-    : { id: 3, icon: Users, label: "学员管理", color: "#4ECDC4", path: "/student-management" },
-  { id: 4, icon: Settings2, label: "设置", color: "#718096", path: "/settings" },
+  { id: 3, icon: Settings2, label: "设置", color: "#718096", path: "/settings" },
 ];
 
 export default function CoachCenter() {

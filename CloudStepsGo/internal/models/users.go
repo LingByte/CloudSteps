@@ -24,8 +24,8 @@ import (
 )
 
 const (
-	RoleAdmin   = "admin"   // 管理员（排课、管理课程）
-	RoleTeacher = "teacher" // 老师（授课计时）
+	RoleAdmin   = "admin"   // 管理员
+	RoleTeacher = "teacher" // 老师
 	RoleStudent = "student" // 学员（被分配到课程）
 )
 

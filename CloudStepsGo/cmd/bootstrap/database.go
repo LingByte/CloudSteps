@@ -150,13 +150,10 @@ func RunMigrations(db *gorm.DB) error {
 		&models.VocabTestQuestion{},
 		&models.VocabTestRecord{},
 		&notification.InternalNotification{},
-		&models.Class{},
-		&models.ClassCourse{},
-		&models.ClassStudent{},
-		&models.Course{},
-		&models.Schedule{},
-		&models.ScheduleStudent{},
-		&models.ClassSession{},
-		&models.StudentClassRecord{},
+		&models.StudentTeacherCoachingQuota{},
+		&models.TeacherCoachingUsagePeriod{},
+		&models.CoachingAppointment{},
+		&models.CoachingSessionRecord{},
+		&models.CoachingAuditLog{},
 	})
 }

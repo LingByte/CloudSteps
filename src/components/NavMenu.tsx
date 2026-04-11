@@ -18,7 +18,10 @@ export function NavMenu({ items, activePath, onNavigate }: NavMenuProps) {
     <nav className="space-y-2">
       {items.map((item) => {
         const Icon = item.icon;
-        const isActive = activePath === item.path;
+        const isActive =
+          item.path === "/"
+            ? activePath === "/"
+            : activePath === item.path || activePath.startsWith(`${item.path}/`);
 
         return (
           <Link

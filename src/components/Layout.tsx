@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, Link, useLocation } from "react-router";
 import {
   Home,
-  BookOpen,
   RefreshCw,
   Users,
+  Library,
   Menu,
   X,
 } from "lucide-react";
@@ -14,7 +14,7 @@ import { useAuthStore } from "@/stores/authStore";
 
 const navItems = [
   { path: "/", label: "首页", icon: Home },
-  { path: "/training-records", label: "训练记录", icon: BookOpen },
+  { path: "/word-books", label: "词库", icon: Library },
   { path: "/anti-forgetting", label: "抗遗忘", icon: RefreshCw },
   { path: "/coach-center", label: "陪练中心", icon: Users },
 ];
@@ -155,7 +155,10 @@ export function Layout() {
         <div className="flex items-center justify-around px-4 py-2">
           {filteredNavItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.path;
+            const isActive =
+              item.path === "/"
+                ? location.pathname === "/"
+                : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
             return (
               <Link
                 key={item.path}

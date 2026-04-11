@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"net/http"
+
+	"github.com/LingByte/CloudStepsGo/internal/models"
 	"github.com/LingByte/CloudStepsGo/pkg/config"
 	"github.com/LingByte/CloudStepsGo/pkg/middleware"
 	"github.com/LingByte/CloudStepsGo/pkg/utils"
@@ -32,9 +35,17 @@ func (h *Handlers) Register(engine *gin.Engine) {
 	h.registerAdminUserRoutes(r)
 	h.registerWordBookRoutes(r)
 	h.registerLearningRoutes(r)
-	h.registerAdminDashboardRoutes(r)
 	h.registerVocabTestRoutes(r)
-	h.registerCourseRoutes(r)
-	h.registerClassRoutes(r)
 	h.registerNotificationRoutes(r)
+	h.registerCoachingRoutes(r)
+}
+
+func (h *Handlers) requireAdmin(c *gin.Context) {
+	user := models.CurrentUser(c)
+	if user == nil || !user.IsAdmin() {
+		c.JSON(http.StatusForbidden, gin.H{"code": 403, "msg": "需要管理员权限"})
+		c.Abort()
+		return
+	}
+	c.Next()
 }

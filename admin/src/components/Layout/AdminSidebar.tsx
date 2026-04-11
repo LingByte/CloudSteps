@@ -3,7 +3,6 @@ import faviconUrl from '/favicon.png'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  LayoutDashboard,
   Settings,
   LogOut,
   Menu,
@@ -15,12 +14,10 @@ import {
   History,
   FileText,
   Lock,
-  BookOpen,
-  CalendarDays,
   Library,
   FlaskConical,
   Brain,
-  GraduationCap,
+  CalendarDays,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useSidebar } from '@/contexts/SidebarContext'
@@ -67,7 +64,6 @@ const AdminSidebar = () => {
   }, [showDropdown])
 
   const navigation: NavItem[] = [
-    { name: '仪表板', href: '/dashboard', icon: LayoutDashboard },
     { name: '用户管理', href: '/users', icon: Users },
     { name: '词库管理', href: '/wordbooks', icon: Library },
     {
@@ -79,16 +75,7 @@ const AdminSidebar = () => {
         { name: '测试记录', href: '/vocab-records', icon: FileText },
       ],
     },
-    {
-      name: '课程管理',
-      href: '/courses',
-      icon: BookOpen,
-      children: [
-        { name: '课程列表', href: '/courses', icon: BookOpen },
-        { name: '班级管理', href: '/classes', icon: GraduationCap },
-        { name: '排课管理', href: '/schedules', icon: CalendarDays },
-      ],
-    },
+    { name: '一对一陪练', href: '/coaching', icon: CalendarDays },
     { name: '配置管理', href: '/configs', icon: Sliders },
     {
       name: '安全管理',
@@ -130,7 +117,7 @@ const AdminSidebar = () => {
         {showLogo && (
           <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200 dark:border-slate-700">
             {!isCollapsed && (
-              <Link to="/dashboard" className="flex items-center gap-3 group">
+              <Link to="/wordbooks" className="flex items-center gap-3 group">
                 <div className="relative">
                   <div className="absolute inset-0 bg-gradient-to-br from-[#4ECDC4] to-[#45b8b0] rounded-lg blur-sm opacity-50 group-hover:opacity-75 transition-opacity" />
                   <div className="relative w-10 h-10 rounded-lg bg-gradient-to-br from-[#4ECDC4] to-[#45b8b0] flex items-center justify-center shadow-lg">
