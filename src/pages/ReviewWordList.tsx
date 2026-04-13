@@ -3,7 +3,13 @@ import { ChevronLeft, Volume2, Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { getReviewToday, startReviewSession } from "@/api/review";
 
-type ReviewWordItem = { id: number; word: string; status: null | "selected" };
+type ReviewWordItem = { 
+  id: number; 
+  word: string; 
+  translation?: string;
+  status: null | "selected";
+  showTranslation?: boolean;
+};
 
 const reviewGroups = ["今日复习"];
 
@@ -27,8 +33,14 @@ export default function ReviewWordList() {
     (async () => {
       try {
         const res = await getReviewToday(wordBookId);
-        const ws = Array.isArray(res.data?.words) ? (res.data.words as Array<{ id: number; word: string }>) : [];
-        const mapped: ReviewWordItem[] = ws.map((w) => ({ id: Number(w.id), word: String(w.word || ""), status: null }));
+        const ws = Array.isArray(res.data?.words) ? (res.data.words as Array<{ id: number; word: string; translation?: string }>) : [];
+        const mapped: ReviewWordItem[] = ws.map((w) => ({ 
+          id: Number(w.id), 
+          word: String(w.word || ""), 
+          translation: w.translation ? String(w.translation) : undefined,
+          status: null,
+          showTranslation: false
+        }));
         if (!mounted) return;
         setSessionId(0);
         setWords(mapped);
@@ -51,6 +63,12 @@ export default function ReviewWordList() {
   const handleStatusClick = (id: number) => {
     setWords((prev) =>
       prev.map((word) => (word.id === id ? { ...word, status: word.status ? null : "selected" } : word))
+    );
+  };
+
+  const handleWordClick = (id: number) => {
+    setWords((prev) =>
+      prev.map((word) => (word.id === id ? { ...word, showTranslation: !word.showTranslation } : word))
     );
   };
 
@@ -128,9 +146,16 @@ export default function ReviewWordList() {
                   <span className="text-[#A0AEC0] text-sm mt-1">
                     {index + 1}
                   </span>
-                  <h3 className="text-2xl font-semibold text-[#2D3748]">
-                    {item.word}
-                  </h3>
+                  <div className="flex-1 cursor-pointer" onClick={() => handleWordClick(item.id)}>
+                    <h3 className="text-2xl font-semibold text-[#2D3748] hover:text-[#4ECDC4] transition-colors">
+                      {item.word}
+                    </h3>
+                    {item.showTranslation && item.translation && (
+                      <p className="text-[#718096] text-sm mt-2 animate-in fade-in slide-in-from-top-1">
+                        {item.translation}
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button className="text-[#55A3FF] hover:text-[#4ECDC4] transition-colors p-2">

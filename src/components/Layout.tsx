@@ -14,7 +14,7 @@ import { useAuthStore } from "@/stores/authStore";
 
 const navItems = [
   { path: "/", label: "首页", icon: Home },
-  { path: "/word-books", label: "词库", icon: Library },
+  { path: "/word-books", label: "备课", icon: Library },
   { path: "/anti-forgetting", label: "抗遗忘", icon: RefreshCw },
   { path: "/coach-center", label: "陪练中心", icon: Users },
 ];

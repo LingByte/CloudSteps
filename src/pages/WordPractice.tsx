@@ -40,7 +40,15 @@ export default function WordPractice() {
       const all: any[] = Array.isArray(arr) ? arr : [];
       const start = batchIdx * 5;
       const slice = all.slice(start, start + 5);
-      const mapped: PracticeWord[] = slice.map((w: any) => ({
+      
+      // 初始乱序（Fisher-Yates 洗牌算法）
+      const shuffledSlice = [...slice];
+      for (let i = shuffledSlice.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledSlice[i], shuffledSlice[j]] = [shuffledSlice[j], shuffledSlice[i]];
+      }
+      
+      const mapped: PracticeWord[] = shuffledSlice.map((w: any) => ({
         id: Number(w.id),
         word: String(w.word || ""),
         translation: String(w.translation || ""),

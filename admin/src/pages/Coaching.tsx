@@ -39,6 +39,14 @@ type Quota = {
   student?: { displayName?: string; username?: string; email?: string }
 }
 
+// 将分钟转换为小时显示
+const formatHours = (minutes: number) => {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (mins === 0) return `${hours}小时`;
+  return `${hours}小时${mins}分钟`;
+};
+
 type Appointment = {
   id: number
   teacherId: number
@@ -230,18 +238,21 @@ export default function Coaching() {
       showAlert('请选择老师', 'error')
       return
     }
-    const cap = Number(usageCap)
-    const used = Number(usageUsed)
-    if (Number.isNaN(cap) || Number.isNaN(used) || cap < 0 || used < 0) {
-      showAlert('封顶/已用分钟无效', 'error')
+    const capHours = Number(usageCap)
+    const usedHours = Number(usageUsed)
+    if (Number.isNaN(capHours) || Number.isNaN(usedHours) || capHours < 0 || usedHours < 0) {
+      showAlert('封顶/已用时间无效', 'error')
       return
     }
+    // 将小时转换为分钟保存到后端
+    const capMinutes = capHours * 60
+    const usedMinutes = usedHours * 60
     try {
       const res = await put(`${BASE()}/coaching/usage-periods`, {
         teacherId: tid,
         month: usageMonth,
-        capMinutes: cap,
-        usedMinutes: used,
+        capMinutes: capMinutes,
+        usedMinutes: usedMinutes,
       })
       if (res.code !== 200) throw new Error(res.msg)
       showAlert('已保存', 'success')
@@ -254,15 +265,17 @@ export default function Coaching() {
   const saveQuota = async () => {
     const tid = Number(qTeacher)
     const sid = Number(qStudent)
-    const mins = Number(qMin)
+    const hours = Number(qMin)
     if (!tid || !sid) {
       showAlert('请选择老师与学员', 'error')
       return
     }
-    if (Number.isNaN(mins) || mins < 0) {
-      showAlert('剩余分钟数无效', 'error')
+    if (Number.isNaN(hours) || hours < 0) {
+      showAlert('剩余时间无效', 'error')
       return
     }
+    // 将小时转换为分钟保存到后端
+    const mins = hours * 60
     try {
       const res = await put(`${BASE()}/coaching/quotas`, {
         teacherId: tid,
@@ -396,7 +409,7 @@ export default function Coaching() {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-slate-500 block mb-1">剩余分钟</label>
+                <label className="text-xs text-slate-500 block mb-1">剩余时间（小时）</label>
                 <Input value={qMin} onChange={(e) => setQMin(e.target.value)} type="number" min={0} />
               </div>
               <Button leftIcon={<Save className="w-4 h-4" />} onClick={() => void saveQuota()}>
@@ -416,7 +429,7 @@ export default function Coaching() {
                   <tr className="border-b border-slate-200 dark:border-slate-700 text-left">
                     <th className="p-2">老师</th>
                     <th className="p-2">学员</th>
-                    <th className="p-2">剩余分钟</th>
+                    <th className="p-2">剩余时间</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -437,7 +450,7 @@ export default function Coaching() {
                       <tr key={q.id} className="border-b border-slate-100 dark:border-slate-800">
                         <td className="p-2">{userLabel(q.teacher)}</td>
                         <td className="p-2">{userLabel(q.student)}</td>
-                        <td className="p-2 font-medium">{q.remainingMinutes}</td>
+                        <td className="p-2 font-medium">{formatHours(q.remainingMinutes)}</td>
                       </tr>
                     ))
                   )}
@@ -478,11 +491,11 @@ export default function Coaching() {
                   <Input type="month" value={usageMonth} onChange={(e) => setUsageMonth(e.target.value)} />
                 </div>
                 <div>
-                  <label className="text-xs text-slate-500 block mb-1">封顶 cap（分钟）</label>
+                  <label className="text-xs text-slate-500 block mb-1">封顶 cap（小时）</label>
                   <Input value={usageCap} onChange={(e) => setUsageCap(e.target.value)} type="number" min={0} />
                 </div>
                 <div>
-                  <label className="text-xs text-slate-500 block mb-1">已用 used（分钟）</label>
+                  <label className="text-xs text-slate-500 block mb-1">已用 used（小时）</label>
                   <Input value={usageUsed} onChange={(e) => setUsageUsed(e.target.value)} type="number" min={0} />
                 </div>
                 <Button leftIcon={<Save className="w-4 h-4" />} onClick={() => void saveUsagePeriod()}>

@@ -4,7 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { completeStudySession } from "@/api/study";
 import { completeReviewSession } from "@/api/review";
 
-type CheckWord = { id: number; word: string; status: null | "correct" | "wrong" };
+type CheckWord = { 
+  id: number; 
+  word: string; 
+  translation?: string;
+  status: null | "correct" | "wrong";
+  showTranslation?: boolean;
+};
 
 export default function PostTrainingCheck() {
   const navigate = useNavigate();
@@ -37,7 +43,13 @@ export default function PostTrainingCheck() {
       const all: any[] = Array.isArray(arr) ? arr : [];
       const start = batchIdx * 5;
       const slice = all.slice(start, start + 5);
-      const mapped: CheckWord[] = slice.map((w: any) => ({ id: Number(w.id), word: String(w.word || ""), status: null }));
+      const mapped: CheckWord[] = slice.map((w: any) => ({ 
+        id: Number(w.id), 
+        word: String(w.word || ""), 
+        translation: w.translation ? String(w.translation) : undefined,
+        status: null,
+        showTranslation: false
+      }));
       setWords(mapped);
       setSubmitDone(false);
     } catch {
@@ -56,6 +68,12 @@ export default function PostTrainingCheck() {
     );
   };
 
+  const handleWordClick = (id: number) => {
+    setWords((prev) =>
+      prev.map((word) => (word.id === id ? { ...word, showTranslation: !word.showTranslation } : word))
+    );
+  };
+
   const handleSubmit = () => {
     const hasSelection = words.some((word) => word.status !== null);
     if (!hasSelection) return;
@@ -67,68 +85,33 @@ export default function PostTrainingCheck() {
           .map((w) => ({ wordId: w.id, remembered: w.status === "correct" }));
 
         if (mode === "review") {
-          // accumulate results across batches
-          const rawAcc = sessionStorage.getItem("lb_review_results") || "{}";
-          const acc = (() => {
-            try {
-              const obj = JSON.parse(rawAcc);
-              return obj && typeof obj === "object" ? (obj as Record<string, boolean>) : {};
-            } catch {
-              return {} as Record<string, boolean>;
-            }
-          })();
-          for (const r of results) acc[String(r.wordId)] = !!r.remembered;
-          sessionStorage.setItem("lb_review_results", JSON.stringify(acc));
-
-          const wordsKey = "lb_review_words";
-          const allRaw = sessionStorage.getItem(wordsKey) || "[]";
-          const allArr = (() => {
-            try {
-              const a = JSON.parse(allRaw);
-              return Array.isArray(a) ? a : [];
-            } catch {
-              return [] as any[];
-            }
-          })();
-          const totalBatches = Math.ceil(allArr.length / 5);
-          const next = batchIdx + 1;
-
-          if (next < totalBatches) {
-            sessionStorage.setItem("lb_review_batch_idx", String(next));
-            setSubmitDone(true);
-            setShowResultDialog(true);
-            return;
+          // 抗遗忘模式：直接提交所有结果，不分批
+          const res = await completeReviewSession({
+            sessionId: sessionId,
+            results: results,
+          });
+          if (res.code !== 200) {
+            throw new Error(res.msg || "提交失败");
           }
-
-          if (!sessionId) {
-            setSubmitDone(true);
-            setShowResultDialog(true);
-            return;
-          }
-
-          const finalResults = Object.entries(acc).map(([wordId, remembered]) => ({
-            wordId: Number(wordId),
-            remembered: !!remembered,
-          }));
-          await completeReviewSession(sessionId, finalResults);
           setSubmitDone(true);
           setShowResultDialog(true);
           return;
         }
 
+        // 学习模式：保持原有逻辑
         if (!sessionId) {
-          setShowResultDialog(true);
           setSubmitDone(true);
+          setShowResultDialog(true);
           return;
         }
 
         await completeStudySession(sessionId, results);
         setSubmitDone(true);
+        setShowResultDialog(true);
       } catch {
         setSubmitDone(true);
       } finally {
         setSubmitting(false);
-        if (mode !== "review") setShowResultDialog(true);
       }
     })();
   };
@@ -167,8 +150,15 @@ export default function PostTrainingCheck() {
                   : ""
               }`}
             >
-              <div className="flex items-center gap-3 flex-1">
-                <span className="text-base font-medium text-[#2D3748]">{word.word}</span>
+              <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => handleWordClick(word.id)}>
+                <div>
+                  <span className="text-base font-medium text-[#2D3748] hover:text-[#4ECDC4] transition-colors">{word.word}</span>
+                  {word.showTranslation && word.translation && (
+                    <p className="text-[#718096] text-sm mt-1 animate-in fade-in slide-in-from-top-1">
+                      {word.translation}
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
@@ -220,7 +210,7 @@ export default function PostTrainingCheck() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-auto">
             <h3 className="text-2xl font-bold text-center mb-2">
-              再接再厉 💪
+              再接再厉
             </h3>
             <div className="space-y-3 mb-6">
               <div className="flex items-center justify-between py-2 border-b border-[#E2E8F0]">
@@ -230,10 +220,6 @@ export default function PostTrainingCheck() {
               <div className="flex items-center justify-between py-2 border-b border-[#E2E8F0]">
                 <span className="text-[#718096]">错误数</span>
                 <span className="text-xl font-bold text-[#FF6B6B]">{wrongCount}</span>
-              </div>
-              <div className="flex items-center justify-between py-2 border-b border-[#E2E8F0]">
-                <span className="text-[#718096]">剩余时间</span>
-                <span className="text-xl font-bold text-[#4ECDC4]">15分钟</span>
               </div>
             </div>
             <div className="space-y-3">

@@ -89,7 +89,7 @@ func coachingGetQuota(db *gorm.DB, teacherID, studentID uint) (models.StudentTea
 	var q models.StudentTeacherCoachingQuota
 	err := db.Where("teacher_id = ? AND student_id = ? AND is_deleted = ?", teacherID, studentID, 0).First(&q).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return models.StudentTeacherCoachingQuota{TeacherID: teacherID, StudentID: studentID, RemainingMinutes: 0}, gorm.ErrRecordNotFound
+		return models.StudentTeacherCoachingQuota{TeacherID: teacherID, StudentID: studentID, RemainingMinutes: 60}, gorm.ErrRecordNotFound
 	}
 	return q, err
 }

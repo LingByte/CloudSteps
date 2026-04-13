@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
-import { ChevronLeft, Search, Volume2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Volume2, Loader2 } from "lucide-react";
 import { CloudButton } from "@/components/cloudsteps";
 import { getWordBook, listWordBookWords, type WordBookWord } from "@/api/wordbooks";
 import { resolveMediaUrl } from "@/utils/mediaUrl";
@@ -251,22 +251,48 @@ export default function WordBookWords() {
           <span>
             第 {page} / {totalPages} 页
           </span>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <CloudButton
               type="button"
               disabled={loading || page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[#2D3748] disabled:opacity-50"
+              className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[#2D3748] disabled:opacity-50 transition-all duration-200 hover:bg-[#F7F9FC] hover:border-[#4ECDC4] hover:shadow-sm active:scale-95"
             >
-              上一页
+              <div className="flex items-center gap-1">
+                {loading && page > 1 ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <ChevronLeft size={16} />
+                )}
+                <span>上一页</span>
+              </div>
             </CloudButton>
+            
+            <div className="px-3 py-1.5 text-sm text-[#718096] bg-[#F7F9FC] rounded-lg border border-[#E2E8F0] min-w-[80px] text-center">
+              {loading ? (
+                <div className="flex items-center justify-center gap-1">
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>加载中</span>
+                </div>
+              ) : (
+                <span>{page} / {totalPages}</span>
+              )}
+            </div>
+            
             <CloudButton
               type="button"
               disabled={loading || page >= totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[#2D3748] disabled:opacity-50"
+              className="px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[#2D3748] disabled:opacity-50 transition-all duration-200 hover:bg-[#F7F9FC] hover:border-[#4ECDC4] hover:shadow-sm active:scale-95"
             >
-              下一页
+              <div className="flex items-center gap-1">
+                <span>下一页</span>
+                {loading && page < totalPages ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <ChevronRight size={16} />
+                )}
+              </div>
             </CloudButton>
           </div>
         </div>

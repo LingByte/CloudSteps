@@ -1,16 +1,34 @@
-import { Volume2, Check, X, Shuffle } from "lucide-react";
+import { Volume2, Check, X, Shuffle, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 
 import { getStudyWords, startStudySession } from "@/api/study";
 import { TopBar } from "@/components/TopBar";
 
-type WordItem = { id: number; word: string; status: null | "correct" | "wrong" };
+type WordItem = { 
+  id: number; 
+  word: string; 
+  translation?: string;
+  showTranslation?: boolean;
+  status: null | "correct" | "wrong" 
+};
+
+const PAGE_SIZE = 20;
 
 export default function PreTrainingCheck() {
   const navigate = useNavigate();
   const [words, setWords] = useState<WordItem[]>([]);
   const [selectedCount, setSelectedCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // 用于防抖的ref
+  const loadingRef = useRef(false);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const handleBack = () => {
     navigate("/word-training");
@@ -18,28 +36,100 @@ export default function PreTrainingCheck() {
 
   const wordBookId = useMemo(() => Number(sessionStorage.getItem("lb_wordbook_id") || 0), []);
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if (!wordBookId) return;
-      try {
-        const res = await getStudyWords(wordBookId);
-        const list = res.data?.words;
-        const arr = Array.isArray(list) ? (list as Array<{ id: number; word: string }>) : [];
-        const mapped = arr.slice(0, 20).map((w) => ({ id: w.id, word: w.word, status: null as WordItem["status"] }));
-        if (!mounted) return;
-        setWords(mapped);
-        setSelectedCount(0);
-      } catch {
-        // ignore
+  // 加载单词数据
+  const loadWords = useCallback(async (page: number, isInitial = false) => {
+    if (loadingRef.current || !wordBookId) return;
+    
+    loadingRef.current = true;
+    if (isInitial) {
+      setInitialLoading(true);
+    } else {
+      setLoading(true);
+    }
+    
+    try {
+      const res = await getStudyWords(wordBookId, page, PAGE_SIZE);
+      const list = res.data?.words;
+      const totalCount = res.data?.total || 0;
+      const arr = Array.isArray(list) ? (list as Array<{ id: number; word: string; translation?: string }>) : [];
+      
+      if (arr.length === 0) {
+        setHasMore(false);
+        return;
       }
-    })();
-    return () => {
-      mounted = false;
-    };
+      
+      const newWords = arr.map((w) => ({ 
+        id: w.id, 
+        word: w.word, 
+        translation: w.translation,
+        showTranslation: false,
+        status: null as WordItem["status"] 
+      }));
+      
+      setWords(prev => {
+        const updatedWords = page === 1 ? newWords : [...prev, ...newWords];
+        
+        // 如果返回的数据少于页面大小，或者已加载完所有数据，说明没有更多数据了
+        if (arr.length < PAGE_SIZE || updatedWords.length >= totalCount) {
+          setHasMore(false);
+        }
+        
+        return updatedWords;
+      });
+      
+      setError(null);
+    } catch (err) {
+      console.error('加载单词失败:', err);
+      setError('加载单词失败，请重试');
+    } finally {
+      loadingRef.current = false;
+      if (isInitial) {
+        setInitialLoading(false);
+      } else {
+        setLoading(false);
+      }
+    }
   }, [wordBookId]);
 
-  const handleStatusClick = (id: number, newStatus: "correct" | "wrong") => {
+  // 初始加载
+  useEffect(() => {
+    if (wordBookId) {
+      setCurrentPage(1);
+      setHasMore(true);
+      setError(null);
+      loadWords(1, true);
+    }
+  }, [wordBookId, loadWords]);
+
+  // 设置无限滚动
+  useEffect(() => {
+    if (!loadMoreRef.current || !hasMore || loading) return;
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        const target = entries[0];
+        if (target.isIntersecting && hasMore && !loadingRef.current && !loading) {
+          const nextPage = currentPage + 1;
+          setCurrentPage(nextPage);
+          loadWords(nextPage, false);
+        }
+      },
+      {
+        threshold: 0.1,
+        rootMargin: '100px',
+      }
+    );
+
+    observerRef.current.observe(loadMoreRef.current);
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [hasMore, loading, currentPage]);
+
+  const handleStatusClick = useCallback((id: number, newStatus: "correct" | "wrong") => {
     setWords((prev) =>
       prev.map((word) => {
         if (word.id === id) {
@@ -47,9 +137,9 @@ export default function PreTrainingCheck() {
           const isNowSelected = newStatus !== null;
 
           if (!wasSelected && isNowSelected) {
-            setSelectedCount(selectedCount + 1);
+            setSelectedCount(s => s + 1);
           } else if (wasSelected && !isNowSelected) {
-            setSelectedCount(selectedCount - 1);
+            setSelectedCount(s => s - 1);
           }
 
           return { ...word, status: word.status === newStatus ? null : newStatus };
@@ -57,39 +147,50 @@ export default function PreTrainingCheck() {
         return word;
       })
     );
-  };
+  }, []);
 
-  const handleShuffle = () => {
-    const shuffled = [...words].sort(() => Math.random() - 0.5);
-    setWords(shuffled);
-  };
-
-  const handleSelectAll = () => {
-    const allSelected = words.every((word) => word.status !== null);
-    if (allSelected) {
-      setWords(words.map((word) => ({ ...word, status: null })));
-      setSelectedCount(0);
-    } else {
-      setWords(words.map((word) => ({ ...word, status: "wrong" })));
-      setSelectedCount(words.length);
-    }
-  };
-
-  const handleSelect5 = () => {
-    const unselected = words.filter((word) => word.status === null);
-    const toSelect = unselected.slice(0, 5);
-
+  const handleWordClick = useCallback((id: number) => {
     setWords((prev) =>
-      prev.map((word) => {
+      prev.map((word) => (word.id === id ? { ...word, showTranslation: !word.showTranslation } : word))
+    );
+  }, []);
+
+  const handleShuffle = useCallback(() => {
+    setWords(prev => {
+      const shuffled = [...prev].sort(() => Math.random() - 0.5);
+      return shuffled;
+    });
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    setWords((prev) => {
+      const allSelected = prev.every((word) => word.status !== null);
+      if (allSelected) {
+        setSelectedCount(0);
+        return prev.map((word) => ({ ...word, status: null }));
+      } else {
+        setSelectedCount(prev.length);
+        return prev.map((word) => ({ ...word, status: "wrong" }));
+      }
+    });
+  }, []);
+
+  const handleSelect5 = useCallback(() => {
+    setWords((prev) => {
+      const unselected = prev.filter((word) => word.status === null);
+      const toSelect = unselected.slice(0, 5);
+      
+      const newWords = prev.map((word) => {
         if (toSelect.find((w) => w.id === word.id)) {
           return { ...word, status: "wrong" };
         }
         return word;
-      })
-    );
-
-    setSelectedCount(words.filter((w) => w.status !== null).length + Math.min(5, unselected.length));
-  };
+      });
+      
+      setSelectedCount(newWords.filter((w) => w.status !== null).length);
+      return newWords;
+    });
+  }, []);
 
   const handleStartLearning = async () => {
     const selectedWords = words.filter((word) => word.status !== null);
@@ -97,6 +198,7 @@ export default function PreTrainingCheck() {
 
     const knownIds = selectedWords.filter((w) => w.status === "correct").map((w) => w.id);
     const unknownIds = selectedWords.filter((w) => w.status === "wrong").map((w) => w.id);
+    
     try {
       const res = await startStudySession({ wordBookId, knownIds, unknownIds });
       const sessionId = res.data?.sessionId;
@@ -116,63 +218,127 @@ export default function PreTrainingCheck() {
     }
   };
 
-  const correctCount = words.filter((word) => word.status === "correct").length;
-  const wrongCount = words.filter((word) => word.status === "wrong").length;
+  const correctCount = useMemo(() => words.filter((word) => word.status === "correct").length, [words]);
+  const wrongCount = useMemo(() => words.filter((word) => word.status === "wrong").length, [words]);
+
+  // 渲染单个单词项（使用React.memo优化）
+  const WordItemComponent = useMemo(() => {
+    const Item = ({ word }: { word: WordItem }) => (
+      <div
+        className={`bg-white rounded-xl p-4 flex items-center justify-between shadow-sm transition-all ${
+          word.status === "correct"
+            ? "border-2 border-[#66BB6A] bg-[#66BB6A]/5"
+            : word.status === "wrong"
+            ? "border-2 border-[#FF6B6B] bg-[#FF6B6B]/5"
+            : ""
+        }`}
+      >
+        <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => handleWordClick(word.id)}>
+          <div>
+            <span className="text-base font-medium text-[#2D3748] hover:text-[#4ECDC4] transition-colors">
+              {word.word}
+            </span>
+            {word.showTranslation && word.translation && (
+              <p className="text-[#718096] text-sm mt-1 animate-in fade-in slide-in-from-top-1">
+                {word.translation}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+            <Volume2 size={20} className="text-[#4ECDC4]" />
+          </button>
+          <button
+            onClick={() => handleStatusClick(word.id, "correct")}
+            className={`p-2 rounded-full transition-colors ${
+              word.status === "correct"
+                ? "bg-[#66BB6A] text-white"
+                : "hover:bg-gray-100 text-[#718096]"
+            }`}
+          >
+            <Check size={20} />
+          </button>
+          <button
+            onClick={() => handleStatusClick(word.id, "wrong")}
+            className={`p-2 rounded-full transition-colors ${
+              word.status === "wrong"
+                ? "bg-[#FF6B6B] text-white"
+                : "hover:bg-gray-100 text-[#718096]"
+            }`}
+          >
+            <X size={20} />
+          </button>
+        </div>
+      </div>
+    );
+    return Item;
+  }, [handleStatusClick, handleWordClick]);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       <TopBar title="训前检测" onBack={handleBack} />
 
       <div className="px-4 mt-6">
-        {/* 提示文字 */}
-        <p className="text-center text-[#718096] mb-4">
-          当前共有 {words.length} 个可选单词
-        </p>
+        {/* 错误提示 */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-600 text-sm mb-4">
+            {error}
+          </div>
+        )}
 
         {/* 单词列表 */}
         <div className="space-y-3 mb-6">
-          {words.map((word) => (
-            <div
-              key={word.id}
-              className={`bg-white rounded-xl p-4 flex items-center justify-between shadow-sm transition-all ${
-                word.status === "correct"
-                  ? "border-2 border-[#66BB6A] bg-[#66BB6A]/5"
-                  : word.status === "wrong"
-                  ? "border-2 border-[#FF6B6B] bg-[#FF6B6B]/5"
-                  : ""
-              }`}
-            >
-              <div className="flex items-center gap-3 flex-1">
-                <span className="text-base font-medium text-[#2D3748]">{word.word}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                  <Volume2 size={20} className="text-[#4ECDC4]" />
-                </button>
-                <button
-                  onClick={() => handleStatusClick(word.id, "correct")}
-                  className={`p-2 rounded-full transition-colors ${
-                    word.status === "correct"
-                      ? "bg-[#66BB6A] text-white"
-                      : "hover:bg-gray-100 text-[#718096]"
-                  }`}
-                >
-                  <Check size={20} />
-                </button>
-                <button
-                  onClick={() => handleStatusClick(word.id, "wrong")}
-                  className={`p-2 rounded-full transition-colors ${
-                    word.status === "wrong"
-                      ? "bg-[#FF6B6B] text-white"
-                      : "hover:bg-gray-100 text-[#718096]"
-                  }`}
-                >
-                  <X size={20} />
-                </button>
-              </div>
+          {initialLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-[#4ECDC4]" />
             </div>
-          ))}
+          ) : (
+            <>
+              {words.map((word) => (
+                <WordItemComponent key={word.id} word={word} />
+              ))}
+              
+              {/* 加载更多指示器 */}
+              {hasMore && (
+                <div ref={loadMoreRef} className="flex justify-center py-4">
+                  {loading ? (
+                    <Loader2 className="w-6 h-6 animate-spin text-[#4ECDC4]" />
+                  ) : (
+                    <span className="text-[#718096] text-sm">下拉加载更多</span>
+                  )}
+                </div>
+              )}
+              
+              {/* 没有更多数据提示 */}
+              {!hasMore && words.length > 0 && (
+                <div className="text-center py-4">
+                  <span className="text-[#718096] text-sm">已加载全部单词</span>
+                </div>
+              )}
+            </>
+          )}
         </div>
+
+        {/* 加载更多触发器 */}
+        {hasMore && (
+          <div ref={loadMoreRef} className="flex justify-center py-4">
+            {loading ? (
+              <div className="flex items-center gap-2 text-[#718096]">
+                <Loader2 size={16} className="animate-spin" />
+                <span>加载更多...</span>
+              </div>
+            ) : (
+              <div className="text-[#718096] text-sm">下拉加载更多</div>
+            )}
+          </div>
+        )}
+        
+        {!hasMore && words.length > 0 && (
+          <div className="text-center text-[#718096] text-sm py-4">
+            已加载全部单词
+          </div>
+        )}
       </div>
 
       {/* 底部栏 */}

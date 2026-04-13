@@ -46,7 +46,16 @@ export default function VocabularyTestTesting() {
   const options: OptionItem[] = useMemo(() => {
     if (!currentQuestion) return [];
     const opts = parseOptions(currentQuestion.options);
-    return [...opts, "不认识"].map((label) => ({ label, value: label }));
+    
+    // 将选项乱序（Fisher-Yates 洗牌算法）
+    const shuffledOptions = [...opts];
+    for (let i = shuffledOptions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
+    }
+    
+    // 将"不认识"选项放在最下面
+    return shuffledOptions.map((label) => ({ label, value: label })).concat([{ label: "不认识", value: "不认识" }]);
   }, [currentQuestion]);
 
   const currentIndex = answeredIds.length;

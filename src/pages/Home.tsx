@@ -12,6 +12,7 @@ import {
   type CoachingTimeStats,
   type CoachingWeekSchedule,
 } from "@/api/coaching";
+import { getLearningStats, type LearningStats } from "@/api/study";
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 const fmtYMD = (d: Date) =>
@@ -49,9 +50,11 @@ export default function Home() {
   /** 用于周课表查询的锚点日期（该周内任意一天即可） */
   const [weekAnchor, setWeekAnchor] = useState(() => new Date());
   const [schedules, setSchedules] = useState<CoachingWeekSchedule[]>([]);
-  const [loadingSchedules, setLoadingSchedules] = useState(false);
+  const [loadingSchedules, setLoadingSchedules] = useState(true);
   const [timeStats, setTimeStats] = useState<CoachingTimeStats | null>(null);
-  const [loadingTimeStats, setLoadingTimeStats] = useState(false);
+  const [loadingTimeStats, setLoadingTimeStats] = useState(true);
+  const [learningStats, setLearningStats] = useState<LearningStats | null>(null);
+  const [loadingLearningStats, setLoadingLearningStats] = useState(true);
 
   const role = (user as { role?: string } | null)?.role || "user";
   const isStudent = role === "student";
@@ -63,13 +66,27 @@ export default function Home() {
     setLoadingTimeStats(true);
     try {
       const res = await getCoachingTimeStats();
-      if (res.code === 200 && res.data) {
-        setTimeStats(res.data);
-      }
-    } catch (error) {
-      console.error("加载时长统计失败:", error);
+      setTimeStats(res.data ?? null);
+    } catch (e: unknown) {
+      console.error("加载时长统计失败:", e);
+      setTimeStats(null);
     } finally {
       setLoadingTimeStats(false);
+    }
+  }, [user]);
+
+  const loadLearningStats = useCallback(async () => {
+    if (!user) return;
+    
+    setLoadingLearningStats(true);
+    try {
+      const res = await getLearningStats();
+      setLearningStats(res.data ?? null);
+    } catch (e: unknown) {
+      console.error("加载学习统计失败:", e);
+      setLearningStats(null);
+    } finally {
+      setLoadingLearningStats(false);
     }
   }, [user]);
 
@@ -111,12 +128,13 @@ export default function Home() {
   }, [weekAnchor, isStudent, isCoach]);
 
   useEffect(() => {
-    void loadWeek();
-  }, [loadWeek]);
+    void loadTimeStats();
+    void loadLearningStats();
+  }, [loadTimeStats, loadLearningStats]);
 
   useEffect(() => {
-    void loadTimeStats();
-  }, [loadTimeStats]);
+    void loadWeek();
+  }, [loadWeek, weekAnchor]);
 
   useEffect(() => {
     const t = window.setInterval(() => setNowTs(Date.now()), 60_000);
@@ -209,6 +227,18 @@ export default function Home() {
           </div>
           <div className="text-[#2D3748] text-sm md:text-base font-medium">词汇测试</div>
           <p className="text-xs text-[#718096] mt-2">进入测评流程</p>
+          {learningStats && (
+            <div className="mt-3 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[#718096]">今日学习</span>
+                <span className="text-[#4ECDC4] font-semibold">{learningStats.todayLearned} 词</span>
+              </div>
+              <div className="flex items-center justify-between text-xs mt-1">
+                <span className="text-[#718096]">累积学习</span>
+                <span className="text-[#55A3FF] font-semibold">{learningStats.totalLearned} 词</span>
+              </div>
+            </div>
+          )}
         </button>
 
         {isCoach ? (
@@ -238,6 +268,18 @@ export default function Home() {
             </div>
             <div className="text-[#2D3748] text-sm md:text-base font-medium">单词训练</div>
             <p className="text-xs text-[#718096] mt-2">选择词库开始练习</p>
+            {learningStats && (
+              <div className="mt-3 pt-3 border-t border-slate-100">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-[#718096]">今日复习</span>
+                  <span className="text-[#FF6B6B] font-semibold">{learningStats.todayReviewed} 词</span>
+                </div>
+                <div className="flex items-center justify-between text-xs mt-1">
+                  <span className="text-[#718096]">连续天数</span>
+                  <span className="text-[#FFA500] font-semibold">{learningStats.consecutiveDays} 天</span>
+                </div>
+              </div>
+            )}
           </button>
         )}
       </div>
@@ -283,10 +325,19 @@ export default function Home() {
                 const st = s.status;
                 const canStart = isCoach && st === "scheduled";
                 const canEnd = isCoach && st === "in_progress";
+                const canEnter = st === "in_progress" || st === "scheduled"; // 正在上课或已排课的都可以进入
                 return (
                   <div
                     key={s.id}
-                    className="bg-white rounded-xl p-4 border border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                    className={`bg-white rounded-xl p-4 border border-[#E2E8F0] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 ${
+                      canEnter ? "cursor-pointer hover:border-[#4ECDC4] hover:shadow-md transition-all" : ""
+                    }`}
+                    onClick={() => {
+                      if (canEnter) {
+                        // 点击直接进入材料选择页面
+                        navigate("/material-selection");
+                      }
+                    }}
                   >
                     <div>
                       <div className="font-medium text-[#2D3748]">{s.title || `排课 #${s.id}`}</div>
@@ -325,7 +376,10 @@ export default function Home() {
                       <div className="flex gap-2 shrink-0">
                         {canStart && (
                           <CloudButton
-                            onClick={() => void onStart(s.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void onStart(s.id);
+                            }}
                             className="px-4 py-2 bg-[#4ECDC4] text-white rounded-full text-sm"
                           >
                             开始上课
@@ -333,7 +387,10 @@ export default function Home() {
                         )}
                         {canEnd && (
                           <CloudButton
-                            onClick={() => void onEnd(s.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void onEnd(s.id);
+                            }}
                             className="px-4 py-2 bg-[#FF6B6B] text-white rounded-full text-sm"
                           >
                             下课

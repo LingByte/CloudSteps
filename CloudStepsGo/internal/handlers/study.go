@@ -77,11 +77,14 @@ func pad2(n int) string {
 	return strconv.Itoa(n)
 }
 
-// handleStudyWords GET /study/words?wordBookId=N
+// handleStudyWords GET /study/words?wordBookId=N&page=1&pageSize=20
 func (h *Handlers) handleStudyWords(c *gin.Context) {
 	db := c.MustGet(constants.DbField).(*gorm.DB)
 	user := models.CurrentUser(c)
 	wordBookID, _ := strconv.Atoi(c.Query("wordBookId"))
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
+	
 	if user == nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "msg": "authorization required"})
 		return
@@ -90,23 +93,43 @@ func (h *Handlers) handleStudyWords(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": "wordBookId 必填"})
 		return
 	}
+	
+	// 确保分页参数合理
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
 
 	var processedIDs []uint
 	_ = db.Model(&models.UserWordState{}).
 		Where("user_id = ? AND word_book_id = ? AND learn_status IN ?", user.ID, wordBookID, []string{"learned", "mastered"}).
 		Pluck("word_id", &processedIDs).Error
 
+	// 先获取总数
+	var total int64
+	countQuery := db.Model(&models.Word{}).Where("word_book_id = ?", wordBookID)
+	if len(processedIDs) > 0 {
+		countQuery = countQuery.Where("id NOT IN ?", processedIDs)
+	}
+	countQuery.Count(&total)
+
+	// 分页查询
 	q := db.Model(&models.Word{}).Where("word_book_id = ?", wordBookID).Order("sort_order ASC, id ASC")
 	if len(processedIDs) > 0 {
 		q = q.Where("id NOT IN ?", processedIDs)
 	}
 
 	var words []models.Word
-	_ = q.Find(&words).Error
+	offset := (page - 1) * pageSize
+	_ = q.Offset(offset).Limit(pageSize).Find(&words).Error
 
 	response.Success(c, "success", gin.H{
-		"total": len(words),
-		"words": words,
+		"total":    total,
+		"page":     page,
+		"pageSize": pageSize,
+		"words":    words,
 	})
 }
 
