@@ -4,6 +4,7 @@ export interface StudyWordItem {
   id: number
   word: string
   translation?: string
+  audioUrl?: string
 }
 
 export interface StudyWordsResponse {
@@ -23,6 +24,8 @@ export interface StudyLighthouseResponse {
   days: LighthouseDay[]
   pendingCount?: number
   masteredCount?: number
+  /** 今日首次计入「已学」的单词数 */
+  todayNewLearned?: number
 }
 
 export interface StartStudySessionRequest {
@@ -68,17 +71,3 @@ export const completeStudySession = async (
   return post<null>(`/study/session/${sessionId}/complete`, { results })
 }
 
-export interface LearningStats {
-  todayLearned: number
-  totalLearned: number
-  todayReviewed: number
-  totalReviewed: number
-  consecutiveDays: number
-  masteryRate: number
-}
-
-export const getLearningStats = async (wordBookId?: number): Promise<ApiResponse<LearningStats>> => {
-  const params: any = {};
-  if (wordBookId) params.wordBookId = wordBookId;
-  return get<LearningStats>('/study/stats', { params });
-}

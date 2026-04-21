@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -25,6 +26,7 @@ func (h *Handlers) handleStudyLighthouse(c *gin.Context) {
 
 	now := time.Now().UTC()
 	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	endOfToday := startOfToday.Add(24 * time.Hour)
 
 	type dayItem struct {
 		ID    string `json:"id"`
@@ -33,18 +35,37 @@ func (h *Handlers) handleStudyLighthouse(c *gin.Context) {
 	}
 	days := make([]dayItem, 0, 7)
 
+	// 艾宾浩斯阶段：第 1～7 格对应 review_stage 0～6（与复习推进一致，非“日历上的连续 7 天”）
+	intervals := models.EbbinghausIntervals
 	for i := 0; i < 7; i++ {
-		dayStart := startOfToday.AddDate(0, 0, i)
-		dayEnd := dayStart.Add(24 * time.Hour)
-		q := db.Model(&models.ReviewQueue{}).
-			Where("user_id = ? AND status = ? AND due_at >= ? AND due_at < ?", user.ID, "pending", dayStart, dayEnd)
+		q := db.Model(&models.UserWordState{}).
+			Where("user_id = ? AND learn_status IN ?", user.ID, []string{"learning", "learned", "mastered"}).
+			Where("review_stage = ?", i)
 		if wordBookID > 0 {
-			q = q.Where("word_book_id = ?", wordBookID)
+			q = q.Where("word_book_id = ?", uint(wordBookID))
 		}
 		var cnt int64
 		_ = q.Count(&cnt).Error
-		days = append(days, dayItem{ID: pad2(i + 1), Count: cnt, Label: "第" + strconv.Itoa(i+1) + "天"})
+
+		label := fmt.Sprintf("第%d步", i+1)
+		if i < len(intervals) {
+			if i == 0 {
+				label += "·初学"
+			} else {
+				label += fmt.Sprintf("·%d天后", intervals[i])
+			}
+		}
+		days = append(days, dayItem{ID: pad2(i + 1), Count: cnt, Label: label})
 	}
+
+	// 今日新学：本日首次标记为已学的词数
+	tq := db.Model(&models.UserWordState{}).
+		Where("user_id = ? AND first_learned_at IS NOT NULL AND first_learned_at >= ? AND first_learned_at < ?", user.ID, startOfToday, endOfToday)
+	if wordBookID > 0 {
+		tq = tq.Where("word_book_id = ?", uint(wordBookID))
+	}
+	var todayNewLearned int64
+	_ = tq.Count(&todayNewLearned).Error
 
 	// 待学：unknown + pending
 	st := db.Model(&models.UserWordState{}).
@@ -64,9 +85,10 @@ func (h *Handlers) handleStudyLighthouse(c *gin.Context) {
 	_ = mt.Count(&masteredCount).Error
 
 	response.Success(c, "success", gin.H{
-		"days":         days,
-		"pendingCount": pendingCount,
-		"masteredCount": masteredCount,
+		"days":            days,
+		"pendingCount":    pendingCount,
+		"masteredCount":   masteredCount,
+		"todayNewLearned": todayNewLearned,
 	})
 }
 

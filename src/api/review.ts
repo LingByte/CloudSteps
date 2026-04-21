@@ -15,8 +15,10 @@ export interface StartReviewSessionRequest {
 }
 
 export interface StartReviewSessionResponse {
-  sessionId: number
-  words: any[]
+  sessionId?: number
+  words?: any[]
+  /** 无到期复习词时为 true */
+  finished?: boolean
 }
 
 export interface CompleteReviewResult {
@@ -28,8 +30,19 @@ export const getReviewToday = async (wordBookId: number): Promise<ApiResponse<Re
   return get<ReviewTodayResponse>('/review/today', { params: { wordBookId } })
 }
 
-export const listReviewBooks = async (): Promise<ApiResponse<Array<{ wordBookId: number; cnt: number; name: string; level: string }>>> => {
-  return get<Array<{ wordBookId: number; cnt: number; name: string; level: string }>>('/review/books')
+export type ReviewBookStatRow = { wordBookId: number; cnt: number; name: string; level: string }
+
+export const listReviewBooks = async (): Promise<ApiResponse<ReviewBookStatRow[]>> => {
+  return get<ReviewBookStatRow[]>('/review/books')
+}
+
+/** 按本地自然日统计各词库待复习词数（与抗遗忘页日期联动） */
+export const listReviewBooksByDate = async (
+  date: string,
+  timeZone?: string
+): Promise<ApiResponse<ReviewBookStatRow[]>> => {
+  const tz = timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai'
+  return get<ReviewBookStatRow[]>('/review/books-by-date', { params: { date, timeZone: tz } })
 }
 
 export const startReviewSession = async (

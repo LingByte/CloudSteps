@@ -1,8 +1,9 @@
 import { ArrowLeft, Pause, Volume2, Shuffle, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { playFirstWordAudio, playWordAudio } from "@/utils/audioPlayer";
 
-type ReviewWord = { id: number; word: string; translation: string; showTranslation: boolean };
+type ReviewWord = { id: number; word: string; translation: string; audioUrl?: string; showTranslation: boolean };
 
 export default function WordReview() {
   const navigate = useNavigate();
@@ -10,6 +11,16 @@ export default function WordReview() {
   const [speed, setSpeed] = useState("1.0x");
   const [showPauseMenu, setShowPauseMenu] = useState(false);
   const [touchedIds, setTouchedIds] = useState<Set<number>>(new Set());
+  const [playingId, setPlayingId] = useState<number | null>(null);
+  const abortRef = useRef<(() => void) | null>(null);
+
+  const handlePlayAudio = (word: ReviewWord) => {
+    if (!word.audioUrl) return;
+    abortRef.current?.();
+    setPlayingId(word.id);
+    const abort = playWordAudio(word.audioUrl, 300, () => setPlayingId(null));
+    abortRef.current = abort;
+  };
 
   const mode = useMemo(() => sessionStorage.getItem("lb_mode") || "study", []);
 
@@ -35,6 +46,7 @@ export default function WordReview() {
         id: Number(w.id),
         word: String(w.word || ""),
         translation: String(w.translation || ""),
+        audioUrl: w.audioUrl ? String(w.audioUrl) : undefined,
         showTranslation: false,
       }));
       setWords(mapped);
@@ -44,7 +56,14 @@ export default function WordReview() {
     }
   }, [batchIdx, mode]);
 
-  const toggleTranslation = (id: number) => {
+  const toggleTranslation = (word: ReviewWord) => {
+    const id = word.id;
+    if (word.audioUrl) {
+      abortRef.current?.();
+      setPlayingId(word.id);
+      const abort = playFirstWordAudio(word.audioUrl, () => setPlayingId(null));
+      abortRef.current = abort;
+    }
     setTouchedIds((prev) => new Set(prev).add(id));
     setWords((prev) =>
       prev.map((word) =>
@@ -98,7 +117,7 @@ export default function WordReview() {
             >
               <div className="flex items-center justify-between">
                 <div
-                  onClick={() => toggleTranslation(word.id)}
+                  onClick={() => toggleTranslation(word)}
                   className="flex-1 cursor-pointer pr-3"
                 >
                   <div className="text-base font-medium text-[#2D3748] mb-1">{word.word}</div>
@@ -107,8 +126,11 @@ export default function WordReview() {
                   )}
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
-                  <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                    <Volume2 size={20} className="text-[#4ECDC4]" />
+                  <button
+                    onClick={() => handlePlayAudio(word)}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <Volume2 size={20} className={playingId === word.id ? "text-[#4ECDC4] animate-pulse" : "text-[#4ECDC4]"} />
                   </button>
                 </div>
               </div>

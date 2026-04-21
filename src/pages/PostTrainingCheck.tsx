@@ -1,13 +1,15 @@
 import { ArrowLeft, Volume2, Check, X } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { completeStudySession } from "@/api/study";
 import { completeReviewSession } from "@/api/review";
+import { playFirstWordAudio, playWordAudio } from "@/utils/audioPlayer";
 
 type CheckWord = { 
   id: number; 
   word: string; 
   translation?: string;
+  audioUrl?: string;
   status: null | "correct" | "wrong";
   showTranslation?: boolean;
 };
@@ -29,6 +31,16 @@ export default function PostTrainingCheck() {
   }, [mode]);
   const [submitting, setSubmitting] = useState(false);
   const [submitDone, setSubmitDone] = useState(false);
+  const [playingId, setPlayingId] = useState<number | null>(null);
+  const abortRef = useRef<(() => void) | null>(null);
+
+  const handlePlayAudio = (word: CheckWord) => {
+    if (!word.audioUrl) return;
+    abortRef.current?.();
+    setPlayingId(word.id);
+    const abort = playWordAudio(word.audioUrl, 300, () => setPlayingId(null));
+    abortRef.current = abort;
+  };
 
   const handleBack = () => {
     if (window.history.length > 1) navigate(-1);
@@ -47,6 +59,7 @@ export default function PostTrainingCheck() {
         id: Number(w.id), 
         word: String(w.word || ""), 
         translation: w.translation ? String(w.translation) : undefined,
+        audioUrl: w.audioUrl ? String(w.audioUrl) : undefined,
         status: null,
         showTranslation: false
       }));
@@ -68,7 +81,14 @@ export default function PostTrainingCheck() {
     );
   };
 
-  const handleWordClick = (id: number) => {
+  const handleWordClick = (word: CheckWord) => {
+    const id = word.id;
+    if (word.audioUrl) {
+      abortRef.current?.();
+      setPlayingId(word.id);
+      const abort = playFirstWordAudio(word.audioUrl, () => setPlayingId(null));
+      abortRef.current = abort;
+    }
     setWords((prev) =>
       prev.map((word) => (word.id === id ? { ...word, showTranslation: !word.showTranslation } : word))
     );
@@ -86,10 +106,7 @@ export default function PostTrainingCheck() {
 
         if (mode === "review") {
           // 抗遗忘模式：直接提交所有结果，不分批
-          const res = await completeReviewSession({
-            sessionId: sessionId,
-            results: results,
-          });
+          const res = await completeReviewSession(sessionId, results);
           if (res.code !== 200) {
             throw new Error(res.msg || "提交失败");
           }
@@ -150,7 +167,7 @@ export default function PostTrainingCheck() {
                   : ""
               }`}
             >
-              <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => handleWordClick(word.id)}>
+              <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => handleWordClick(word)}>
                 <div>
                   <span className="text-base font-medium text-[#2D3748] hover:text-[#4ECDC4] transition-colors">{word.word}</span>
                   {word.showTranslation && word.translation && (
@@ -161,8 +178,11 @@ export default function PostTrainingCheck() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                  <Volume2 size={20} className="text-[#4ECDC4]" />
+                <button
+                  onClick={() => handlePlayAudio(word)}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <Volume2 size={20} className={playingId === word.id ? "text-[#4ECDC4] animate-pulse" : "text-[#4ECDC4]"} />
                 </button>
                 <button
                   onClick={() => handleStatusClick(word.id, "correct")}

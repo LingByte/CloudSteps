@@ -1,9 +1,10 @@
 import { ArrowLeft, Pause, Volume2, Scissors, Check, X } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import confetti from "canvas-confetti";
+import { playWordAudio } from "@/utils/audioPlayer";
 
-type FlashWord = { id: number; word: string; translation: string; scissorCount: number; status: any; showTranslation: boolean };
+type FlashWord = { id: number; word: string; translation: string; audioUrl?: string; scissorCount: number; status: any; showTranslation: boolean };
 
 export default function FlashReview() {
   const navigate = useNavigate();
@@ -34,6 +35,7 @@ export default function FlashReview() {
         id: Number(w.id),
         word: String(w.word || ""),
         translation: String(w.translation || ""),
+        audioUrl: w.audioUrl ? String(w.audioUrl) : undefined,
         scissorCount: 0,
         status: null,
         showTranslation: false,
@@ -59,6 +61,17 @@ export default function FlashReview() {
         return word;
       })
     );
+  };
+
+  const [playingId, setPlayingId] = useState<number | null>(null);
+  const abortRef = useRef<(() => void) | null>(null);
+
+  const handlePlayAudio = (word: FlashWord) => {
+    if (!word.audioUrl) return;
+    abortRef.current?.();
+    setPlayingId(word.id);
+    const abort = playWordAudio(word.audioUrl, 300, () => setPlayingId(null));
+    abortRef.current = abort;
   };
 
   const allCut = words.length > 0 && words.every((word) => word.scissorCount >= 2);
@@ -102,14 +115,14 @@ export default function FlashReview() {
         {/* 组信息 */}
         <div className="text-center text-sm text-[#718096] mb-6">1/1组</div>
 
-        {/* 单词列表 */}
+        {/* 单词列表：已剪完的不渲染，避免占位，下方条目自动顶上来 */}
         <div className="space-y-3 mb-6">
-          {words.map((word) => (
+          {words
+            .filter((w) => w.scissorCount < 2)
+            .map((word) => (
             <div
               key={word.id}
-              className={`bg-white rounded-xl p-4 flex items-center justify-between shadow-sm transition-all ${
-                word.scissorCount >= 2 ? "opacity-0 h-0 overflow-hidden p-0 mb-0" : ""
-              }`}
+              className="bg-white rounded-xl p-4 flex items-center justify-between shadow-sm transition-all"
             >
               <div className="flex items-center gap-3 flex-1">
                 <div>
@@ -120,8 +133,11 @@ export default function FlashReview() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                  <Volume2 size={20} className="text-[#4ECDC4]" />
+                <button
+                  onClick={() => handlePlayAudio(word)}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <Volume2 size={20} className={playingId === word.id ? "text-[#4ECDC4] animate-pulse" : "text-[#4ECDC4]"} />
                 </button>
                 <button
                   onClick={() => handleScissorClick(word.id)}

@@ -1,12 +1,14 @@
 import { useNavigate } from "react-router";
 import { ChevronLeft, Volume2, Check } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getReviewToday, startReviewSession } from "@/api/review";
+import { playFirstWordAudio, playWordAudio } from "@/utils/audioPlayer";
 
 type ReviewWordItem = { 
   id: number; 
   word: string; 
   translation?: string;
+  audioUrl?: string;
   status: null | "selected";
   showTranslation?: boolean;
 };
@@ -27,6 +29,16 @@ export default function ReviewWordList() {
   }, []);
 
   const [sessionId, setSessionId] = useState<number>(0);
+  const [playingId, setPlayingId] = useState<number | null>(null);
+  const abortRef = useRef<(() => void) | null>(null);
+
+  const handlePlayAudio = (item: ReviewWordItem) => {
+    if (!item.audioUrl) return;
+    abortRef.current?.();
+    setPlayingId(item.id);
+    const abort = playWordAudio(item.audioUrl, 300, () => setPlayingId(null));
+    abortRef.current = abort;
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -34,10 +46,11 @@ export default function ReviewWordList() {
       try {
         const res = await getReviewToday(wordBookId);
         const ws = Array.isArray(res.data?.words) ? (res.data.words as Array<{ id: number; word: string; translation?: string }>) : [];
-        const mapped: ReviewWordItem[] = ws.map((w) => ({ 
+        const mapped: ReviewWordItem[] = ws.map((w: any) => ({ 
           id: Number(w.id), 
           word: String(w.word || ""), 
           translation: w.translation ? String(w.translation) : undefined,
+          audioUrl: w.audioUrl ? String(w.audioUrl) : undefined,
           status: null,
           showTranslation: false
         }));
@@ -66,7 +79,14 @@ export default function ReviewWordList() {
     );
   };
 
-  const handleWordClick = (id: number) => {
+  const handleWordClick = (item: ReviewWordItem) => {
+    const id = item.id;
+    if (item.audioUrl) {
+      abortRef.current?.();
+      setPlayingId(item.id);
+      const abort = playFirstWordAudio(item.audioUrl, () => setPlayingId(null));
+      abortRef.current = abort;
+    }
     setWords((prev) =>
       prev.map((word) => (word.id === id ? { ...word, showTranslation: !word.showTranslation } : word))
     );
@@ -146,7 +166,7 @@ export default function ReviewWordList() {
                   <span className="text-[#A0AEC0] text-sm mt-1">
                     {index + 1}
                   </span>
-                  <div className="flex-1 cursor-pointer" onClick={() => handleWordClick(item.id)}>
+                  <div className="flex-1 cursor-pointer" onClick={() => handleWordClick(item)}>
                     <h3 className="text-2xl font-semibold text-[#2D3748] hover:text-[#4ECDC4] transition-colors">
                       {item.word}
                     </h3>
@@ -158,8 +178,11 @@ export default function ReviewWordList() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button className="text-[#55A3FF] hover:text-[#4ECDC4] transition-colors p-2">
-                    <Volume2 size={24} />
+                  <button
+                    onClick={() => handlePlayAudio(item)}
+                    className={`p-2 transition-colors ${playingId === item.id ? "text-[#4ECDC4]" : "text-[#55A3FF] hover:text-[#4ECDC4]"}`}
+                  >
+                    <Volume2 size={24} className={playingId === item.id ? "animate-pulse" : ""} />
                   </button>
                   <button
                     onClick={() => handleStatusClick(item.id)}

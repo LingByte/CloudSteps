@@ -107,6 +107,81 @@ func (h *Handlers) handleReviewBooks(c *gin.Context) {
 	response.Success(c, "success", stats)
 }
 
+// handleReviewBooksByDate GET /review/books-by-date?date=2006-01-02&timeZone=Asia/Shanghai
+// 按「用户时区下的自然日」统计该日待复习词数（按词库分组）。
+// - 选中「今天」：与原先 /review/books 一致，包含逾期未复习（due_at < 明天 0 点）。
+// - 选中其它日期：仅包含 due_at 落在该日 0 点～次日 0 点之间的待复习项。
+func (h *Handlers) handleReviewBooksByDate(c *gin.Context) {
+	db := c.MustGet(constants.DbField).(*gorm.DB)
+	user := models.CurrentUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "msg": "authorization required"})
+		return
+	}
+
+	dateStr := c.Query("date")
+	if dateStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": "date 必填，格式 YYYY-MM-DD"})
+		return
+	}
+
+	tzName := c.DefaultQuery("timeZone", "Asia/Shanghai")
+	loc, err := time.LoadLocation(tzName)
+	if err != nil {
+		loc = time.FixedZone("CST", 8*3600)
+	}
+
+	dayStart, err := time.ParseInLocation("2006-01-02", dateStr, loc)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": "date 格式应为 YYYY-MM-DD"})
+		return
+	}
+	dayStart = time.Date(dayStart.Year(), dayStart.Month(), dayStart.Day(), 0, 0, 0, 0, loc)
+	dayEnd := dayStart.Add(24 * time.Hour)
+
+	now := time.Now().In(loc)
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	isSelectedToday := dayStart.Equal(todayStart)
+
+	type bookStat struct {
+		WordBookID uint   `gorm:"column:word_book_id" json:"wordBookId"`
+		Count      int64  `gorm:"column:cnt" json:"cnt"`
+		BookName   string `gorm:"column:name" json:"name"`
+		Level      string `gorm:"column:level" json:"level"`
+	}
+	var stats []bookStat
+
+	var q string
+	var args []any
+	if isSelectedToday {
+		// 今日：待复习且 due 不晚于「本地明天 0 点」＝今日应完成 + 逾期
+		q = `
+			SELECT rq.word_book_id, COUNT(*) as cnt, wb.name, wb.level
+			FROM review_queue rq
+			JOIN word_books wb ON wb.id = rq.word_book_id
+			WHERE rq.user_id = ? AND rq.status = 'pending' AND rq.due_at < ?
+			GROUP BY rq.word_book_id, wb.name, wb.level
+		`
+		args = []any{user.ID, dayEnd}
+	} else {
+		q = `
+			SELECT rq.word_book_id, COUNT(*) as cnt, wb.name, wb.level
+			FROM review_queue rq
+			JOIN word_books wb ON wb.id = rq.word_book_id
+			WHERE rq.user_id = ? AND rq.status = 'pending' AND rq.due_at >= ? AND rq.due_at < ?
+			GROUP BY rq.word_book_id, wb.name, wb.level
+		`
+		args = []any{user.ID, dayStart, dayEnd}
+	}
+
+	err = db.Raw(q, args...).Scan(&stats).Error
+	if err != nil {
+		response.Fail(c, "查询失败", err)
+		return
+	}
+	response.Success(c, "success", stats)
+}
+
 // handleReviewCurve GET /review/curve
 func (h *Handlers) handleReviewCurve(c *gin.Context) {
 	db := c.MustGet(constants.DbField).(*gorm.DB)

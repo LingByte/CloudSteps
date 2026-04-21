@@ -17,6 +17,7 @@ export default function WordTraining() {
   const [memoryData, setMemoryData] = useState<LighthouseDay[]>([]);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [masteredCount, setMasteredCount] = useState<number>(0);
+  const [todayNewLearned, setTodayNewLearned] = useState<number>(0);
 
   const handleBack = () => {
     navigate("/");
@@ -62,15 +63,18 @@ export default function WordTraining() {
         const days = Array.isArray(res.data?.days) ? (res.data.days as LighthouseDay[]) : [];
         const pending = Number(res.data?.pendingCount || 0);
         const mastered = Number(res.data?.masteredCount || 0);
+        const todayNew = Number(res.data?.todayNewLearned ?? 0);
         if (!mounted) return;
         setMemoryData(days);
         setPendingCount(pending);
         setMasteredCount(mastered);
+        setTodayNewLearned(todayNew);
       } catch {
         if (!mounted) return;
         setMemoryData([]);
         setPendingCount(0);
         setMasteredCount(0);
+        setTodayNewLearned(0);
       }
     })();
     return () => {
@@ -137,7 +141,7 @@ export default function WordTraining() {
         {/* 数据统计区 */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-white rounded-xl p-4 text-center shadow-sm">
-            <div className="text-2xl font-bold text-[#4ECDC4] mb-1">0</div>
+            <div className="text-2xl font-bold text-[#4ECDC4] mb-1">{todayNewLearned}</div>
             <div className="text-xs text-[#718096]">今日训新</div>
           </div>
           <div className="bg-white rounded-xl p-4 text-center shadow-sm">
@@ -152,9 +156,14 @@ export default function WordTraining() {
 
         {/* 智能记忆灯塔 */}
         <div className="bg-white rounded-xl p-6 shadow-sm">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Lightbulb className="text-[#FFD700]" size={24} />
-            <h3 className="text-base font-semibold text-[#2D3748]">智能记忆灯塔</h3>
+          <div className="flex flex-col items-center gap-1 mb-4">
+            <div className="flex items-center justify-center gap-2">
+              <Lightbulb className="text-[#FFD700]" size={24} />
+              <h3 className="text-base font-semibold text-[#2D3748]">智能记忆灯塔</h3>
+            </div>
+            <p className="text-[11px] text-[#A0AEC0] text-center px-2">
+              按艾宾浩斯复习阶段（第 1～7 步）统计当前词库词汇量
+            </p>
           </div>
 
           {/* 九宫格 */}
@@ -168,7 +177,7 @@ export default function WordTraining() {
                 >
                   <div className="text-xs opacity-80 mb-1">{item.id}</div>
                   <div className="text-2xl font-bold">{item.count}</div>
-                  <div className="text-xs opacity-80 mt-1">{item.label}</div>
+                  <div className="text-[10px] sm:text-xs opacity-90 mt-1 text-center leading-tight px-0.5 line-clamp-3">{item.label}</div>
                 </div>
               ))}
             </div>
@@ -182,7 +191,7 @@ export default function WordTraining() {
                 >
                   <div className="text-xs opacity-80 mb-1">{item.id}</div>
                   <div className="text-2xl font-bold">{item.count}</div>
-                  <div className="text-xs opacity-80 mt-1">{item.label}</div>
+                  <div className="text-[10px] sm:text-xs opacity-90 mt-1 text-center leading-tight px-0.5 line-clamp-3">{item.label}</div>
                 </div>
               ))}
             </div>
@@ -196,7 +205,7 @@ export default function WordTraining() {
                 >
                   <div className="text-xs opacity-80 mb-1">{item.id}</div>
                   <div className="text-2xl font-bold">{item.count}</div>
-                  <div className="text-xs opacity-80 mt-1">{item.label}</div>
+                  <div className="text-[10px] sm:text-xs opacity-90 mt-1 text-center leading-tight px-0.5 line-clamp-3">{item.label}</div>
                 </div>
               ))}
               {/* 待学 */}

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { Calendar, Clock, User, Eye, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Calendar, Clock, Eye, BookOpen, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router";
-import { listReviewBooks } from "@/api/review";
+import { listReviewBooksByDate } from "@/api/review";
 
 type ReviewBookStat = { wordBookId: number; cnt: number; name: string; level: string };
 
@@ -23,27 +23,46 @@ function toDateInputValue(d: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+const WEEKDAY_ZH = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+
+function parseYMDLocal(ymd: string): Date {
+  const [y, m, d] = ymd.split("-").map((x) => Number(x));
+  if (!y || !m || !d) return new Date();
+  return new Date(y, m - 1, d);
+}
+
+function formatDateZhLong(ymd: string) {
+  const d = parseYMDLocal(ymd);
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${WEEKDAY_ZH[d.getDay()]}`;
+}
+
 export default function AntiForgetting() {
   const [selectedDate, setSelectedDate] = useState(() => toDateInputValue(new Date()));
+  const dateInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   const [bookStats, setBookStats] = useState<ReviewBookStat[]>([]);
+  const [loadingBooks, setLoadingBooks] = useState(true);
 
   useEffect(() => {
     let mounted = true;
     (async () => {
+      setLoadingBooks(true);
       try {
-        const res = await listReviewBooks();
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Shanghai";
+        const res = await listReviewBooksByDate(selectedDate, tz);
         const arr = Array.isArray(res.data) ? (res.data as ReviewBookStat[]) : [];
         if (mounted) setBookStats(arr);
       } catch {
         if (mounted) setBookStats([]);
+      } finally {
+        if (mounted) setLoadingBooks(false);
       }
     })();
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [selectedDate]);
 
   // 获取选中日期的任务
   const reviewTasks = useMemo<ReviewTask[]>(() => {
@@ -71,9 +90,24 @@ export default function AntiForgetting() {
   });
 
   const shiftDate = (deltaDays: number) => {
-    const d = new Date(selectedDate);
+    const d = parseYMDLocal(selectedDate);
     d.setDate(d.getDate() + deltaDays);
     setSelectedDate(toDateInputValue(d));
+  };
+
+  const openNativeDatePicker = () => {
+    const el = dateInputRef.current;
+    if (!el) return;
+    const anyEl = el as HTMLInputElement & { showPicker?: () => void };
+    if (typeof anyEl.showPicker === "function") {
+      try {
+        anyEl.showPicker();
+        return;
+      } catch {
+        // 部分浏览器仍可能抛错，回退为 click
+      }
+    }
+    el.click();
   };
 
   const handleOpenTask = (task: ReviewTask) => {
@@ -94,33 +128,64 @@ export default function AntiForgetting() {
         </p>
       </div>
 
-      {/* 日期筛选器 */}
+      {/* 日期筛选器：移动端用大字 + 系统日历，避免原生 date 输入条难点 */}
       <div className="bg-white rounded-xl p-4 md:p-6 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-stretch justify-between gap-2 sm:gap-4">
           <button
+            type="button"
             onClick={() => shiftDate(-1)}
-            className="p-2 hover:bg-[#F7F9FC] rounded-lg transition-colors"
+            className="shrink-0 self-center p-3 rounded-xl hover:bg-[#F7F9FC] active:scale-[0.98] transition-all"
+            aria-label="上一天"
           >
-            <ChevronLeft size={20} className="text-[#718096]" />
+            <ChevronLeft size={22} className="text-[#718096]" />
           </button>
-          <div className="flex items-center gap-3">
-            <Calendar size={20} className="text-[#4ECDC4]" />
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="text-[#2D3748] font-medium text-base md:text-lg border-none outline-none cursor-pointer"
-            />
-          </div>
+
           <button
-            onClick={() => shiftDate(1)}
-            className="p-2 hover:bg-[#F7F9FC] rounded-lg transition-colors"
+            type="button"
+            onClick={openNativeDatePicker}
+            className="flex-1 min-w-0 flex flex-col items-center justify-center rounded-xl px-2 py-3 hover:bg-[#F7F9FC]/80 active:bg-[#F7F9FC] transition-colors"
           >
-            <ChevronRight size={20} className="text-[#718096]" />
+            <div className="flex items-center gap-1.5 text-[#4ECDC4] mb-1">
+              <Calendar size={18} />
+              <span className="text-xs font-medium text-[#718096]">选择日期</span>
+            </div>
+            <div className="text-[15px] sm:text-lg font-semibold text-[#2D3748] text-center leading-snug">
+              {formatDateZhLong(selectedDate)}
+            </div>
+            <span className="text-[11px] text-[#A0AEC0] mt-1.5">点按打开系统日历</span>
+          </button>
+
+          <input
+            ref={dateInputRef}
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="absolute opacity-0 w-px h-px overflow-hidden -z-10"
+            tabIndex={-1}
+            aria-label="选择日期"
+          />
+
+          <button
+            type="button"
+            onClick={() => shiftDate(1)}
+            className="shrink-0 self-center p-3 rounded-xl hover:bg-[#F7F9FC] active:scale-[0.98] transition-all"
+            aria-label="下一天"
+          >
+            <ChevronRight size={22} className="text-[#718096]" />
           </button>
         </div>
       </div>
 
+      {loadingBooks ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="w-10 h-10 animate-spin text-[#4ECDC4]" />
+        </div>
+      ) : reviewTasks.length === 0 ? (
+        <div className="bg-white rounded-xl p-10 text-center text-[#718096] shadow-sm">
+          该日暂无待复习词库任务（或已全部完成）。可切换日期查看其它天的计划。
+        </div>
+      ) : (
+        <>
       {/* 桌面端：按学员分组显示 */}
       <div className="hidden lg:block space-y-6">
         {Object.entries(groupedByStudent).map(([student, tasks]) => (
@@ -132,7 +197,7 @@ export default function AntiForgetting() {
               <div>
                 <h3 className="text-[#2D3748] font-semibold text-lg">{student}</h3>
                 <p className="text-[#A0AEC0] text-sm">
-                  今日 {tasks.length} 个复习任务
+                  本日 {tasks.length} 个复习任务（按所选日期统计）
                 </p>
               </div>
             </div>
@@ -219,6 +284,8 @@ export default function AntiForgetting() {
           </div>
         ))}
       </div>
+        </>
+      )}
     </div>
   );
 }

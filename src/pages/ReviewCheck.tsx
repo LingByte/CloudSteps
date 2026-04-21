@@ -1,4 +1,4 @@
-import { ArrowLeft, Volume2, Check, X, Shuffle } from "lucide-react";
+import { ArrowLeft, Volume2, Check, X, Shuffle, BookOpen } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useEffect, useMemo, useState } from "react";
 
@@ -6,10 +6,20 @@ import { completeReviewSession, startReviewSession } from "@/api/review";
 
 type ReviewWord = { id: number; word: string; status: null | "correct" | "wrong" };
 
+type StartReviewData = {
+  sessionId?: number;
+  words?: Array<{ id: number; word: string }>;
+  finished?: boolean;
+};
+
 export default function ReviewCheck() {
   const navigate = useNavigate();
   const [words, setWords] = useState<ReviewWord[]>([]);
   const [showResultDialog, setShowResultDialog] = useState(false);
+  const [loading, setLoading] = useState(true);
+  /** 无词可复习时后端返回 finished + msg */
+  const [emptyMessage, setEmptyMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const handleBack = () => {
     if (window.history.length > 1) navigate(-1);
@@ -22,15 +32,33 @@ export default function ReviewCheck() {
   useEffect(() => {
     let mounted = true;
     (async () => {
+      setLoading(true);
+      setEmptyMessage(null);
+      setLoadError(null);
       try {
         const res = await startReviewSession({ wordBookId });
-        const sid = Number(res.data?.sessionId || 0);
-        const ws = Array.isArray(res.data?.words) ? (res.data.words as Array<{ id: number; word: string }>) : [];
         if (!mounted) return;
+
+        const data = res.data as StartReviewData | undefined;
+        if (res.code === 200 && data?.finished) {
+          setSessionId(0);
+          setWords([]);
+          setEmptyMessage(res.msg || "今日无待复习单词");
+          return;
+        }
+
+        const sid = Number(data?.sessionId || 0);
+        const ws = Array.isArray(data?.words) ? data!.words! : [];
         setSessionId(sid);
         setWords(ws.map((w) => ({ id: w.id, word: w.word, status: null })));
-      } catch {
-        // ignore
+        if (ws.length === 0 && !data?.finished) {
+          setEmptyMessage(res.msg || "暂无可复习内容");
+        }
+      } catch (e: unknown) {
+        const msg = e && typeof e === "object" && "msg" in e ? String((e as { msg: string }).msg) : "加载失败";
+        if (mounted) setLoadError(msg);
+      } finally {
+        if (mounted) setLoading(false);
       }
     })();
     return () => {
@@ -88,24 +116,63 @@ export default function ReviewCheck() {
   const correctCount = words.filter((word) => word.status === "correct").length;
   const wrongCount = words.filter((word) => word.status === "wrong").length;
 
+  const showList = !loading && !loadError && !emptyMessage && words.length > 0;
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
-      {/* 顶部栏 */}
-      <div className="bg-white sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center px-4 py-4">
+      {/* 顶部栏：三列网格，避免标题负边距盖住返回键 */}
+      <div className="bg-white sticky top-0 z-30 shadow-sm">
+        <div className="grid grid-cols-[3rem_1fr_3rem] items-center px-2 py-3">
           <button
+            type="button"
             onClick={handleBack}
-            className="p-2 -ml-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-2 justify-self-start hover:bg-gray-100 rounded-full transition-colors"
+            aria-label="返回"
           >
             <ArrowLeft size={24} className="text-[#2D3748]" />
           </button>
-          <h1 className="flex-1 text-center text-lg font-semibold text-[#2D3748] -ml-10">
+          <h1 className="text-center text-lg font-semibold text-[#2D3748] truncate">
             复习检测
           </h1>
+          <span className="w-10" aria-hidden />
         </div>
       </div>
 
       <div className="px-4 mt-6">
+        {loading && (
+          <p className="text-center text-[#718096] py-12">加载中…</p>
+        )}
+
+        {loadError && (
+          <div className="rounded-xl bg-white border border-[#E2E8F0] p-6 text-center space-y-4">
+            <p className="text-[#FF6B6B]">{loadError}</p>
+            <button
+              type="button"
+              onClick={handleBack}
+              className="px-6 py-2 rounded-full bg-[#4ECDC4] text-white font-medium"
+            >
+              返回
+            </button>
+          </div>
+        )}
+
+        {!loading && !loadError && emptyMessage && (
+          <div className="rounded-xl bg-white border border-[#E2E8F0] p-8 text-center space-y-4 shadow-sm">
+            <BookOpen className="mx-auto text-[#4ECDC4]" size={40} />
+            <p className="text-[#2D3748] font-medium">{emptyMessage}</p>
+            <p className="text-sm text-[#718096]">当前词库没有到期的复习任务，可先进行单词训练或改日再来。</p>
+            <button
+              type="button"
+              onClick={() => navigate("/word-training")}
+              className="w-full max-w-xs mx-auto py-3 rounded-full bg-[#4ECDC4] text-white font-medium"
+            >
+              返回单词训练
+            </button>
+          </div>
+        )}
+
+        {showList && (
+          <>
         {/* 提示文字 */}
         <p className="text-center text-[#718096] mb-4">
           当前共有 {words.length} 个可选单词
@@ -155,10 +222,13 @@ export default function ReviewCheck() {
             </div>
           ))}
         </div>
+          </>
+        )}
       </div>
 
-      {/* 底部栏 */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E2E8F0] px-4 py-4 shadow-lg">
+      {/* 底部栏：无列表时不挡操作，有列表时固定底部 */}
+      {showList && (
+      <div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-[#E2E8F0] px-4 py-4 shadow-lg">
         <div className="flex items-center justify-between mb-3">
           <div className="text-sm text-[#718096]">
             已选择 <span className="text-[#4ECDC4] font-semibold">{correctCount + wrongCount}</span> ·
@@ -188,6 +258,7 @@ export default function ReviewCheck() {
           提交
         </button>
       </div>
+      )}
 
       {/* 结果弹窗 */}
       {showResultDialog && (

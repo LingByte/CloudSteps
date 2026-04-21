@@ -1,11 +1,13 @@
 import { ArrowLeft, Pause, Volume2, Shuffle, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { playFirstWordAudio, playWordAudio } from "@/utils/audioPlayer";
 
 type PracticeWord = {
   id: number;
   word: string;
   translation: string;
+  audioUrl?: string;
   count: number;
   completed: boolean;
   showTranslation: boolean;
@@ -19,6 +21,16 @@ export default function WordPractice() {
   const [showPauseMenu, setShowPauseMenu] = useState(false);
   const [frameIdx, setFrameIdx] = useState(0);
   const [finished, setFinished] = useState(false);
+  const [playingId, setPlayingId] = useState<number | null>(null);
+  const abortRef = useRef<(() => void) | null>(null);
+
+  const handlePlayAudio = (word: PracticeWord) => {
+    if (!word.audioUrl) return;
+    abortRef.current?.();
+    setPlayingId(word.id);
+    const abort = playWordAudio(word.audioUrl, 300, () => setPlayingId(null));
+    abortRef.current = abort;
+  };
 
   const mode = useMemo(() => sessionStorage.getItem("lb_mode") || "study", []);
 
@@ -52,6 +64,7 @@ export default function WordPractice() {
         id: Number(w.id),
         word: String(w.word || ""),
         translation: String(w.translation || ""),
+        audioUrl: w.audioUrl ? String(w.audioUrl) : undefined,
         count: 0,
         completed: false,
         showTranslation: false,
@@ -84,7 +97,14 @@ export default function WordPractice() {
     setCurrentIndex(activeIndex);
   }, [activeIndex, words.length]);
 
-  const toggleTranslation = (id: number) => {
+  const toggleTranslation = (word: PracticeWord) => {
+    const id = word.id;
+    if (word.audioUrl) {
+      abortRef.current?.();
+      setPlayingId(word.id);
+      const abort = playFirstWordAudio(word.audioUrl, () => setPlayingId(null));
+      abortRef.current = abort;
+    }
     setWords((prev) =>
       prev.map((word) =>
         word.id === id ? { ...word, showTranslation: !word.showTranslation } : word
@@ -157,7 +177,7 @@ export default function WordPractice() {
             >
               <div className="flex items-center justify-between">
                 <div
-                  onClick={() => toggleTranslation(word.id)}
+                  onClick={() => toggleTranslation(word)}
                   className="flex-1 cursor-pointer pr-3"
                 >
                   <div className="text-base font-medium text-[#2D3748] mb-1">{word.word}</div>
@@ -166,8 +186,11 @@ export default function WordPractice() {
                   )}
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
-                  <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                    <Volume2 size={20} className="text-[#4ECDC4]" />
+                  <button
+                    onClick={() => handlePlayAudio(word)}
+                    className={`p-2 hover:bg-gray-100 rounded-full transition-colors`}
+                  >
+                    <Volume2 size={20} className={playingId === word.id ? "text-[#4ECDC4] animate-pulse" : "text-[#4ECDC4]"} />
                   </button>
                   <button
                     onClick={() => handleCountClick(word.id)}

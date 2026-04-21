@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 
 import { getStudyWords, startStudySession } from "@/api/study";
 import { TopBar } from "@/components/TopBar";
+import { playFirstWordAudio, playWordAudio } from "@/utils/audioPlayer";
 
 type WordItem = { 
   id: number; 
   word: string; 
   translation?: string;
+  audioUrl?: string;
   showTranslation?: boolean;
   status: null | "correct" | "wrong" 
 };
@@ -29,6 +31,16 @@ export default function PreTrainingCheck() {
   const loadingRef = useRef(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const [playingId, setPlayingId] = useState<number | null>(null);
+  const abortRef = useRef<(() => void) | null>(null);
+
+  const handlePlayAudio = useCallback((word: WordItem) => {
+    if (!word.audioUrl) return;
+    abortRef.current?.();
+    setPlayingId(word.id);
+    const abort = playWordAudio(word.audioUrl, 300, () => setPlayingId(null));
+    abortRef.current = abort;
+  }, []);
 
   const handleBack = () => {
     navigate("/word-training");
@@ -51,7 +63,7 @@ export default function PreTrainingCheck() {
       const res = await getStudyWords(wordBookId, page, PAGE_SIZE);
       const list = res.data?.words;
       const totalCount = res.data?.total || 0;
-      const arr = Array.isArray(list) ? (list as Array<{ id: number; word: string; translation?: string }>) : [];
+      const arr = Array.isArray(list) ? (list as Array<{ id: number; word: string; translation?: string; audioUrl?: string }>) : [];
       
       if (arr.length === 0) {
         setHasMore(false);
@@ -62,6 +74,7 @@ export default function PreTrainingCheck() {
         id: w.id, 
         word: w.word, 
         translation: w.translation,
+        audioUrl: w.audioUrl,
         showTranslation: false,
         status: null as WordItem["status"] 
       }));
@@ -149,7 +162,14 @@ export default function PreTrainingCheck() {
     );
   }, []);
 
-  const handleWordClick = useCallback((id: number) => {
+  const handleWordClick = useCallback((word: WordItem) => {
+    const id = word.id;
+    if (word.audioUrl) {
+      abortRef.current?.();
+      setPlayingId(word.id);
+      const abort = playFirstWordAudio(word.audioUrl, () => setPlayingId(null));
+      abortRef.current = abort;
+    }
     setWords((prev) =>
       prev.map((word) => (word.id === id ? { ...word, showTranslation: !word.showTranslation } : word))
     );
@@ -167,10 +187,10 @@ export default function PreTrainingCheck() {
       const allSelected = prev.every((word) => word.status !== null);
       if (allSelected) {
         setSelectedCount(0);
-        return prev.map((word) => ({ ...word, status: null }));
+        return prev.map((word) => ({ ...word, status: null as WordItem["status"] }));
       } else {
         setSelectedCount(prev.length);
-        return prev.map((word) => ({ ...word, status: "wrong" }));
+        return prev.map((word) => ({ ...word, status: "wrong" as WordItem["status"] }));
       }
     });
   }, []);
@@ -182,7 +202,7 @@ export default function PreTrainingCheck() {
       
       const newWords = prev.map((word) => {
         if (toSelect.find((w) => w.id === word.id)) {
-          return { ...word, status: "wrong" };
+          return { ...word, status: "wrong" as WordItem["status"] };
         }
         return word;
       });
@@ -233,7 +253,7 @@ export default function PreTrainingCheck() {
             : ""
         }`}
       >
-        <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => handleWordClick(word.id)}>
+        <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => handleWordClick(word)}>
           <div>
             <span className="text-base font-medium text-[#2D3748] hover:text-[#4ECDC4] transition-colors">
               {word.word}
@@ -246,8 +266,11 @@ export default function PreTrainingCheck() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-            <Volume2 size={20} className="text-[#4ECDC4]" />
+          <button
+            onClick={() => handlePlayAudio(word)}
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <Volume2 size={20} className={playingId === word.id ? "text-[#4ECDC4] animate-pulse" : "text-[#4ECDC4]"} />
           </button>
           <button
             onClick={() => handleStatusClick(word.id, "correct")}

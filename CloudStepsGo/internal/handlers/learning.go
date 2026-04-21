@@ -35,6 +35,7 @@ func (h *Handlers) registerLearningRoutes(r *gin.RouterGroup) {
 	{
 		review.GET("/today", h.handleReviewToday)
 		review.GET("/books", h.handleReviewBooks)
+		review.GET("/books-by-date", h.handleReviewBooksByDate)
 		review.GET("/curve", h.handleReviewCurve)
 		review.POST("/session/start", h.handleReviewSessionStart)
 		review.POST("/session/:id/complete", h.handleReviewSessionComplete)

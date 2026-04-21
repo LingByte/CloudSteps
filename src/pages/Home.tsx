@@ -12,7 +12,6 @@ import {
   type CoachingTimeStats,
   type CoachingWeekSchedule,
 } from "@/api/coaching";
-import { getLearningStats, type LearningStats } from "@/api/study";
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 const fmtYMD = (d: Date) =>
@@ -53,8 +52,7 @@ export default function Home() {
   const [loadingSchedules, setLoadingSchedules] = useState(true);
   const [timeStats, setTimeStats] = useState<CoachingTimeStats | null>(null);
   const [loadingTimeStats, setLoadingTimeStats] = useState(true);
-  const [learningStats, setLearningStats] = useState<LearningStats | null>(null);
-  const [loadingLearningStats, setLoadingLearningStats] = useState(true);
+  const [pendingActionById, setPendingActionById] = useState<Record<number, "start" | "end" | null>>({});
 
   const role = (user as { role?: string } | null)?.role || "user";
   const isStudent = role === "student";
@@ -72,21 +70,6 @@ export default function Home() {
       setTimeStats(null);
     } finally {
       setLoadingTimeStats(false);
-    }
-  }, [user]);
-
-  const loadLearningStats = useCallback(async () => {
-    if (!user) return;
-    
-    setLoadingLearningStats(true);
-    try {
-      const res = await getLearningStats();
-      setLearningStats(res.data ?? null);
-    } catch (e: unknown) {
-      console.error("加载学习统计失败:", e);
-      setLearningStats(null);
-    } finally {
-      setLoadingLearningStats(false);
     }
   }, [user]);
 
@@ -129,8 +112,7 @@ export default function Home() {
 
   useEffect(() => {
     void loadTimeStats();
-    void loadLearningStats();
-  }, [loadTimeStats, loadLearningStats]);
+  }, [loadTimeStats]);
 
   useEffect(() => {
     void loadWeek();
@@ -142,6 +124,7 @@ export default function Home() {
   }, []);
 
   const onStart = async (id: number) => {
+    setPendingActionById((prev) => ({ ...prev, [id]: "start" }));
     try {
       const res = await startCoachingAppointment(id);
       if (res.code !== 200) {
@@ -153,10 +136,13 @@ export default function Home() {
     } catch (e: unknown) {
       const msg = e && typeof e === "object" && "msg" in e ? String((e as { msg: string }).msg) : "开始失败";
       alert(msg);
+    } finally {
+      setPendingActionById((prev) => ({ ...prev, [id]: null }));
     }
   };
 
   const onEnd = async (id: number) => {
+    setPendingActionById((prev) => ({ ...prev, [id]: "end" }));
     try {
       const res = await endCoachingAppointment(id);
       if (res.code !== 200) {
@@ -167,6 +153,8 @@ export default function Home() {
     } catch (e: unknown) {
       const msg = e && typeof e === "object" && "msg" in e ? String((e as { msg: string }).msg) : "下课失败";
       alert(msg);
+    } finally {
+      setPendingActionById((prev) => ({ ...prev, [id]: null }));
     }
   };
 
@@ -227,18 +215,6 @@ export default function Home() {
           </div>
           <div className="text-[#2D3748] text-sm md:text-base font-medium">词汇测试</div>
           <p className="text-xs text-[#718096] mt-2">进入测评流程</p>
-          {learningStats && (
-            <div className="mt-3 pt-3 border-t border-slate-100">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-[#718096]">今日学习</span>
-                <span className="text-[#4ECDC4] font-semibold">{learningStats.todayLearned} 词</span>
-              </div>
-              <div className="flex items-center justify-between text-xs mt-1">
-                <span className="text-[#718096]">累积学习</span>
-                <span className="text-[#55A3FF] font-semibold">{learningStats.totalLearned} 词</span>
-              </div>
-            </div>
-          )}
         </button>
 
         {isCoach ? (
@@ -268,18 +244,6 @@ export default function Home() {
             </div>
             <div className="text-[#2D3748] text-sm md:text-base font-medium">单词训练</div>
             <p className="text-xs text-[#718096] mt-2">选择词库开始练习</p>
-            {learningStats && (
-              <div className="mt-3 pt-3 border-t border-slate-100">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-[#718096]">今日复习</span>
-                  <span className="text-[#FF6B6B] font-semibold">{learningStats.todayReviewed} 词</span>
-                </div>
-                <div className="flex items-center justify-between text-xs mt-1">
-                  <span className="text-[#718096]">连续天数</span>
-                  <span className="text-[#FFA500] font-semibold">{learningStats.consecutiveDays} 天</span>
-                </div>
-              </div>
-            )}
           </button>
         )}
       </div>
@@ -325,7 +289,8 @@ export default function Home() {
                 const st = s.status;
                 const canStart = isCoach && st === "scheduled";
                 const canEnd = isCoach && st === "in_progress";
-                const canEnter = st === "in_progress" || st === "scheduled"; // 正在上课或已排课的都可以进入
+                const canEnter = st === "in_progress"; // 仅已开始课程可进入
+                const pendingAction = pendingActionById[s.id] ?? null;
                 return (
                   <div
                     key={s.id}
@@ -380,6 +345,9 @@ export default function Home() {
                               e.stopPropagation();
                               void onStart(s.id);
                             }}
+                            loading={pendingAction === "start"}
+                            loadingText="开始中..."
+                            disabled={pendingAction !== null}
                             className="px-4 py-2 bg-[#4ECDC4] text-white rounded-full text-sm"
                           >
                             开始上课
@@ -391,6 +359,9 @@ export default function Home() {
                               e.stopPropagation();
                               void onEnd(s.id);
                             }}
+                            loading={pendingAction === "end"}
+                            loadingText="下课中..."
+                            disabled={pendingAction !== null}
                             className="px-4 py-2 bg-[#FF6B6B] text-white rounded-full text-sm"
                           >
                             下课

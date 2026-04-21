@@ -87,7 +87,8 @@ export function Layout() {
         onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)}
       />
 
-      <div className="pt-[120px] md:pt-16 lg:pt-16 flex">
+      {/* 与固定顶栏 h-16 对齐；移动端勿用过大的 pt，否则主内容会显得“沉在下方” */}
+      <div className="pt-[calc(4rem+env(safe-area-inset-top,0px))] lg:pt-16 flex">
         {/* 左侧边栏（桌面端） */}
         <aside className="hidden lg:block fixed left-0 top-16 bottom-0 w-60 bg-white border-r border-[#E2E8F0] overflow-y-auto">
           <div className="p-6">

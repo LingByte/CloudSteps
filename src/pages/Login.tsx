@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { CloudButton } from "@/components/cloudsteps";
 import { getCaptcha, loginWithPassword, type User } from "@/api/auth";
@@ -15,6 +15,10 @@ export default function Login() {
   const [captchaImage, setCaptchaImage] = useState<string | null>(null);
   const [captchaCode, setCaptchaCode] = useState("");
   const [errorText, setErrorText] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const lastSubmitTsRef = useRef(0);
+
+  const isSubmitting = isLoading || submitting;
 
   const nextPath = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -38,6 +42,10 @@ export default function Login() {
   }, []);
 
   const onSubmit = async () => {
+    const now = Date.now();
+    // 防连点：1秒内重复提交直接忽略
+    if (isSubmitting || now - lastSubmitTsRef.current < 1000) return;
+    lastSubmitTsRef.current = now;
     setErrorText(null);
 
     if (!email.trim()) {
@@ -55,6 +63,7 @@ export default function Login() {
       return;
     }
 
+    setSubmitting(true);
     try {
       const res = await loginWithPassword({
         email,
@@ -110,6 +119,8 @@ export default function Login() {
     } catch (e: any) {
       setErrorText(e?.msg || e?.message || "登录失败");
       refreshCaptcha();
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -162,6 +173,7 @@ export default function Login() {
               <CloudButton
                 type="button"
                 onClick={refreshCaptcha}
+                disabled={isSubmitting}
                 className="h-[46px] w-[120px] rounded-xl border border-slate-200 bg-white/70 hover:bg-white transition-all duration-200 overflow-hidden flex items-center justify-center p-0 hover:shadow-sm active:scale-[0.99]"
                 aria-label="刷新验证码"
               >
@@ -186,17 +198,12 @@ export default function Login() {
 
           <CloudButton
             onClick={onSubmit}
+            loading={isSubmitting}
+            loadingText="登录中..."
             className="w-full py-3 rounded-xl font-medium bg-[#4ECDC4] text-white hover:bg-[#45b8b0] transition-all duration-200 hover:shadow-md active:scale-[0.99]"
-            disabled={isLoading}
+            disabled={isSubmitting}
           >
-            {isLoading ? (
-              <span className="inline-flex items-center justify-center gap-2">
-                <span className="inline-block h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                <span>登录中...</span>
-              </span>
-            ) : (
-              "登录"
-            )}
+            登录
           </CloudButton>
 
           <div className="text-xs text-[#A0AEC0] leading-relaxed">请使用你的后端账号进行登录。</div>

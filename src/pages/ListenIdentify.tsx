@@ -1,6 +1,7 @@
 import { ArrowLeft, Pause, Volume2, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { playWordAudio } from "@/utils/audioPlayer";
 
 type ListenWord = {
   id: number;
@@ -22,7 +23,8 @@ export default function ListenIdentify() {
     return Number(sessionStorage.getItem(key) || 0);
   }, [mode]);
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playingId, setPlayingId] = useState<number | null>(null);
+  const abortRef = useRef<(() => void) | null>(null);
 
   const handleBack = () => {
     if (window.history.length > 1) navigate(-1);
@@ -51,16 +53,12 @@ export default function ListenIdentify() {
     }
   }, [batchIdx, mode]);
 
-  const playAudio = (audioUrl?: string) => {
-    if (!audioUrl) return;
-    try {
-      if (!audioRef.current) audioRef.current = new Audio();
-      const a = audioRef.current;
-      if (a.src !== audioUrl) a.src = audioUrl;
-      void a.play();
-    } catch {
-      // ignore
-    }
+  const handlePlayAudio = (w: ListenWord) => {
+    if (!w.audioUrl) return;
+    abortRef.current?.();
+    setPlayingId(w.id);
+    const abort = playWordAudio(w.audioUrl, 300, () => setPlayingId(null));
+    abortRef.current = abort;
   };
 
   const handleCardClick = (id: number) => {
@@ -68,11 +66,11 @@ export default function ListenIdentify() {
       prev.map((w) => {
         if (w.id !== id) return w;
         if (w.state === "idle") {
-          playAudio(w.audioUrl);
+          handlePlayAudio(w);
           return { ...w, state: "played" };
         }
         if (w.state === "played") {
-          playAudio(w.audioUrl);
+          handlePlayAudio(w);
           return { ...w, state: "played2" };
         }
         if (w.state === "played2") {
@@ -151,11 +149,11 @@ export default function ListenIdentify() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleCardClick(w.id);
+                      handlePlayAudio(w);
                     }}
                     className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                   >
-                    <Volume2 size={20} className="text-[#4ECDC4]" />
+                    <Volume2 size={20} className={playingId === w.id ? "text-[#4ECDC4] animate-pulse" : "text-[#4ECDC4]"} />
                   </button>
                 </div>
               </div>
