@@ -14,7 +14,6 @@ const Login = lazy(() => import('@/pages/Login'))
 const Settings = lazy(() => import('@/pages/Settings'))
 const Profile = lazy(() => import('@/pages/Profile'))
 const Notifications = lazy(() => import('@/pages/Notifications'))
-const Configs = lazy(() => import('@/pages/Configs'))
 const Users = lazy(() => import('@/pages/Users'))
 const OperationLogs = lazy(() => import('@/pages/OperationLogs'))
 const LoginHistory = lazy(() => import('@/pages/LoginHistory'))
@@ -73,14 +72,6 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Notifications />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/configs"
-              element={
-                <ProtectedRoute>
-                  <Configs />
                 </ProtectedRoute>
               }
             />

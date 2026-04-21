@@ -4,7 +4,23 @@ import AdminLayout from '@/components/Layout/AdminLayout'
 import { get, post, put, del } from '@/utils/request'
 import { getApiBaseURL } from '@/config/apiConfig'
 import { showAlert } from '@/utils/notification'
-import { Plus, Pencil, Trash2, Search, X, Upload, Download, AlertTriangle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, X, Upload, Download, AlertTriangle, Wand2, Volume2 } from 'lucide-react'
+import LingechoTTS from '@/components/UI/LingechoTTS'
+
+const LINGECHO_URL = 'https://soulmy.top/api/open/tts'
+const API_KEY = import.meta.env.VITE_LINGECHO_API_KEY as string
+const API_SECRET = import.meta.env.VITE_LINGECHO_API_SECRET as string
+
+async function fetchTTS(text: string): Promise<string> {
+  const res = await fetch(LINGECHO_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'x-api-secret': API_SECRET },
+    body: JSON.stringify({ text }),
+  })
+  const data = await res.json()
+  if (data.code !== 200 || !data.data?.url) throw new Error(data.msg || 'TTS 失败')
+  return data.data.url as string
+}
 
 interface VocabQuestion {
   id: number
@@ -13,6 +29,7 @@ interface VocabQuestion {
   correctAnswer: string
   level: string
   difficultyScore: number
+  audioUrl?: string
 }
 
 interface ImportRow {
@@ -28,7 +45,7 @@ interface ImportRow {
 const LEVELS = ['', 'A1', 'A2', 'B1', 'B2', 'C1']
 
 const emptyForm = (): Partial<VocabQuestion> => ({
-  word: '', options: '[]', correctAnswer: '', level: 'A1', difficultyScore: 1,
+  word: '', options: '[]', correctAnswer: '', level: 'A1', difficultyScore: 1, audioUrl: '',
 })
 
 export default function VocabQuestions() {
@@ -46,6 +63,65 @@ export default function VocabQuestions() {
   const [form, setForm] = useState<Partial<VocabQuestion>>(emptyForm())
   const [optionsArr, setOptionsArr] = useState<string[]>(['', '', '', ''])
   const [saving, setSaving] = useState(false)
+  const [generatingAudio, setGeneratingAudio] = useState(false)
+  const [showBatchAudioModal, setShowBatchAudioModal] = useState(false)
+  const [batchGenerating, setBatchGenerating] = useState(false)
+  const [selectedForBatch, setSelectedForBatch] = useState<Set<number>>(new Set())
+
+  const handleGenerateAudio = async () => {
+    if (!form.word?.trim()) {
+      showAlert('请先输入单词', 'error')
+      return
+    }
+    setGeneratingAudio(true)
+    try {
+      const url = await fetchTTS(form.word.trim())
+      setForm(f => ({ ...f, audioUrl: url }))
+      showAlert('音频生成成功', 'success')
+    } catch (e: any) {
+      showAlert(e?.message || '音频生成失败', 'error')
+    } finally {
+      setGeneratingAudio(false)
+    }
+  }
+
+  const handleBatchAudioGeneration = async () => {
+    const questionsWithoutAudio = list.filter(q => !q.audioUrl)
+    if (questionsWithoutAudio.length === 0) {
+      showAlert('没有需要生成音频的题目', 'info')
+      return
+    }
+    setSelectedForBatch(new Set(questionsWithoutAudio.map(q => q.id)))
+    setShowBatchAudioModal(true)
+  }
+
+  const handleBatchGenerateAudio = async () => {
+    if (selectedForBatch.size === 0) {
+      showAlert('请至少选择一个题目', 'error')
+      return
+    }
+    setBatchGenerating(true)
+    try {
+      const selectedQuestions = list.filter(q => selectedForBatch.has(q.id))
+      let successCount = 0
+      for (const q of selectedQuestions) {
+        try {
+          const url = await fetchTTS(q.word)
+          await put(`${getApiBaseURL()}/vocab/questions/${q.id}`, { audioUrl: url })
+          successCount++
+        } catch (e) {
+          console.error(`Failed to generate audio for ${q.word}:`, e)
+        }
+      }
+      showAlert(`成功生成 ${successCount}/${selectedForBatch.size} 个音频`, 'success')
+      setShowBatchAudioModal(false)
+      fetchList()
+    } catch (e: any) {
+      showAlert(e?.message || '批量生成失败', 'error')
+    } finally {
+      setBatchGenerating(false)
+    }
+  }
 
   // 导入
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -59,7 +135,7 @@ export default function VocabQuestions() {
     try {
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
       if (level) params.append('level', level)
-      if (keyword) params.append('keyword', keyword)
+      if (keyword) params.append('word', keyword)
       const res = await get<any>(`${getApiBaseURL()}/vocab/questions?${params}`)
       const payload = res?.data
       if (res?.code && res.code !== 200) {
@@ -224,6 +300,10 @@ export default function VocabQuestions() {
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">词汇测评题库</h1>
           <div className="flex items-center gap-2">
+            <button onClick={handleBatchAudioGeneration} disabled={loading}
+              className="flex items-center gap-2 px-3 py-2 border border-purple-300 dark:border-purple-600 text-purple-600 dark:text-purple-300 rounded-lg text-sm hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors disabled:opacity-50">
+              <Wand2 className="w-4 h-4" /> 批量生成音频
+            </button>
             <button onClick={downloadTemplate}
               className="flex items-center gap-2 px-3 py-2 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
               <Download className="w-4 h-4" /> 下载模板
@@ -263,14 +343,15 @@ export default function VocabQuestions() {
                 <th className="px-4 py-3 text-left">等级</th>
                 <th className="px-4 py-3 text-left">难度分</th>
                 <th className="px-4 py-3 text-left">选项数</th>
+                <th className="px-4 py-3 text-left">音频</th>
                 <th className="px-4 py-3 text-right">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {loading ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">加载中...</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">加载中...</td></tr>
               ) : list.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">暂无数据</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">暂无数据</td></tr>
               ) : list.map(q => {
                 let optCount = 0
                 try { optCount = JSON.parse(q.options).length } catch {}
@@ -283,6 +364,21 @@ export default function VocabQuestions() {
                     </td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{q.difficultyScore}</td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400">{optCount}</td>
+                    <td className="px-4 py-3">
+                      {q.audioUrl ? (
+                        <button
+                          onClick={() => {
+                            const audio = new Audio(q.audioUrl)
+                            audio.play()
+                          }}
+                          className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-blue-600"
+                        >
+                          <Volume2 className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <span className="text-slate-400 text-xs">-</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button onClick={() => openEdit(q)} className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500">
@@ -326,14 +422,46 @@ export default function VocabQuestions() {
             <div className="px-6 py-4 space-y-4 max-h-[70vh] overflow-y-auto">
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">单词 *</label>
-                <input value={form.word || ''} onChange={e => setForm(f => ({ ...f, word: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" />
+                <div className="flex gap-2">
+                  <input value={form.word || ''} onChange={e => setForm(f => ({ ...f, word: e.target.value }))}
+                    className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" />
+                  <button
+                    type="button"
+                    onClick={handleGenerateAudio}
+                    disabled={generatingAudio || !form.word?.trim()}
+                    className="px-3 py-2 rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    <Wand2 className="w-4 h-4" />
+                    {generatingAudio ? '生成中...' : '生成音频'}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">正确答案 *</label>
                 <input value={form.correctAnswer || ''} onChange={e => setForm(f => ({ ...f, correctAnswer: e.target.value }))}
                   className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm" />
               </div>
+              {form.audioUrl && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">音频 URL</label>
+                  <div className="flex gap-2">
+                    <input value={form.audioUrl || ''} onChange={e => setForm(f => ({ ...f, audioUrl: e.target.value }))}
+                      className="flex-1 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-xs" readOnly />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (form.audioUrl) {
+                          const audio = new Audio(form.audioUrl)
+                          audio.play()
+                        }
+                      }}
+                      className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+                    >
+                      <Volume2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">干扰选项（4个）</label>
                 {optionsArr.map((opt, i) => (
@@ -434,6 +562,74 @@ export default function VocabQuestions() {
               <button onClick={confirmImport} disabled={importing || selectedCount === 0}
                 className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm disabled:opacity-50">
                 {importing ? '导入中...' : `导入 ${selectedCount} 条`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 批量生成音频弹窗 */}
+      {showBatchAudioModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-2xl flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+              <div>
+                <h2 className="font-semibold text-slate-900 dark:text-slate-100">批量生成音频</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  共 {list.filter(q => !q.audioUrl).length} 条无音频题目，已选 {selectedForBatch.size} 条
+                </p>
+              </div>
+              <button onClick={() => setShowBatchAudioModal(false)}><X className="w-5 h-5 text-slate-400" /></button>
+            </div>
+
+            <div className="px-6 py-3 border-b border-slate-100 dark:border-slate-800 shrink-0 flex gap-3">
+              <button onClick={() => setSelectedForBatch(new Set(list.filter(q => !q.audioUrl).map(q => q.id)))} className="text-xs text-purple-600 hover:underline">全选</button>
+              <button onClick={() => setSelectedForBatch(new Set())} className="text-xs text-slate-500 hover:underline">全不选</button>
+            </div>
+
+            <div className="overflow-auto flex-1">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-2 text-left w-10"></th>
+                    <th className="px-4 py-2 text-left">单词</th>
+                    <th className="px-4 py-2 text-left">等级</th>
+                    <th className="px-4 py-2 text-left">状态</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {list.filter(q => !q.audioUrl).map((q, i) => (
+                    <tr key={q.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                      <td className="px-4 py-2">
+                        <input type="checkbox" checked={selectedForBatch.has(q.id)} onChange={() => {
+                          const newSet = new Set(selectedForBatch)
+                          if (newSet.has(q.id)) {
+                            newSet.delete(q.id)
+                          } else {
+                            newSet.add(q.id)
+                          }
+                          setSelectedForBatch(newSet)
+                        }} className="rounded border-slate-300" />
+                      </td>
+                      <td className="px-4 py-2 font-medium text-slate-900 dark:text-slate-100">{q.word}</td>
+                      <td className="px-4 py-2">
+                        <span className="px-2 py-0.5 rounded-full text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">{q.level}</span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className="text-xs text-purple-600">无音频</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-800 shrink-0">
+              <button onClick={() => setShowBatchAudioModal(false)}
+                className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-400">取消</button>
+              <button onClick={handleBatchGenerateAudio} disabled={batchGenerating || selectedForBatch.size === 0}
+                className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm disabled:opacity-50">
+                {batchGenerating ? '生成中...' : `生成 ${selectedForBatch.size} 个音频`}
               </button>
             </div>
           </div>

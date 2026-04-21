@@ -10,6 +10,7 @@ type VocabTestQuestion struct {
 	CorrectAnswer   string `json:"correctAnswer" gorm:"size:256;not null;comment:正确答案"`
 	Level           string `json:"level" gorm:"size:10;index;comment:对应等级 A1-C1"`
 	DifficultyScore int    `json:"difficultyScore" gorm:"default:1;comment:难度分值 用于自适应"`
+	AudioURL        string `json:"audioUrl" gorm:"size:512;comment:发音音频URL"`
 }
 
 func (VocabTestQuestion) TableName() string { return "vocab_test_questions" }

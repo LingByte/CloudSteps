@@ -76,7 +76,6 @@ const AdminSidebar = () => {
       ],
     },
     { name: '一对一陪练', href: '/coaching', icon: CalendarDays },
-    { name: '配置管理', href: '/configs', icon: Sliders },
     {
       name: '安全管理',
       href: '/security',

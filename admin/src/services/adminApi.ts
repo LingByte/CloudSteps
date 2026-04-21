@@ -695,48 +695,6 @@ export const processImage = async (
   return res.data
 }
 
-// ==================== Configs API ====================
-const CONFIGS_API_BASE = `${BACKEND_BASE}/configs`
-
-export interface Config {
-  id: number
-  key: string
-  desc: string
-  autoload: boolean
-  public: boolean
-  format: 'json' | 'yaml' | 'int' | 'float' | 'bool' | 'text'
-  value: string
-  Value?: string // Backend may return uppercase Value
-  createdAt?: string
-  updatedAt?: string
-}
-
-export interface ListConfigsResponse {
-  configs: Config[]
-  total: number
-  page: number
-  size: number
-}
-
-export interface ListConfigsParams {
-  page?: number
-  page_size?: number
-  autoload?: boolean
-  public?: boolean
-  search?: string
-}
-
-export const listConfigs = async (params?: ListConfigsParams) => {
-  const queryParams: any = {}
-  if (params?.page) queryParams.page = params.page
-  if (params?.page_size) queryParams.page_size = params.page_size
-  if (params?.autoload !== undefined) queryParams.autoload = params.autoload.toString()
-  if (params?.public !== undefined) queryParams.public = params.public.toString()
-  if (params?.search) queryParams.search = params.search
-  const res = await get<ListConfigsResponse>(CONFIGS_API_BASE, { params: queryParams })
-  return res.data
-}
-
 // ==================== Public Site Config API ====================
 export interface SiteConfig {
   SITE_NAME: string
@@ -750,75 +708,6 @@ export interface SiteConfig {
 
 export const getSiteConfig = async (): Promise<SiteConfig> => {
   const res = await get(`${BACKEND_BASE}/public/site-config`)
-  return res.data
-}
-
-// ==================== Config Management API ====================
-export const getConfig = async (key: string) => {
-  const res = await get<{ config: Config }>(`${CONFIGS_API_BASE}/${key}`)
-  return res.data.config
-}
-
-export const createConfig = async (data: {
-  key: string
-  desc?: string
-  value: string
-  format?: 'json' | 'yaml' | 'int' | 'float' | 'bool' | 'text'
-  autoload?: boolean
-  public?: boolean
-}) => {
-  const res = await post<{ config: Config }>(CONFIGS_API_BASE, data)
-  
-  // 如果创建的是站点配置，清除缓存
-  handleConfigCacheUpdate(data.key, 'create')
-  
-  return res.data.config
-}
-
-export const updateConfig = async (key: string, data: {
-  desc?: string
-  value?: string
-  format?: 'json' | 'yaml' | 'int' | 'float' | 'bool' | 'text'
-  autoload?: boolean
-  public?: boolean
-}) => {
-  const res = await put<{ config: Config }>(`${CONFIGS_API_BASE}/${key}`, data)
-  
-  // 如果更新的是站点配置，清除缓存
-  handleConfigCacheUpdate(key, 'update')
-  
-  return res.data.config
-}
-
-export const deleteConfig = async (key: string) => {
-  const res = await del(`${CONFIGS_API_BASE}/${key}`)
-  
-  // 如果删除的是站点配置，清除缓存
-  handleConfigCacheUpdate(key, 'delete')
-  
-  return res.data
-}
-
-export interface BatchUpdateConfig {
-  key: string
-  desc?: string
-  value?: string
-  format?: 'json' | 'yaml' | 'int' | 'float' | 'bool' | 'text'
-  autoload?: boolean
-  public?: boolean
-}
-
-export const batchUpdateConfigs = async (configs: BatchUpdateConfig[]) => {
-  const res = await put<{ updated: number; failed: number; errors: string[] }>(
-    `${CONFIGS_API_BASE}/batch`,
-    { configs }
-  )
-  
-  // 检查是否有站点配置被更新，如果有则清除缓存
-  configs.forEach(config => {
-    handleConfigCacheUpdate(config.key, 'update')
-  })
-  
   return res.data
 }
 

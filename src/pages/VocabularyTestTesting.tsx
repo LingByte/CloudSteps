@@ -11,6 +11,7 @@ type ApiQuestion = {
   correctAnswer: string;
   level: string;
   difficultyScore: number;
+  audioUrl?: string;
 };
 
 type OptionItem = { label: string; value: string };
@@ -40,6 +41,13 @@ export default function VocabularyTestTesting() {
   const [currentDifficultyScore, setCurrentDifficultyScore] = useState(3);
   const [lastQuestionId, setLastQuestionId] = useState(0);
   const [finished, setFinished] = useState(false);
+
+  const handlePlayAudio = () => {
+    if (currentQuestion?.audioUrl) {
+      const audio = new Audio(currentQuestion.audioUrl);
+      audio.play().catch((err) => console.error("Audio play error:", err));
+    }
+  };
 
 	const WRONG_LIMIT = 5;
 
@@ -223,9 +231,14 @@ export default function VocabularyTestTesting() {
             <h2 className="text-4xl font-bold text-[#2D3748]">
               {loading || !currentQuestion ? "加载中..." : currentQuestion.word}
             </h2>
-            <button className="text-[#55A3FF] hover:text-[#4ECDC4] transition-colors">
-              <Volume2 size={28} />
-            </button>
+            {currentQuestion?.audioUrl && (
+              <button
+                onClick={handlePlayAudio}
+                className="text-[#55A3FF] hover:text-[#4ECDC4] transition-colors"
+              >
+                <Volume2 size={28} />
+              </button>
+            )}
           </div>
         </div>
 
