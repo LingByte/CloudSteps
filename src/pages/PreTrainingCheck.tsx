@@ -164,14 +164,20 @@ export default function PreTrainingCheck() {
 
   const handleWordClick = useCallback((word: WordItem) => {
     const id = word.id;
-    if (word.audioUrl) {
+    const isShowing = !word.showTranslation;
+    if (isShowing && word.audioUrl) {
       abortRef.current?.();
       setPlayingId(word.id);
       const abort = playFirstWordAudio(word.audioUrl, () => setPlayingId(null));
       abortRef.current = abort;
     }
     setWords((prev) =>
-      prev.map((word) => (word.id === id ? { ...word, showTranslation: !word.showTranslation } : word))
+      prev.map((w) => {
+        if (isShowing) {
+          return w.id === id ? { ...w, showTranslation: true } : { ...w, showTranslation: false };
+        }
+        return w.id === id ? { ...w, showTranslation: false } : w;
+      })
     );
   }, []);
 

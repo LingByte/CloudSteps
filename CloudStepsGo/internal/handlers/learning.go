@@ -25,6 +25,7 @@ func (h *Handlers) registerLearningRoutes(r *gin.RouterGroup) {
 	{
 		study.GET("/words", h.handleStudyWords)
 		study.GET("/lighthouse", h.handleStudyLighthouse)
+		study.GET("/lighthouse/words", h.handleStudyLighthouseWords)
 		study.POST("/session/start", h.handleStudySessionStart)
 		study.POST("/session/:id/complete", h.handleStudySessionComplete)
 		study.GET("/session/:id", h.handleStudySessionGet)

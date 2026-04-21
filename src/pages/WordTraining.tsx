@@ -140,15 +140,24 @@ export default function WordTraining() {
 
         {/* 数据统计区 */}
         <div className="grid grid-cols-3 gap-3">
-          <div className="bg-white rounded-xl p-4 text-center shadow-sm">
+          <div
+            onClick={() => navigate('/lighthouse-words?step=today')}
+            className="bg-white rounded-xl p-4 text-center shadow-sm cursor-pointer hover:bg-gray-50 active:scale-95 transition-all"
+          >
             <div className="text-2xl font-bold text-[#4ECDC4] mb-1">{todayNewLearned}</div>
             <div className="text-xs text-[#718096]">今日训新</div>
           </div>
-          <div className="bg-white rounded-xl p-4 text-center shadow-sm">
+          <div
+            onClick={() => navigate('/lighthouse-words?step=01')}
+            className="bg-white rounded-xl p-4 text-center shadow-sm cursor-pointer hover:bg-gray-50 active:scale-95 transition-all"
+          >
             <div className="text-2xl font-bold text-[#FF9800] mb-1">{memoryData[0]?.count ?? 0}</div>
             <div className="text-xs text-[#718096]">今日复习目标</div>
           </div>
-          <div className="bg-white rounded-xl p-4 text-center shadow-sm">
+          <div
+            onClick={() => navigate('/lighthouse-words?step=mastered')}
+            className="bg-white rounded-xl p-4 text-center shadow-sm cursor-pointer hover:bg-gray-50 active:scale-95 transition-all"
+          >
             <div className="text-2xl font-bold text-[#66BB6A] mb-1">{masteredCount}</div>
             <div className="text-xs text-[#718096]">累计识词</div>
           </div>
@@ -173,7 +182,8 @@ export default function WordTraining() {
               {memoryData.slice(0, 3).map((item) => (
                 <div
                   key={item.id}
-                  className="aspect-square bg-gradient-to-br from-[#4ECDC4] to-[#45b8b0] rounded-xl flex flex-col items-center justify-center text-white cursor-default"
+                  onClick={() => navigate(`/lighthouse-words?step=${item.id}`)}
+                  className="aspect-square bg-gradient-to-br from-[#4ECDC4] to-[#45b8b0] rounded-xl flex flex-col items-center justify-center text-white cursor-pointer hover:opacity-90 active:scale-95 transition-all"
                 >
                   <div className="text-xs opacity-80 mb-1">{item.id}</div>
                   <div className="text-2xl font-bold">{item.count}</div>
@@ -187,7 +197,8 @@ export default function WordTraining() {
               {memoryData.slice(3, 6).map((item) => (
                 <div
                   key={item.id}
-                  className="aspect-square bg-gradient-to-br from-[#66BB6A] to-[#5ca860] rounded-xl flex flex-col items-center justify-center text-white cursor-default"
+                  onClick={() => navigate(`/lighthouse-words?step=${item.id}`)}
+                  className="aspect-square bg-gradient-to-br from-[#66BB6A] to-[#5ca860] rounded-xl flex flex-col items-center justify-center text-white cursor-pointer hover:opacity-90 active:scale-95 transition-all"
                 >
                   <div className="text-xs opacity-80 mb-1">{item.id}</div>
                   <div className="text-2xl font-bold">{item.count}</div>
@@ -201,7 +212,8 @@ export default function WordTraining() {
               {memoryData.slice(6, 7).map((item) => (
                 <div
                   key={item.id}
-                  className="aspect-square bg-gradient-to-br from-[#FF9800] to-[#e68900] rounded-xl flex flex-col items-center justify-center text-white cursor-default"
+                  onClick={() => navigate(`/lighthouse-words?step=${item.id}`)}
+                  className="aspect-square bg-gradient-to-br from-[#FF9800] to-[#e68900] rounded-xl flex flex-col items-center justify-center text-white cursor-pointer hover:opacity-90 active:scale-95 transition-all"
                 >
                   <div className="text-xs opacity-80 mb-1">{item.id}</div>
                   <div className="text-2xl font-bold">{item.count}</div>
@@ -209,12 +221,18 @@ export default function WordTraining() {
                 </div>
               ))}
               {/* 待学 */}
-              <div className="aspect-square bg-gray-100 rounded-xl flex flex-col items-center justify-center cursor-default">
+              <div
+                onClick={() => navigate('/lighthouse-words?step=pending')}
+                className="aspect-square bg-gray-100 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-gray-200 active:scale-95 transition-all"
+              >
                 <div className="text-2xl font-bold text-[#718096]">{pendingCount}</div>
                 <div className="text-xs text-[#718096] mt-1">待学</div>
               </div>
               {/* 掌握 */}
-              <div className="aspect-square bg-gradient-to-br from-[#FFD700] to-[#e6c200] rounded-xl flex flex-col items-center justify-center text-white cursor-default">
+              <div
+                onClick={() => navigate('/lighthouse-words?step=mastered')}
+                className="aspect-square bg-gradient-to-br from-[#FFD700] to-[#e6c200] rounded-xl flex flex-col items-center justify-center text-white cursor-pointer hover:opacity-90 active:scale-95 transition-all"
+              >
                 <div className="text-2xl font-bold">{masteredCount}</div>
                 <div className="text-xs opacity-80 mt-1">掌握</div>
               </div>

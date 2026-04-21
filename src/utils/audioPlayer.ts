@@ -70,6 +70,23 @@ export function playWordAudio(
 }
 
 /**
+ * 播放指定索引的音频（0-based）
+ * @returns abort 函数
+ */
+export function playAudioAtIndex(
+  audioUrl: string | undefined | null,
+  index: number,
+  onDone?: () => void
+): () => void {
+  const urls = parseAudioUrls(audioUrl)
+  if (urls.length === 0 || index < 0 || index >= urls.length) {
+    onDone?.()
+    return () => {}
+  }
+  return playSingleAudio(urls[index], onDone)
+}
+
+/**
  * 播放第一个音频，并把下次顺序播放位置推进到第二个
  */
 export function playFirstWordAudio(

@@ -92,6 +92,101 @@ func (h *Handlers) handleStudyLighthouse(c *gin.Context) {
 	})
 }
 
+// handleStudyLighthouseWords GET /study/lighthouse/words?wordBookId=N&step=01|pending|mastered
+func (h *Handlers) handleStudyLighthouseWords(c *gin.Context) {
+	db := c.MustGet(constants.DbField).(*gorm.DB)
+	user := models.CurrentUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"code": 401, "msg": "authorization required"})
+		return
+	}
+
+	wordBookID, _ := strconv.Atoi(c.Query("wordBookId"))
+	step := c.Query("step")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 200 {
+		pageSize = 50
+	}
+
+	// 根据 step 查询对应的 word_id 列表
+	var wordIDs []uint
+
+	switch {
+	case step == "today":
+		// 今日新学：本日首次标记为已学的词
+		now := time.Now().UTC()
+		startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+		endOfToday := startOfToday.Add(24 * time.Hour)
+		q := db.Model(&models.UserWordState{}).
+			Where("user_id = ? AND first_learned_at IS NOT NULL AND first_learned_at >= ? AND first_learned_at < ?", user.ID, startOfToday, endOfToday)
+		if wordBookID > 0 {
+			q = q.Where("word_book_id = ?", wordBookID)
+		}
+		_ = q.Pluck("word_id", &wordIDs).Error
+
+	case step == "pending":
+		// 待学：screen_result=unknown, learn_status=pending
+		q := db.Model(&models.UserWordState{}).
+			Where("user_id = ? AND screen_result = ? AND learn_status = ?", user.ID, "unknown", "pending")
+		if wordBookID > 0 {
+			q = q.Where("word_book_id = ?", wordBookID)
+		}
+		_ = q.Pluck("word_id", &wordIDs).Error
+
+	case step == "mastered":
+		// 掌握：learn_status=mastered
+		q := db.Model(&models.UserWordState{}).
+			Where("user_id = ? AND learn_status = ?", user.ID, "mastered")
+		if wordBookID > 0 {
+			q = q.Where("word_book_id = ?", wordBookID)
+		}
+		_ = q.Pluck("word_id", &wordIDs).Error
+
+	default:
+		// 步骤 01-07：对应 review_stage 0-6，learn_status IN (learning, learned, mastered)
+		stage, err := strconv.Atoi(step)
+		if err != nil || stage < 1 || stage > 7 {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": "step 参数无效，应为 today、01-07、pending 或 mastered"})
+			return
+		}
+		q := db.Model(&models.UserWordState{}).
+			Where("user_id = ? AND learn_status IN ? AND review_stage = ?", user.ID, []string{"learning", "learned", "mastered"}, stage-1)
+		if wordBookID > 0 {
+			q = q.Where("word_book_id = ?", wordBookID)
+		}
+		_ = q.Pluck("word_id", &wordIDs).Error
+	}
+
+	var total int64 = int64(len(wordIDs))
+	if total == 0 {
+		response.Success(c, "success", gin.H{"words": []models.Word{}, "total": 0})
+		return
+	}
+
+	// 分页截取 wordIDs
+	offset := (page - 1) * pageSize
+	end := offset + pageSize
+	if offset > len(wordIDs) {
+		offset = len(wordIDs)
+	}
+	if end > len(wordIDs) {
+		end = len(wordIDs)
+	}
+	pageIDs := wordIDs[offset:end]
+
+	var words []models.Word
+	_ = db.Where("id IN ?", pageIDs).Order("sort_order ASC, id ASC").Find(&words).Error
+
+	response.Success(c, "success", gin.H{
+		"words": words,
+		"total": total,
+	})
+}
+
 func pad2(n int) string {
 	if n < 10 {
 		return "0" + strconv.Itoa(n)

@@ -2,7 +2,7 @@ import { ArrowLeft, Pause, Volume2, Scissors, Check, X } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useState, useEffect, useMemo, useRef } from "react";
 import confetti from "canvas-confetti";
-import { playWordAudio } from "@/utils/audioPlayer";
+import { playFirstWordAudio, playWordAudio } from "@/utils/audioPlayer";
 
 type FlashWord = { id: number; word: string; translation: string; audioUrl?: string; scissorCount: number; status: any; showTranslation: boolean };
 
@@ -46,19 +46,21 @@ export default function FlashReview() {
     }
   }, [batchIdx, mode]);
 
-  const handleScissorClick = (id: number) => {
+  const handleScissorClick = (word: FlashWord) => {
+    // 播放第一个音频
+    if (word.audioUrl) {
+      abortRef.current?.();
+      setPlayingId(word.id);
+      const abort = playFirstWordAudio(word.audioUrl, () => setPlayingId(null));
+      abortRef.current = abort;
+    }
+    // 一次点击直接剪掉
     setWords((prev) =>
-      prev.map((word) => {
-        if (word.id === id) {
-          if (word.scissorCount === 0) {
-            // 第一次点击：显示中文释义
-            return { ...word, scissorCount: 1, showTranslation: true };
-          } else if (word.scissorCount === 1) {
-            // 第二次点击：单词消失
-            return { ...word, scissorCount: 2 };
-          }
+      prev.map((w) => {
+        if (w.id === word.id) {
+          return { ...w, scissorCount: 2 };
         }
-        return word;
+        return w;
       })
     );
   };
@@ -140,7 +142,7 @@ export default function FlashReview() {
                   <Volume2 size={20} className={playingId === word.id ? "text-[#4ECDC4] animate-pulse" : "text-[#4ECDC4]"} />
                 </button>
                 <button
-                  onClick={() => handleScissorClick(word.id)}
+                  onClick={() => handleScissorClick(word)}
                   className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                 >
                   <Scissors

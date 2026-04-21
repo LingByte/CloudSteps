@@ -33,6 +33,7 @@ import MyStudents from "@/pages/MyStudents";
 import StudentTrainingRecords from "@/pages/StudentTrainingRecords";
 import WordBooks from "@/pages/WordBooks";
 import WordBookWords from "@/pages/WordBookWords";
+import LighthouseWords from "@/pages/LighthouseWords";
 
 export const router = createBrowserRouter([
   {
@@ -63,6 +64,7 @@ export const router = createBrowserRouter([
       },
       { path: "word-books", element: <WordBooks /> },
       { path: "word-books/:id", element: <WordBookWords /> },
+      { path: "lighthouse-words", element: <LighthouseWords /> },
       { path: "anti-forgetting", element: <AntiForgetting /> },
       { path: "coach-center", element: <CoachCenter /> },
       { path: "profile/edit", element: <ProfileEdit /> },

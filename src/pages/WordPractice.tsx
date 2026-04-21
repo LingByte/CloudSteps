@@ -1,7 +1,7 @@
-import { ArrowLeft, Pause, Volume2, Shuffle, ArrowRight } from "lucide-react";
+import { ArrowLeft, Pause, Shuffle, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { playFirstWordAudio, playWordAudio } from "@/utils/audioPlayer";
+import { playFirstWordAudio, playWordAudio, parseAudioUrls } from "@/utils/audioPlayer";
 
 type PracticeWord = {
   id: number;
@@ -24,12 +24,17 @@ export default function WordPractice() {
   const [playingId, setPlayingId] = useState<number | null>(null);
   const abortRef = useRef<(() => void) | null>(null);
 
-  const handlePlayAudio = (word: PracticeWord) => {
+  const [audioIndexMap, setAudioIndexMap] = useState<Map<number, number>>(new Map());
+
+  const handlePlayNextAudio = (word: PracticeWord) => {
     if (!word.audioUrl) return;
     abortRef.current?.();
     setPlayingId(word.id);
     const abort = playWordAudio(word.audioUrl, 300, () => setPlayingId(null));
     abortRef.current = abort;
+    const urls = parseAudioUrls(word.audioUrl);
+    const prev = audioIndexMap.get(word.id) ?? 0;
+    setAudioIndexMap(new Map(audioIndexMap).set(word.id, (prev + 1) % urls.length));
   };
 
   const mode = useMemo(() => sessionStorage.getItem("lb_mode") || "study", []);
@@ -99,16 +104,20 @@ export default function WordPractice() {
 
   const toggleTranslation = (word: PracticeWord) => {
     const id = word.id;
-    if (word.audioUrl) {
+    const isShowing = !word.showTranslation;
+    if (isShowing && word.audioUrl) {
       abortRef.current?.();
       setPlayingId(word.id);
       const abort = playFirstWordAudio(word.audioUrl, () => setPlayingId(null));
       abortRef.current = abort;
     }
     setWords((prev) =>
-      prev.map((word) =>
-        word.id === id ? { ...word, showTranslation: !word.showTranslation } : word
-      )
+      prev.map((w) => {
+        if (isShowing) {
+          return w.id === id ? { ...w, showTranslation: true } : { ...w, showTranslation: false };
+        }
+        return w.id === id ? { ...w, showTranslation: false } : w;
+      })
     );
   };
 
@@ -185,13 +194,19 @@ export default function WordPractice() {
                     <div className="text-sm text-[#718096]">{word.translation}</div>
                   )}
                 </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <button
-                    onClick={() => handlePlayAudio(word)}
-                    className={`p-2 hover:bg-gray-100 rounded-full transition-colors`}
-                  >
-                    <Volume2 size={20} className={playingId === word.id ? "text-[#4ECDC4] animate-pulse" : "text-[#4ECDC4]"} />
-                  </button>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {parseAudioUrls(word.audioUrl).length > 0 && (
+                    <button
+                      onClick={() => handlePlayNextAudio(word)}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
+                        playingId === word.id
+                          ? "bg-[#4ECDC4] text-white hover:bg-[#45b8b0]"
+                          : "bg-[#4ECDC4]/10 text-[#4ECDC4] hover:bg-[#4ECDC4]/20"
+                      }`}
+                    >
+                      {(audioIndexMap.get(word.id) ?? 0) + 1}
+                    </button>
+                  )}
                   <button
                     onClick={() => handleCountClick(word.id)}
                     className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold transition-colors ${

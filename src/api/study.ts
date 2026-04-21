@@ -64,6 +64,22 @@ export const startStudySession = async (
   return post<StartStudySessionResponse>('/study/session/start', data)
 }
 
+export interface LighthouseWordsResponse {
+  words: StudyWordItem[]
+  total: number
+}
+
+export const getLighthouseWords = async (
+  wordBookId: number,
+  step: string,
+  page: number = 1,
+  pageSize: number = 50
+): Promise<ApiResponse<LighthouseWordsResponse>> => {
+  return get<LighthouseWordsResponse>('/study/lighthouse/words', {
+    params: { wordBookId, step, page, pageSize }
+  })
+}
+
 export const completeStudySession = async (
   sessionId: number,
   results: CompleteSessionResult[]

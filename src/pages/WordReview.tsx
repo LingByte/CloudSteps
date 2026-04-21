@@ -1,7 +1,7 @@
-import { ArrowLeft, Pause, Volume2, Shuffle, ArrowRight } from "lucide-react";
+import { ArrowLeft, Pause, Shuffle, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { playFirstWordAudio, playWordAudio } from "@/utils/audioPlayer";
+import { playFirstWordAudio, playWordAudio, parseAudioUrls } from "@/utils/audioPlayer";
 
 type ReviewWord = { id: number; word: string; translation: string; audioUrl?: string; showTranslation: boolean };
 
@@ -13,13 +13,20 @@ export default function WordReview() {
   const [touchedIds, setTouchedIds] = useState<Set<number>>(new Set());
   const [playingId, setPlayingId] = useState<number | null>(null);
   const abortRef = useRef<(() => void) | null>(null);
+  const [frameIdx, setFrameIdx] = useState(0);
+  const [finished, setFinished] = useState(false);
 
-  const handlePlayAudio = (word: ReviewWord) => {
+  const [audioIndexMap, setAudioIndexMap] = useState<Map<number, number>>(new Map());
+
+  const handlePlayNextAudio = (word: ReviewWord) => {
     if (!word.audioUrl) return;
     abortRef.current?.();
     setPlayingId(word.id);
     const abort = playWordAudio(word.audioUrl, 300, () => setPlayingId(null));
     abortRef.current = abort;
+    const urls = parseAudioUrls(word.audioUrl);
+    const prev = audioIndexMap.get(word.id) ?? 0;
+    setAudioIndexMap(new Map(audioIndexMap).set(word.id, (prev + 1) % urls.length));
   };
 
   const mode = useMemo(() => sessionStorage.getItem("lb_mode") || "study", []);
@@ -51,14 +58,42 @@ export default function WordReview() {
       }));
       setWords(mapped);
       setTouchedIds(new Set());
+      setFrameIdx(0);
+      setFinished(false);
     } catch {
       // ignore
     }
   }, [batchIdx, mode]);
 
+  // LinguaStart memorize sequence: 1,2,1,2,3,1,2,3,4,1,2,3,4,5 (0-based)
+  const sequence = useMemo(() => {
+    const n = words.length;
+    if (n <= 0) return [] as number[];
+    const seq: number[] = [0];
+    for (let i = 1; i < n; i++) {
+      seq.push(i);
+      for (let j = 0; j <= i; j++) seq.push(j);
+    }
+    return seq;
+  }, [words]);
+
+  const activeIndex = sequence.length > 0 ? sequence[Math.min(frameIdx, sequence.length - 1)] : 0;
+
+  const handleCountClick = (id: number) => {
+    const idx = words.findIndex((w) => w.id === id);
+    if (idx !== activeIndex) return;
+    if (sequence.length === 0) return;
+    if (frameIdx >= sequence.length - 1) {
+      setFinished(true);
+      return;
+    }
+    setFrameIdx((f) => f + 1);
+  };
+
   const toggleTranslation = (word: ReviewWord) => {
     const id = word.id;
-    if (word.audioUrl) {
+    const isShowing = !word.showTranslation;
+    if (isShowing && word.audioUrl) {
       abortRef.current?.();
       setPlayingId(word.id);
       const abort = playFirstWordAudio(word.audioUrl, () => setPlayingId(null));
@@ -66,15 +101,20 @@ export default function WordReview() {
     }
     setTouchedIds((prev) => new Set(prev).add(id));
     setWords((prev) =>
-      prev.map((word) =>
-        word.id === id ? { ...word, showTranslation: !word.showTranslation } : word
-      )
+      prev.map((w) => {
+        if (isShowing) {
+          return w.id === id ? { ...w, showTranslation: true } : { ...w, showTranslation: false };
+        }
+        return w.id === id ? { ...w, showTranslation: false } : w;
+      })
     );
   };
 
   const handleShuffle = () => {
     const shuffled = [...words].sort(() => Math.random() - 0.5);
     setWords(shuffled);
+    setFrameIdx(0);
+    setFinished(false);
   };
 
   const handleNext = () => {
@@ -110,10 +150,12 @@ export default function WordReview() {
 
         {/* 单词列表 */}
         <div className="space-y-3 mb-6">
-          {words.map((word) => (
+          {words.map((word, index) => (
             <div
               key={word.id}
-              className="bg-white rounded-xl p-4 shadow-sm"
+              className={`bg-white rounded-xl p-4 shadow-sm transition-all ${
+                index === activeIndex ? "bg-[#4ECDC4]/10 border-2 border-[#4ECDC4]" : ""
+              }`}
             >
               <div className="flex items-center justify-between">
                 <div
@@ -125,12 +167,28 @@ export default function WordReview() {
                     <div className="text-sm text-[#718096]">{word.translation}</div>
                   )}
                 </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {parseAudioUrls(word.audioUrl).length > 0 && (
+                    <button
+                      onClick={() => handlePlayNextAudio(word)}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
+                        playingId === word.id
+                          ? "bg-[#4ECDC4] text-white hover:bg-[#45b8b0]"
+                          : "bg-[#4ECDC4]/10 text-[#4ECDC4] hover:bg-[#4ECDC4]/20"
+                      }`}
+                    >
+                      {(audioIndexMap.get(word.id) ?? 0) + 1}
+                    </button>
+                  )}
                   <button
-                    onClick={() => handlePlayAudio(word)}
-                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                    onClick={() => handleCountClick(word.id)}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold transition-colors ${
+                      index === activeIndex
+                        ? "bg-[#4ECDC4] text-white hover:bg-[#45b8b0]"
+                        : "bg-gray-100 text-[#A0AEC0] cursor-not-allowed"
+                    }`}
                   >
-                    <Volume2 size={20} className={playingId === word.id ? "text-[#4ECDC4] animate-pulse" : "text-[#4ECDC4]"} />
+                    ✓
                   </button>
                 </div>
               </div>

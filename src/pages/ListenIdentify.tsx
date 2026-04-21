@@ -1,7 +1,7 @@
-import { ArrowLeft, Pause, Volume2, ArrowRight } from "lucide-react";
+import { ArrowLeft, Pause, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { playWordAudio } from "@/utils/audioPlayer";
+import { playFirstWordAudio } from "@/utils/audioPlayer";
 
 type ListenWord = {
   id: number;
@@ -53,11 +53,11 @@ export default function ListenIdentify() {
     }
   }, [batchIdx, mode]);
 
-  const handlePlayAudio = (w: ListenWord) => {
+  const handlePlayFirstAudio = (w: ListenWord) => {
     if (!w.audioUrl) return;
     abortRef.current?.();
     setPlayingId(w.id);
-    const abort = playWordAudio(w.audioUrl, 300, () => setPlayingId(null));
+    const abort = playFirstWordAudio(w.audioUrl, () => setPlayingId(null));
     abortRef.current = abort;
   };
 
@@ -66,11 +66,11 @@ export default function ListenIdentify() {
       prev.map((w) => {
         if (w.id !== id) return w;
         if (w.state === "idle") {
-          handlePlayAudio(w);
+          handlePlayFirstAudio(w);
           return { ...w, state: "played" };
         }
         if (w.state === "played") {
-          handlePlayAudio(w);
+          handlePlayFirstAudio(w);
           return { ...w, state: "played2" };
         }
         if (w.state === "played2") {
@@ -146,15 +146,6 @@ export default function ListenIdentify() {
                       )}
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePlayAudio(w);
-                    }}
-                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                  >
-                    <Volume2 size={20} className={playingId === w.id ? "text-[#4ECDC4] animate-pulse" : "text-[#4ECDC4]"} />
-                  </button>
                 </div>
               </div>
             );
