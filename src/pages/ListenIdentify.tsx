@@ -1,4 +1,4 @@
-import { ArrowLeft, Pause, ArrowRight } from "lucide-react";
+import { ArrowLeft, Pause, ArrowRight, Volume2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { playFirstWordAudio } from "@/utils/audioPlayer";
