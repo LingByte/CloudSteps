@@ -31,3 +31,29 @@
 .icon-zu:before {
   content: "\e69e";
 }
+
+@font-face {
+  font-family: "payment-iconfont";
+  src: url("../../download%20(4)/font_5228186_75je4ry4ypr/iconfont.woff2") format("woff2"),
+       url("../../download%20(4)/font_5228186_75je4ry4ypr/iconfont.woff") format("woff"),
+       url("../../download%20(4)/font_5228186_75je4ry4ypr/iconfont.ttf") format("truetype");
+}
+
+.payment-iconfont {
+  font-family: "payment-iconfont" !important;
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.payment-iconfont.icon-zhifubaozhifu:before {
+  content: "\e634";
+}
+
+.payment-iconfont.icon-weixinzhifu:before {
+  content: "\e607";
+}
+
+.payment-iconfont.icon-xinyongkayinhangka:before {
+  content: "\e998";
+}

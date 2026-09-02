@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { Eye, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { get } from '@/lib/api'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -12,7 +12,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
 import { AdminPage } from '@/components/admin-page'
 import { UserPicker } from '@/features/inbox-notifications/user-picker'
 import {
@@ -98,11 +97,7 @@ export function ScenarioSessionsPage() {
           </select>
         </div>
         {userId && (
-          <Button
-            size='sm'
-            variant='ghost'
-            onClick={() => setUserId('')}
-          >
+          <Button size='sm' variant='ghost' onClick={() => setUserId('')}>
             清除用户
           </Button>
         )}

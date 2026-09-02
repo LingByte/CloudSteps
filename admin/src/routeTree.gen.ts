@@ -59,7 +59,9 @@ import { Route as ClerkAuthenticatedUserManagementRouteImport } from './routes/c
 import { Route as ClerkauthSignUpRouteImport } from './routes/clerk/(auth)/sign-up'
 import { Route as ClerkauthSignInRouteImport } from './routes/clerk/(auth)/sign-in'
 import { Route as AuthenticatedWordbooksBookIdRouteImport } from './routes/_authenticated/wordbooks/$bookId'
+import { Route as AuthenticatedSettingsRechargeRouteImport } from './routes/_authenticated/settings/recharge'
 import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated/settings/notifications'
+import { Route as AuthenticatedSettingsInviteCodeRouteImport } from './routes/_authenticated/settings/invite-code'
 import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_authenticated/settings/display'
 import { Route as AuthenticatedSettingsAppearanceRouteImport } from './routes/_authenticated/settings/appearance'
 import { Route as AuthenticatedSettingsAccountRouteImport } from './routes/_authenticated/settings/account'
@@ -347,10 +349,22 @@ const AuthenticatedWordbooksBookIdRoute =
     path: '/wordbooks/$bookId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedSettingsRechargeRoute =
+  AuthenticatedSettingsRechargeRouteImport.update({
+    id: '/recharge',
+    path: '/recharge',
+    getParentRoute: () => AuthenticatedSettingsRouteRoute,
+  } as any)
 const AuthenticatedSettingsNotificationsRoute =
   AuthenticatedSettingsNotificationsRouteImport.update({
     id: '/notifications',
     path: '/notifications',
+    getParentRoute: () => AuthenticatedSettingsRouteRoute,
+  } as any)
+const AuthenticatedSettingsInviteCodeRoute =
+  AuthenticatedSettingsInviteCodeRouteImport.update({
+    id: '/invite-code',
+    path: '/invite-code',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
 const AuthenticatedSettingsDisplayRoute =
@@ -452,7 +466,9 @@ export interface FileRoutesByFullPath {
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
+  '/settings/invite-code': typeof AuthenticatedSettingsInviteCodeRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/settings/recharge': typeof AuthenticatedSettingsRechargeRoute
   '/wordbooks/$bookId': typeof AuthenticatedWordbooksBookIdRoute
   '/clerk/sign-in': typeof ClerkauthSignInRoute
   '/clerk/sign-up': typeof ClerkauthSignUpRoute
@@ -513,7 +529,9 @@ export interface FileRoutesByTo {
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayRoute
+  '/settings/invite-code': typeof AuthenticatedSettingsInviteCodeRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/settings/recharge': typeof AuthenticatedSettingsRechargeRoute
   '/wordbooks/$bookId': typeof AuthenticatedWordbooksBookIdRoute
   '/clerk/sign-in': typeof ClerkauthSignInRoute
   '/clerk/sign-up': typeof ClerkauthSignUpRoute
@@ -579,7 +597,9 @@ export interface FileRoutesById {
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceRoute
   '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayRoute
+  '/_authenticated/settings/invite-code': typeof AuthenticatedSettingsInviteCodeRoute
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
+  '/_authenticated/settings/recharge': typeof AuthenticatedSettingsRechargeRoute
   '/_authenticated/wordbooks/$bookId': typeof AuthenticatedWordbooksBookIdRoute
   '/clerk/(auth)/sign-in': typeof ClerkauthSignInRoute
   '/clerk/(auth)/sign-up': typeof ClerkauthSignUpRoute
@@ -643,7 +663,9 @@ export interface FileRouteTypes {
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
+    | '/settings/invite-code'
     | '/settings/notifications'
+    | '/settings/recharge'
     | '/wordbooks/$bookId'
     | '/clerk/sign-in'
     | '/clerk/sign-up'
@@ -704,7 +726,9 @@ export interface FileRouteTypes {
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
+    | '/settings/invite-code'
     | '/settings/notifications'
+    | '/settings/recharge'
     | '/wordbooks/$bookId'
     | '/clerk/sign-in'
     | '/clerk/sign-up'
@@ -769,7 +793,9 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/display'
+    | '/_authenticated/settings/invite-code'
     | '/_authenticated/settings/notifications'
+    | '/_authenticated/settings/recharge'
     | '/_authenticated/wordbooks/$bookId'
     | '/clerk/(auth)/sign-in'
     | '/clerk/(auth)/sign-up'
@@ -1175,11 +1201,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWordbooksBookIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/settings/recharge': {
+      id: '/_authenticated/settings/recharge'
+      path: '/recharge'
+      fullPath: '/settings/recharge'
+      preLoaderRoute: typeof AuthenticatedSettingsRechargeRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
     '/_authenticated/settings/notifications': {
       id: '/_authenticated/settings/notifications'
       path: '/notifications'
       fullPath: '/settings/notifications'
       preLoaderRoute: typeof AuthenticatedSettingsNotificationsRouteImport
+      parentRoute: typeof AuthenticatedSettingsRouteRoute
+    }
+    '/_authenticated/settings/invite-code': {
+      id: '/_authenticated/settings/invite-code'
+      path: '/invite-code'
+      fullPath: '/settings/invite-code'
+      preLoaderRoute: typeof AuthenticatedSettingsInviteCodeRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
     '/_authenticated/settings/display': {
@@ -1273,7 +1313,9 @@ interface AuthenticatedSettingsRouteRouteChildren {
   AuthenticatedSettingsAccountRoute: typeof AuthenticatedSettingsAccountRoute
   AuthenticatedSettingsAppearanceRoute: typeof AuthenticatedSettingsAppearanceRoute
   AuthenticatedSettingsDisplayRoute: typeof AuthenticatedSettingsDisplayRoute
+  AuthenticatedSettingsInviteCodeRoute: typeof AuthenticatedSettingsInviteCodeRoute
   AuthenticatedSettingsNotificationsRoute: typeof AuthenticatedSettingsNotificationsRoute
+  AuthenticatedSettingsRechargeRoute: typeof AuthenticatedSettingsRechargeRoute
   AuthenticatedSettingsIndexRoute: typeof AuthenticatedSettingsIndexRoute
   AuthenticatedSettingsLoginHistoryIndexRoute: typeof AuthenticatedSettingsLoginHistoryIndexRoute
   AuthenticatedSettingsOperationLogsIndexRoute: typeof AuthenticatedSettingsOperationLogsIndexRoute
@@ -1284,8 +1326,10 @@ const AuthenticatedSettingsRouteRouteChildren: AuthenticatedSettingsRouteRouteCh
     AuthenticatedSettingsAccountRoute: AuthenticatedSettingsAccountRoute,
     AuthenticatedSettingsAppearanceRoute: AuthenticatedSettingsAppearanceRoute,
     AuthenticatedSettingsDisplayRoute: AuthenticatedSettingsDisplayRoute,
+    AuthenticatedSettingsInviteCodeRoute: AuthenticatedSettingsInviteCodeRoute,
     AuthenticatedSettingsNotificationsRoute:
       AuthenticatedSettingsNotificationsRoute,
+    AuthenticatedSettingsRechargeRoute: AuthenticatedSettingsRechargeRoute,
     AuthenticatedSettingsIndexRoute: AuthenticatedSettingsIndexRoute,
     AuthenticatedSettingsLoginHistoryIndexRoute:
       AuthenticatedSettingsLoginHistoryIndexRoute,

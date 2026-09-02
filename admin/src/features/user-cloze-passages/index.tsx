@@ -87,7 +87,13 @@ export function UserClozePassagesPage() {
           value={userId}
           onChange={(e) => setUserId(e.target.value)}
         />
-        <Button size='sm' onClick={() => { setPage(1); void load(1) }}>
+        <Button
+          size='sm'
+          onClick={() => {
+            setPage(1)
+            void load(1)
+          }}
+        >
           查询
         </Button>
       </div>
@@ -111,13 +117,19 @@ export function UserClozePassagesPage() {
           <TableBody>
             {list.map((row) => (
               <TableRow key={row.id}>
-                <TableCell className='max-w-[200px] truncate font-medium'>{row.title}</TableCell>
+                <TableCell className='max-w-[200px] truncate font-medium'>
+                  {row.title}
+                </TableCell>
                 <TableCell>{row.username || row.email || row.userId}</TableCell>
                 <TableCell>{row.level}</TableCell>
                 <TableCell>{row.blankCount ?? '—'}</TableCell>
                 <TableCell>
                   <div className='flex gap-1'>
-                    <Button size='sm' variant='ghost' onClick={() => setDetail(row)}>
+                    <Button
+                      size='sm'
+                      variant='ghost'
+                      onClick={() => setDetail(row)}
+                    >
                       <Eye />
                     </Button>
                     <Button
@@ -140,10 +152,20 @@ export function UserClozePassagesPage() {
       )}
 
       <div className='mt-4 flex justify-end gap-2'>
-        <Button variant='outline' size='sm' disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+        <Button
+          variant='outline'
+          size='sm'
+          disabled={page <= 1}
+          onClick={() => setPage((p) => p - 1)}
+        >
           上一页
         </Button>
-        <Button variant='outline' size='sm' disabled={page * pageSize >= total} onClick={() => setPage((p) => p + 1)}>
+        <Button
+          variant='outline'
+          size='sm'
+          disabled={page * pageSize >= total}
+          onClick={() => setPage((p) => p + 1)}
+        >
           下一页
         </Button>
       </div>
@@ -156,8 +178,8 @@ export function UserClozePassagesPage() {
         desc={`确定删除「${deleteTarget?.title}」？`}
         confirmText='删除'
         destructive
-        loading={deleting}
-        onConfirm={() => void handleDeleteConfirm()}
+        isLoading={deleting}
+        handleConfirm={() => void handleDeleteConfirm()}
       />
     </AdminPage>
   )

@@ -8,6 +8,8 @@ import {
   Mars,
   Venus,
   Loader2,
+  Ticket,
+  Wallet,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
@@ -168,6 +170,22 @@ export default function CoachCenter() {
         label: t("coach_center.settings"),
         tint: "cream" as const,
         path: "/settings",
+      },
+      {
+        id: 5,
+        icon: Ticket,
+        label: "邀请码",
+        description: "邀请好友一起学习",
+        tint: "sky" as const,
+        path: "/invite-code",
+      },
+      {
+        id: 6,
+        icon: Wallet,
+        label: "账户充值",
+        description: "充值余额，解锁学习服务",
+        tint: "mint" as const,
+        path: "/recharge",
       },
     ];
     if (!isCoach) return base;

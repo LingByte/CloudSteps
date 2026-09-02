@@ -38,7 +38,10 @@ export default function Login() {
   const { t } = useTranslation();
   const doLogin = useAuthStore((s) => s.login);
   const isLoading = useAuthStore((s) => s.isLoading);
-  const [screen, setScreen] = useState<Screen>("login");
+  const [screen, setScreen] = useState<Screen>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("register") === "1" ? "register" : "login";
+  });
   const [showWechat, setShowWechat] = useState(false);
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");

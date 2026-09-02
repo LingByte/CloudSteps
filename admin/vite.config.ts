@@ -8,6 +8,9 @@ import { playwright } from '@vitest/browser-playwright'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // GitHub Pages 部署时通过 VITE_BASE_PATH 注入子路径（如 /CloudSteps/），
+  // 本地 dev 不设置则默认相对路径 './'，不影响开发。
+  base: process.env.VITE_BASE_PATH || './',
   plugins: [
     tanstackRouter({
       target: 'react',

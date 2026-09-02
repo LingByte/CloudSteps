@@ -75,6 +75,7 @@ const queryClient = new QueryClient({
 // Create a new router instance
 const router = createRouter({
   routeTree,
+  basepath: import.meta.env.VITE_ROUTER_BASE_PATH || '/',
   context: { queryClient },
   defaultPreload: 'intent',
   defaultPreloadStaleTime: 0,

@@ -1,5 +1,13 @@
 import { Outlet, useRouterState } from '@tanstack/react-router'
-import { Bell, History, Palette, ScrollText, UserCog } from 'lucide-react'
+import {
+  Bell,
+  History,
+  Palette,
+  ScrollText,
+  Ticket,
+  UserCog,
+  Wallet,
+} from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
@@ -14,6 +22,16 @@ const sidebarNavItems = [
     title: '个人资料',
     href: '/settings',
     icon: <UserCog size={18} />,
+  },
+  {
+    title: '邀请码',
+    href: '/settings/invite-code',
+    icon: <Ticket size={18} />,
+  },
+  {
+    title: '账户充值',
+    href: '/settings/recharge',
+    icon: <Wallet size={18} />,
   },
   {
     title: '通知',

@@ -20,9 +20,25 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
   const { auth } = useAuthStore()
   const navigate = useNavigate()
   const location = useLocation()
-  const [ready, setReady] = useState(!auth.accessToken)
+  // demo 模式（GitHub Pages 预览）：跳过登录校验，直接放行看 UI
+  const demoMode = import.meta.env.VITE_DEMO_MODE === '1'
+  const [ready, setReady] = useState(!auth.accessToken || demoMode)
 
   useEffect(() => {
+    if (demoMode) {
+      if (!auth.user) {
+        auth.setUser({
+          accountNo: 'demo',
+          email: 'demo@cloudsteps.example',
+          role: ['admin'],
+          exp: Date.now() + 24 * 60 * 60 * 1000,
+          displayName: '演示账号',
+          username: 'demo',
+        })
+      }
+      return
+    }
+
     if (!auth.accessToken) {
       navigate({
         to: '/sign-in',
@@ -86,7 +102,7 @@ export function AuthenticatedLayout({ children }: AuthenticatedLayoutProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.accessToken])
 
-  if (!auth.accessToken || !ready) {
+  if ((!auth.accessToken && !demoMode) || !ready) {
     return (
       <div className='flex h-svh items-center justify-center text-sm text-muted-foreground'>
         正在验证登录状态…
