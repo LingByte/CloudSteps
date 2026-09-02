@@ -64,6 +64,7 @@ func (h *Handlers) Register(engine *gin.Engine, api huma.API) {
 	h.registerNotificationRoutes(r)
 	h.registerNotificationAdminRoutes(r)
 	h.registerAnnouncementRoutes(r)
+	h.registerAIContentRoutes(r)
 	h.registerWechatMpArticleRoutes(r)
 	h.registerCheckInRoutes(r)
 	h.registerStorageAdminRoutes(r)

@@ -39,6 +39,14 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { AdminPage } from '@/components/admin-page'
+import { AiContentAssist } from '@/components/ai-content-assist'
+import {
+  CONTENT_SHEET_BODY_CLASS,
+  CONTENT_SHEET_FOOTER_CLASS,
+  CONTENT_SHEET_HEADER_CLASS,
+  CONTENT_SHEET_PANEL_CLASS,
+  CONTENT_SHEET_WIDE_PANEL_CLASS,
+} from '@/components/content-sheet'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { MarkdownEditor } from '@/components/markdown-editor'
 import { MarkdownView } from '@/components/markdown-view'
@@ -372,8 +380,8 @@ export function AnnouncementsPage() {
       ) : null}
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className='overflow-y-auto sm:max-w-xl'>
-          <SheetHeader>
+        <SheetContent className={CONTENT_SHEET_WIDE_PANEL_CLASS}>
+          <SheetHeader className={CONTENT_SHEET_HEADER_CLASS}>
             <SheetTitle className='flex items-center gap-2'>
               <Megaphone className='size-4' />
               {editing ? '编辑公告' : '新建公告'}
@@ -383,8 +391,20 @@ export function AnnouncementsPage() {
               会看到弹窗；确认后写入已读，不再主动弹出。
             </SheetDescription>
           </SheetHeader>
-          <div className='mt-4 space-y-4 px-1'>
-            <div className='grid gap-1.5'>
+          <div className={CONTENT_SHEET_BODY_CLASS}>
+            <div className='space-y-5'>
+              <AiContentAssist
+                kind='announcement'
+                title={form.title}
+                onApply={(data) =>
+                  setForm((f) => ({
+                    ...f,
+                    title: data.title?.trim() || f.title,
+                    content: data.content?.trim() || f.content,
+                  }))
+                }
+              />
+              <div className='grid gap-1.5'>
               <Label htmlFor='ann-title'>标题</Label>
               <Input
                 id='ann-title'
@@ -426,8 +446,9 @@ export function AnnouncementsPage() {
               />
               保存后立即发布
             </label>
+            </div>
           </div>
-          <SheetFooter className='mt-6'>
+          <SheetFooter className={CONTENT_SHEET_FOOTER_CLASS}>
             <Button variant='outline' onClick={() => setSheetOpen(false)}>
               取消
             </Button>
@@ -449,8 +470,8 @@ export function AnnouncementsPage() {
           }
         }}
       >
-        <SheetContent className='overflow-y-auto sm:max-w-lg'>
-          <SheetHeader>
+        <SheetContent className={CONTENT_SHEET_PANEL_CLASS}>
+          <SheetHeader className={CONTENT_SHEET_HEADER_CLASS}>
             <SheetTitle>{detail?.title}</SheetTitle>
             <SheetDescription>
               {detail?.status === 'published' ? '已发布' : '草稿'}
@@ -460,14 +481,13 @@ export function AnnouncementsPage() {
               {` · 已读 ${readersTotal || detail?.readCount || 0} 人`}
             </SheetDescription>
           </SheetHeader>
-          <div className='mt-4 space-y-5 px-1'>
-            <div>
+          <div className={CONTENT_SHEET_BODY_CLASS}>
+            <div className='space-y-5'>
               {detail?.content ? (
                 <MarkdownView content={detail.content} />
               ) : (
                 <p className='text-sm text-muted-foreground'>无正文</p>
               )}
-            </div>
             <div className='border-t pt-4'>
               <h3 className='mb-2 text-sm font-semibold'>已读用户</h3>
               {readersLoading ? (
@@ -494,6 +514,7 @@ export function AnnouncementsPage() {
                   ))}
                 </ul>
               )}
+            </div>
             </div>
           </div>
         </SheetContent>
