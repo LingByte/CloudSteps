@@ -341,6 +341,12 @@ func UpdateWordBook(db *gorm.DB, id uint, vals map[string]any) error {
 // 注意：这里使用 Unscoped，硬删除词库及相关数据（与 DeletedAt 软删无关）。
 func DeleteWordBook(db *gorm.DB, id uint, operator string) error {
 	_ = operator // operator currently only used for soft delete audit; keep signature compatibility
+	if id == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	if err := db.First(&WordBook{}, id).Error; err != nil {
+		return err
+	}
 
 	tx := db.Unscoped()
 
@@ -365,7 +371,14 @@ func DeleteWordBook(db *gorm.DB, id uint, operator string) error {
 	}
 
 	// 最后删除词库主表
-	return tx.Where("id = ?", id).Delete(&WordBook{}).Error
+	res := tx.Where("id = ?", id).Delete(&WordBook{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 // SetWordBookActive 上架 / 下架词库

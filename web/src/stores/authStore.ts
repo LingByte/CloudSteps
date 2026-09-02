@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { registerUser, getUserInfo, logoutUser, type User, type RegisterUserForm } from '../api/auth'
 import { clearTrainingStudent } from '../utils/trainingStudent'
+import { clearPracticeBilling } from '../utils/practiceBilling'
 import i18n from '../i18n'
 
 interface AuthState {
@@ -112,6 +113,7 @@ export const useAuthStore = create<AuthState>()(
           // 清除本地存储
           localStorage.removeItem('auth_token')
           clearTrainingStudent()
+          clearPracticeBilling()
           set({ user: null, isAuthenticated: false, token: null })
         }
       },
@@ -136,6 +138,7 @@ export const useAuthStore = create<AuthState>()(
           // 如果获取用户信息失败，清除认证状态
           localStorage.removeItem('auth_token')
           clearTrainingStudent()
+          clearPracticeBilling()
           set({ user: null, isAuthenticated: false, token: null })
         }
       },
@@ -151,6 +154,7 @@ export const useAuthStore = create<AuthState>()(
         clearUser: () => {
             localStorage.removeItem('auth_token')
             clearTrainingStudent()
+            clearPracticeBilling()
             set({ user: null, isAuthenticated: false, token: null })
         },
     }),

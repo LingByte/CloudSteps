@@ -7,6 +7,7 @@ import { formatApiMessage } from "./apiMessage";
 import { showToast } from "./toast";
 import { useAuthStore } from "../stores/authStore";
 import { normalizeSnowflakeId, sameSnowflakeId } from "./json-snowflake";
+import { isCoachRole } from "./coachOnboarding";
 
 export type PracticeBillingLink = {
   /** 雪花 ID，必须用字符串，禁止 Number() */
@@ -59,9 +60,20 @@ export const usePracticeBillingStore = create<PracticeBillingState>()(
   )
 );
 
-function isCoachRole(): boolean {
-  const role = useAuthStore.getState().user?.role || "user";
-  return role === "user" || role === "admin" || role === "teacher";
+function isAuthenticatedCoach(): boolean {
+  const auth = useAuthStore.getState();
+  if (!auth.isAuthenticated || !auth.token) return false;
+  return isCoachRole(auth.user?.role);
+}
+
+/** 练习计费同步前提：已登录教练端 + 已选学员 */
+export function canSyncPracticeBilling(): boolean {
+  if (!isAuthenticatedCoach()) return false;
+  return Boolean(getTrainingStudent()?.id);
+}
+
+export function clearPracticeBilling(): void {
+  usePracticeBillingStore.getState().clear();
 }
 
 /** 并发 ensure 合并为一次请求，避免进入练习时连打三次 */
@@ -75,13 +87,15 @@ let ensureInFlight: Promise<PracticeBillingLink | null> | null = null;
  */
 export async function ensurePracticeBillingActive(
   plannedMinutes = 180,
-  opts?: { force?: boolean }
+  opts?: { force?: boolean; silent?: boolean }
 ): Promise<PracticeBillingLink | null> {
-  if (!isCoachRole()) return null;
+  if (!isAuthenticatedCoach()) return null;
 
   const student = getTrainingStudent();
   if (!student?.id) {
-    showToast.warning(i18n.t("practice_billing.select_student"));
+    if (!opts?.silent) {
+      showToast.warning(i18n.t("practice_billing.select_student"));
+    }
     return null;
   }
 

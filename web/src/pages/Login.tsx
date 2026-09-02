@@ -13,6 +13,8 @@ import {
   type User,
 } from "../api/auth";
 import { useAuthStore } from "../stores/authStore";
+import { useClassTimerStore } from "../stores/classTimerStore";
+import { clearPracticeBilling } from "../utils/practiceBilling";
 import { formatAuthErrorMessage } from "../utils/authErrors";
 import { WechatLoginPanel } from "../components/WechatLoginPanel";
 
@@ -67,6 +69,12 @@ export default function Login() {
   useEffect(() => {
     setErrorText(null);
   }, [screen, showWechat]);
+
+  // 登录页不应保留练习计费/定时状态，避免切回时误触发计费同步
+  useEffect(() => {
+    clearPracticeBilling();
+    useClassTimerStore.getState().stop();
+  }, []);
 
   const finishLogin = async (token: string, rawUser: any) => {
     const userForStore: User | undefined = rawUser

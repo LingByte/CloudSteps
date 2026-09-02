@@ -78,5 +78,3 @@ go.work.sum
 
 # Local secrets (use configs/config.example.yaml as template)
 configs/config.yaml
-*.pdf
-scripts/wordimport/.venv/

@@ -72,7 +72,7 @@ function pickGradient(tag: string): [string, string] {
 }
 
 type WordBook = {
-  id: number
+  id: string | number
   name: string
   description: string
   level: string

@@ -13,6 +13,7 @@ import {
 import { CloudButton } from "./cloudsteps";
 import { formatCountdown, useClassTimerStore } from "../stores/classTimerStore";
 import {
+  canSyncPracticeBilling,
   ensurePracticeBillingActive,
   usePracticeBillingStore,
 } from "../utils/practiceBilling";
@@ -298,11 +299,12 @@ export function ClassSessionTimer() {
     return () => window.clearInterval(id);
   }, []);
 
-  // 断网恢复 / 切回前台：强制与服务端对齐（挂载时不打，避免与「继续练习」叠打）
+  // 断网恢复 / 切回前台：仅在练习区内、已选学员时与服务端对齐
   useEffect(() => {
-    if (!hasBillingLink) return;
+    if (!inTimerZone || !hasBillingLink) return;
     const recover = () => {
-      void ensurePracticeBillingActive(180, { force: true });
+      if (!canSyncPracticeBilling()) return;
+      void ensurePracticeBillingActive(180, { force: true, silent: true });
     };
     const onVis = () => {
       if (document.visibilityState === "visible") recover();
@@ -313,7 +315,7 @@ export function ClassSessionTimer() {
       window.removeEventListener("online", recover);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [hasBillingLink]);
+  }, [hasBillingLink, inTimerZone]);
 
   useEffect(() => {
     if (!endsAt) {

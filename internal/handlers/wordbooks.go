@@ -206,7 +206,10 @@ func (h *Handlers) handleListWordBooks(c *gin.Context) {
 
 func (h *Handlers) handleGetWordBook(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
-	id, _ := strconv.Atoi(c.Param("id"))
+	id, ok := parseRouteUintID(c, "id")
+	if !ok {
+		return
+	}
 	book, err := models.GetWordBookByID(db, uint(id))
 	if err != nil {
 		response.FailI18n(c, "wordbook.not_found", err)
@@ -225,9 +228,8 @@ func (h *Handlers) handleGetWordBook(c *gin.Context) {
 // handleGetWordDetail GET /words/:id — 返回单个单词的完整词典数据
 func (h *Handlers) handleGetWordDetail(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
-	id, _ := strconv.Atoi(c.Param("id"))
-	if id <= 0 {
-		response.FailI18n(c, "wordbook.word_id_invalid", nil)
+	id, ok := parseRouteUintID(c, "id")
+	if !ok {
 		return
 	}
 	var word models.Word
@@ -243,12 +245,11 @@ func (h *Handlers) handleGetWordDetail(c *gin.Context) {
 // 登录用户浏览词库单词（不含管理端编辑能力）
 func (h *Handlers) handleListWordBookWords(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
-	id, _ := strconv.Atoi(c.Param("id"))
-	if id <= 0 {
-		response.FailI18n(c, "wordbook.invalid_id", nil)
+	id, ok := parseRouteUintID(c, "id")
+	if !ok {
 		return
 	}
-	book, err := models.GetWordBookByID(db, uint(id))
+	book, err := models.GetWordBookByID(db, id)
 	if err != nil {
 		response.FailI18n(c, "wordbook.not_found", nil)
 		return
@@ -277,7 +278,7 @@ func (h *Handlers) handleListWordBookWords(c *gin.Context) {
 		}
 	}
 	keyword := strings.TrimSpace(c.Query("keyword"))
-	words, total, err := models.ListWordsLite(db, uint(id), keyword, page, pageSize)
+	words, total, err := models.ListWordsLite(db, id, keyword, page, pageSize)
 	if err != nil {
 		response.FailI18n(c, "common.query_failed", err)
 		return
@@ -294,7 +295,10 @@ func (h *Handlers) handleListWordBookWords(c *gin.Context) {
 func (h *Handlers) handleSelectWordBook(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
 	user := auth.CurrentUser(c)
-	id, _ := strconv.Atoi(c.Param("id"))
+	id, ok := parseRouteUintID(c, "id")
+	if !ok {
+		return
+	}
 	if user == nil {
 		response.FailI18n(c, "auth.authorization_required", nil)
 		return
@@ -324,7 +328,10 @@ func (h *Handlers) handleSelectWordBook(c *gin.Context) {
 func (h *Handlers) handleGetWordBookProgress(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
 	user := auth.CurrentUser(c)
-	id, _ := strconv.Atoi(c.Param("id"))
+	id, ok := parseRouteUintID(c, "id")
+	if !ok {
+		return
+	}
 	if user == nil {
 		response.FailI18n(c, "auth.authorization_required", nil)
 		return
@@ -362,7 +369,10 @@ func (h *Handlers) handleGetWordBookProgress(c *gin.Context) {
 func (h *Handlers) handleScreenNext(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
 	user := auth.CurrentUser(c)
-	id, _ := strconv.Atoi(c.Param("id"))
+	id, ok := parseRouteUintID(c, "id")
+	if !ok {
+		return
+	}
 	if user == nil {
 		response.FailI18n(c, "auth.authorization_required", nil)
 		return
@@ -407,7 +417,10 @@ func (h *Handlers) handleScreenNext(c *gin.Context) {
 func (h *Handlers) handleScreenSubmit(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
 	user := auth.CurrentUser(c)
-	id, _ := strconv.Atoi(c.Param("id"))
+	id, ok := parseRouteUintID(c, "id")
+	if !ok {
+		return
+	}
 	if user == nil {
 		response.FailI18n(c, "auth.authorization_required", nil)
 		return
@@ -474,7 +487,10 @@ func (h *Handlers) handleScreenSubmit(c *gin.Context) {
 func (h *Handlers) handleScreenStatus(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
 	user := auth.CurrentUser(c)
-	id, _ := strconv.Atoi(c.Param("id"))
+	id, ok := parseRouteUintID(c, "id")
+	if !ok {
+		return
+	}
 	if user == nil {
 		response.FailI18n(c, "auth.authorization_required", nil)
 		return
@@ -666,7 +682,10 @@ func (h *Handlers) adminCreateWordBook(c *gin.Context) {
 func (h *Handlers) adminUpdateWordBook(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
 	user := auth.CurrentUser(c)
-	id, _ := strconv.Atoi(c.Param("id"))
+	id, ok := parseRouteUintID(c, "id")
+	if !ok {
+		return
+	}
 	if _, err := models.GetWordBookByID(db, uint(id)); err != nil {
 		response.FailI18n(c, "wordbook.not_found", err)
 		return
@@ -702,7 +721,10 @@ func (h *Handlers) adminUpdateWordBook(c *gin.Context) {
 func (h *Handlers) adminDeleteWordBook(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
 	user := auth.CurrentUser(c)
-	id, _ := strconv.Atoi(c.Param("id"))
+	bookID, ok := parseRouteUintID(c, "id")
+	if !ok {
+		return
+	}
 	operator := ""
 	if user != nil {
 		operator = user.DisplayName
@@ -713,7 +735,11 @@ func (h *Handlers) adminDeleteWordBook(c *gin.Context) {
 			operator = fmt.Sprintf("%d", user.ID)
 		}
 	}
-	if err := models.DeleteWordBook(db, uint(id), operator); err != nil {
+	if err := models.DeleteWordBook(db, bookID, operator); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			response.FailI18n(c, "wordbook.not_found", err)
+			return
+		}
 		response.FailI18n(c, "common.operation_failed", err)
 		return
 	}
@@ -722,7 +748,10 @@ func (h *Handlers) adminDeleteWordBook(c *gin.Context) {
 
 func (h *Handlers) adminListWords(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
-	id, _ := strconv.Atoi(c.Param("id"))
+	id, ok := parseRouteUintID(c, "id")
+	if !ok {
+		return
+	}
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "30"))
 	keyword := c.Query("keyword")
@@ -738,7 +767,10 @@ func (h *Handlers) adminListWords(c *gin.Context) {
 func (h *Handlers) adminCreateWord(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
 	user := auth.CurrentUser(c)
-	id, _ := strconv.Atoi(c.Param("id"))
+	id, ok := parseRouteUintID(c, "id")
+	if !ok {
+		return
+	}
 	var body adminWordPayload
 	if err := c.ShouldBindJSON(&body); err != nil {
 		response.AbortWithStatusJSON(c, http.StatusBadRequest, err)
@@ -789,13 +821,15 @@ func operatorName(user *models.User) string {
 func (h *Handlers) handleUpdateWordBookWord(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
 	user := auth.CurrentUser(c)
-	bookID, _ := strconv.Atoi(c.Param("id"))
-	wid, _ := strconv.Atoi(c.Param("wid"))
-	if bookID <= 0 || wid <= 0 {
-		response.FailI18n(c, "common.invalid_params", nil)
+	bookID, ok := parseRouteUintID(c, "id")
+	if !ok {
 		return
 	}
-	book, err := models.GetWordBookByID(db, uint(bookID))
+	wid, ok := parseRouteUintID(c, "wid")
+	if !ok {
+		return
+	}
+	book, err := models.GetWordBookByID(db, bookID)
 	if err != nil {
 		response.FailI18n(c, "wordbook.not_found", err)
 		return
@@ -804,8 +838,8 @@ func (h *Handlers) handleUpdateWordBookWord(c *gin.Context) {
 		response.FailI18n(c, "wordbook.no_edit_access", nil)
 		return
 	}
-	word, err := models.GetWordByID(db, uint(wid))
-	if err != nil || word.WordBookID != uint(bookID) {
+	word, err := models.GetWordByID(db, wid)
+	if err != nil || word.WordBookID != bookID {
 		response.FailI18n(c, "wordbook.word_not_found", err)
 		return
 	}
@@ -852,13 +886,15 @@ func (h *Handlers) handleUpdateWordBookWord(c *gin.Context) {
 func (h *Handlers) handleDeleteWordBookWord(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
 	user := auth.CurrentUser(c)
-	bookID, _ := strconv.Atoi(c.Param("id"))
-	wid, _ := strconv.Atoi(c.Param("wid"))
-	if bookID <= 0 || wid <= 0 {
-		response.FailI18n(c, "common.invalid_params", nil)
+	bookID, ok := parseRouteUintID(c, "id")
+	if !ok {
 		return
 	}
-	book, err := models.GetWordBookByID(db, uint(bookID))
+	wid, ok := parseRouteUintID(c, "wid")
+	if !ok {
+		return
+	}
+	book, err := models.GetWordBookByID(db, bookID)
 	if err != nil {
 		response.FailI18n(c, "wordbook.not_found", err)
 		return
@@ -867,23 +903,26 @@ func (h *Handlers) handleDeleteWordBookWord(c *gin.Context) {
 		response.FailI18n(c, "wordbook.no_delete_access", nil)
 		return
 	}
-	word, err := models.GetWordByID(db, uint(wid))
-	if err != nil || word.WordBookID != uint(bookID) {
+	word, err := models.GetWordByID(db, wid)
+	if err != nil || word.WordBookID != bookID {
 		response.FailI18n(c, "wordbook.word_not_found", err)
 		return
 	}
-	if err := models.DeleteWord(db, uint(wid), operatorName(user)); err != nil {
+	if err := models.DeleteWord(db, wid, operatorName(user)); err != nil {
 		response.FailI18n(c, "common.operation_failed", err)
 		return
 	}
-	_ = models.SyncWordBookCount(db, uint(bookID))
+	_ = models.SyncWordBookCount(db, bookID)
 	response.SuccessI18n(c, "common.deleted", nil)
 }
 
 // adminCheckWords POST {adminPrefix}/wordbooks/:id/words/check
 func (h *Handlers) adminCheckWords(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
-	id, _ := strconv.Atoi(c.Param("id"))
+	id, ok := parseRouteUintID(c, "id")
+	if !ok {
+		return
+	}
 	var body struct {
 		Words []string `json:"words"`
 	}
@@ -902,7 +941,10 @@ func (h *Handlers) adminCheckWords(c *gin.Context) {
 func (h *Handlers) adminBatchCreateWords(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
 	user := auth.CurrentUser(c)
-	id, _ := strconv.Atoi(c.Param("id"))
+	id, ok := parseRouteUintID(c, "id")
+	if !ok {
+		return
+	}
 	var body struct {
 		Words []adminWordPayload `json:"words"`
 	}
@@ -946,9 +988,8 @@ func (h *Handlers) adminBatchCreateWords(c *gin.Context) {
 // adminDeduplicateWordBookAudio POST /wordbooks/:id/words/deduplicate-audio
 func (h *Handlers) adminDeduplicateWordBookAudio(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
-	bookID, err := strconv.Atoi(c.Param("id"))
-	if err != nil || bookID <= 0 {
-		response.FailI18n(c, "wordbook.invalid_id", nil)
+	bookID, ok := parseRouteUintID(c, "id")
+	if !ok {
 		return
 	}
 
