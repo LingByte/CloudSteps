@@ -352,6 +352,54 @@ func (rg *RegistrationGuard) CheckRegistrationAllowed(ip string, account string,
 	return nil
 }
 
+// RegistrationGuardMessage maps guard errors to user-facing text (Chinese).
+func RegistrationGuardMessage(err error) string {
+	if err == nil {
+		return ""
+	}
+	switch err.Error() {
+	case "password must contain at least one lowercase letter":
+		return "密码需包含至少一个小写字母"
+	case "password must contain at least one uppercase letter":
+		return "密码需包含至少一个大写字母"
+	case "password must contain at least one number":
+		return "密码需包含至少一个数字"
+	case "password must contain at least one special character":
+		return "密码需包含至少一个特殊字符"
+	case "invalid email format":
+		return "邮箱格式不正确"
+	case "email domain is not allowed":
+		return "该邮箱域名不允许注册"
+	case "disposable email addresses are not allowed":
+		return "不支持临时邮箱注册"
+	case "IP address is blocked":
+		return "当前网络不允许注册"
+	case "registration rate limit exceeded for this IP, please try again later":
+		return "注册过于频繁，请稍后再试"
+	case "too many failed registration attempts, please try again later":
+		return "注册失败次数过多，请稍后再试"
+	default:
+		if strings.HasPrefix(err.Error(), "password must be at least ") {
+			return "密码至少 6 位"
+		}
+		return err.Error()
+	}
+}
+
+// UserFacingError prefers validation messages, then guard messages.
+func UserFacingError(err error) string {
+	if err == nil {
+		return ""
+	}
+	if msg := Message(err); msg != "" {
+		return msg
+	}
+	if msg := RegistrationGuardMessage(err); msg != "" {
+		return msg
+	}
+	return err.Error()
+}
+
 // maskEmail 掩码邮箱地址用于日志记录
 func maskEmail(email string) string {
 	parts := strings.Split(email, "@")

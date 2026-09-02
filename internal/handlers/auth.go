@@ -468,7 +468,7 @@ func (h *Handlers) handleUserSignup(c *gin.Context) {
 	clientIP := c.ClientIP()
 
 	if err := utils.PreparePasswordRegister(&form); err != nil {
-		response.FailI18n(c, "common.invalid_params", err)
+		failUserMessage(c, err)
 		return
 	}
 
@@ -496,11 +496,7 @@ func (h *Handlers) handleUserSignup(c *gin.Context) {
 	if utils.GlobalRegistrationGuard != nil {
 		if err := utils.GlobalRegistrationGuard.CheckRegistrationAllowed(clientIP, form.Username, form.Password); err != nil {
 			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, false, err.Error())
-			status := http.StatusBadRequest
-			if utils.IsRegistrationThrottleError(err) {
-				status = http.StatusTooManyRequests
-			}
-			response.AbortWithStatusJSON(c, status, err)
+			failUserMessage(c, err)
 			return
 		}
 	}
@@ -592,7 +588,7 @@ func (h *Handlers) handleUserSignupByEmail(c *gin.Context) {
 	clientIP := c.ClientIP()
 
 	if err := utils.PrepareEmailRegister(&form); err != nil {
-		response.FailI18n(c, "common.invalid_params", err)
+		failUserMessage(c, err)
 		return
 	}
 
@@ -620,11 +616,7 @@ func (h *Handlers) handleUserSignupByEmail(c *gin.Context) {
 	if utils.GlobalRegistrationGuard != nil {
 		if err := utils.GlobalRegistrationGuard.CheckRegistrationAllowed(clientIP, form.Username, form.Password); err != nil {
 			utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, false, err.Error())
-			status := http.StatusBadRequest
-			if utils.IsRegistrationThrottleError(err) {
-				status = http.StatusTooManyRequests
-			}
-			response.AbortWithStatusJSON(c, status, err)
+			failUserMessage(c, err)
 			return
 		}
 	}

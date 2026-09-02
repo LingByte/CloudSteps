@@ -51,7 +51,10 @@ const PATTERN_KEY_MAP: Array<{ re: RegExp; key: string }> = [
   { re: /invalid verification code|invalid or expired/i, key: "validation.code_invalid" },
   { re: /invalid email format/i, key: "login.invalid_email" },
   { re: /password too short|password must be at least/i, key: "common.password_too_short" },
-  { re: /too many requests|rate limit/i, key: "common.rate_limited" },
+  { re: /password must contain at least one lowercase/i, key: "login.password_need_lowercase" },
+  { re: /password must contain at least one uppercase/i, key: "validation.password_need_uppercase" },
+  { re: /password must contain at least one number/i, key: "validation.password_need_number" },
+  { re: /too many requests|rate limit|registration rate limit|too many failed registration/i, key: "common.rate_limited" },
   { re: /token expired|invalid token|bad token|token required/i, key: "auth.invalid_token" },
 ];
 

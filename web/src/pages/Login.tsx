@@ -122,6 +122,10 @@ export default function Login() {
         setErrorText(t("login.password_min_6"));
         return;
       }
+      if (!/[a-z]/.test(password)) {
+        setErrorText(t("login.password_need_lowercase"));
+        return;
+      }
     }
     if (!captchaFields?.captchaId || captchaFields.captchaValue == null || captchaFields.captchaValue === "") {
       setErrorText(t("login.complete_captcha"));
