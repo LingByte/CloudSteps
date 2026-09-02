@@ -114,9 +114,10 @@ type MailConfig struct {
 }
 
 type LLMConfig struct {
-	APIKey  string `yaml:"apiKey"`
-	BaseURL string `yaml:"baseUrl"`
-	Model   string `yaml:"model"`
+	APIKey      string `yaml:"apiKey"`
+	BaseURL     string `yaml:"baseUrl"`
+	Model       string `yaml:"model"`
+	VisionModel string `yaml:"visionModel"`
 }
 
 type ImageGenConfig struct {
@@ -518,6 +519,7 @@ func exportCompatEnv(cfg *Config) {
 	set("LLM_API_KEY", cfg.Services.LLM.APIKey)
 	set("LLM_BASE_URL", cfg.Services.LLM.BaseURL)
 	set("LLM_MODEL", cfg.Services.LLM.Model)
+	set("LLM_VISION_MODEL", cfg.Services.LLM.VisionModel)
 	set("IMAGE_GEN_API_KEY", cfg.Services.ImageGen.APIKey)
 	set("IMAGE_GEN_BASE_URL", cfg.Services.ImageGen.BaseURL)
 	set("IMAGE_GEN_MODEL", cfg.Services.ImageGen.Model)

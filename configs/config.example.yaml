@@ -59,6 +59,7 @@ services:
     apiKey: ""
     baseUrl: https://dashscope.aliyuncs.com/compatible-mode/v1
     model: qwen-plus
+    visionModel: qwen-vl-max
   imageGen:
     apiKey: ""
     baseUrl: https://ai.lingecho.com

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -36,6 +37,21 @@ func FromGlobal() Config {
 		BaseURL: normalizeBaseURL(c.BaseURL),
 		Model:   model,
 	}
+}
+
+// VisionFromGlobal returns LLM config for multimodal OCR (visionModel env/yaml, else chat model).
+func VisionFromGlobal() Config {
+	cfg := FromGlobal()
+	if v := strings.TrimSpace(os.Getenv("LLM_VISION_MODEL")); v != "" {
+		cfg.Model = v
+		return cfg
+	}
+	if configs.Global != nil {
+		if v := strings.TrimSpace(configs.Global.Services.LLM.VisionModel); v != "" {
+			cfg.Model = v
+		}
+	}
+	return cfg
 }
 
 func normalizeBaseURL(raw string) string {
