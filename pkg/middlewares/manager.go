@@ -114,6 +114,7 @@ func getDefaultEndpointTimeouts() map[string]time.Duration {
 		"/api/admin/storage/stats/":       2 * time.Minute,
 		"/api/wordbooks/batch-audio/jobs": 8 * time.Second,
 		"/api/wordbooks/cover-ai/jobs":    8 * time.Second,
+		"/api/admin/wechat-mp-articles/generate-thumb": 15 * time.Second,
 		"/api/wordbooks/custom":           2 * time.Minute,
 	}
 }

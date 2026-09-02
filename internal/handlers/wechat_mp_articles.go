@@ -34,6 +34,8 @@ func (h *Handlers) registerWechatMpArticleRoutes(r *humax.Group) {
 		g.GET("/remote/published", h.handleAdminListRemoteWechatPublished)
 		g.POST("/import", h.handleAdminImportWechatPublished)
 		g.POST("/upload-thumb", h.handleAdminUploadWechatMpThumb)
+		g.POST("/generate-thumb", h.handleAdminStartWechatMpThumbGenerate)
+		g.GET("/generate-thumb", h.handleAdminWechatMpThumbGenerateStatus)
 		g.POST("/upload-content-image", h.handleAdminUploadWechatMpContentImage)
 		g.GET("/:id", h.handleAdminGetWechatMpArticle)
 		g.PUT("/:id", h.handleAdminUpdateWechatMpArticle)
@@ -293,6 +295,50 @@ func wechatMpCoverExt(filename string) string {
 	}
 }
 
+func buildWechatMpCoverPrompt(title, digest, userPrompt string) string {
+	if p := strings.TrimSpace(userPrompt); p != "" {
+		return p
+	}
+	var b strings.Builder
+	b.WriteString("微信公众号图文封面插画，横版 2.35:1，清新教育品牌风格，画面简洁有层次，无文字、无水印、无 logo。")
+	if t := strings.TrimSpace(title); t != "" {
+		b.WriteString(" 主题：")
+		b.WriteString(t)
+	}
+	if d := strings.TrimSpace(digest); d != "" {
+		if len(d) > 80 {
+			d = d[:80] + "…"
+		}
+		b.WriteString("。氛围：")
+		b.WriteString(d)
+	}
+	return b.String()
+}
+
+func persistWechatMpThumb(ctx context.Context, client *wechat.MPClient, data []byte, filename string) (mediaID, previewURL string, err error) {
+	if len(data) == 0 {
+		return "", "", fmt.Errorf("empty image")
+	}
+	if len(data) > maxWechatCoverBytes {
+		return "", "", fmt.Errorf("cover too large")
+	}
+	mediaID, err = client.UploadPermanentThumb(ctx, filename, bytes.NewReader(data))
+	if err != nil {
+		return "", "", err
+	}
+	store := stores.Default()
+	key := fmt.Sprintf("wechat-mp/covers/%d%s", time.Now().UnixNano(), wechatMpCoverExt(filename))
+	if err := store.Write(key, bytes.NewReader(data)); err != nil {
+		logger.Error("wechat mp cover store write failed",
+			zap.String("key", key),
+			zap.String("kind", stores.DefaultStoreKind),
+			zap.Error(err),
+		)
+		return "", "", err
+	}
+	return mediaID, strings.TrimSpace(store.PublicURL(key)), nil
+}
+
 func (h *Handlers) handleAdminUploadWechatMpThumb(c *gin.Context) {
 	client, err := h.wechatMPClient()
 	if err != nil {
@@ -323,34 +369,30 @@ func (h *Handlers) handleAdminUploadWechatMpThumb(c *gin.Context) {
 		return
 	}
 
-	mediaID, err := client.UploadPermanentThumb(
-		c.Request.Context(),
-		header.Filename,
-		bytes.NewReader(data),
-	)
+	mediaID, previewURL, err := persistWechatMpThumb(c.Request.Context(), client, data, header.Filename)
 	if err != nil {
-		response.FailI18n(c, "wechat_mp_article.upload_failed", gin.H{"reason": wechat.HumanizeAPIError(err)}, wechat.HumanizeAPIError(err))
-		return
-	}
-
-	store := stores.Default()
-	key := fmt.Sprintf("wechat-mp/covers/%d%s", time.Now().UnixNano(), wechatMpCoverExt(header.Filename))
-	if err := store.Write(key, bytes.NewReader(data)); err != nil {
-		logger.Error("wechat mp cover store write failed",
-			zap.String("key", key),
-			zap.String("kind", stores.DefaultStoreKind),
-			zap.Error(err),
-		)
+		if strings.Contains(err.Error(), "cover too large") {
+			response.FailI18n(c, "wechat_mp_article.cover_too_large", nil)
+			return
+		}
+		if mediaID == "" {
+			response.FailI18n(c, "wechat_mp_article.upload_failed", gin.H{"reason": wechat.HumanizeAPIError(err)}, wechat.HumanizeAPIError(err))
+			return
+		}
 		response.FailI18n(c, "wechat_mp_article.cover_store_failed", err)
 		return
 	}
-	previewURL := strings.TrimSpace(store.PublicURL(key))
 
 	response.SuccessI18n(c, "common.success", gin.H{
 		"mediaId":    mediaID,
 		"previewUrl": previewURL,
-		"storageKey": key,
 	})
+}
+
+type generateWechatMpThumbReq struct {
+	Title  string `json:"title"`
+	Digest string `json:"digest"`
+	Prompt string `json:"prompt"`
 }
 
 func (h *Handlers) handleAdminUploadWechatMpContentImage(c *gin.Context) {

@@ -7,12 +7,14 @@ import {
   Plus,
   RefreshCw,
   Send,
+  Sparkles,
   Trash2,
   Upload,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { del, get, post, put } from '@/lib/api'
 import { formatDateTime } from '@/lib/datetime'
+import { sleep } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,6 +43,13 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { AdminPage } from '@/components/admin-page'
+import { AiContentAssist } from '@/components/ai-content-assist'
+import {
+  CONTENT_SHEET_BODY_CLASS,
+  CONTENT_SHEET_FOOTER_CLASS,
+  CONTENT_SHEET_HEADER_CLASS,
+  CONTENT_SHEET_WIDE_PANEL_CLASS,
+} from '@/components/content-sheet'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { MarkdownEditor } from '@/components/markdown-editor'
 import { MarkdownView } from '@/components/markdown-view'
@@ -135,8 +144,7 @@ function articlePreviewText(row: WechatMpArticle): string {
   return plain.slice(0, 160)
 }
 
-const EDIT_SHEET_CLASS =
-  'flex w-full flex-col gap-0 p-0 sm:w-2/3 sm:max-w-[66.666667vw]'
+const EDIT_SHEET_CLASS = CONTENT_SHEET_WIDE_PANEL_CLASS
 
 export function WechatMpArticlesPage() {
   const [list, setList] = useState<WechatMpArticle[]>([])
@@ -152,6 +160,9 @@ export function WechatMpArticlesPage() {
   const [deleting, setDeleting] = useState<WechatMpArticle | null>(null)
   const [actionId, setActionId] = useState<string | null>(null)
   const [uploadingThumb, setUploadingThumb] = useState(false)
+  const [generatingThumb, setGeneratingThumb] = useState(false)
+  const [thumbPrompt, setThumbPrompt] = useState('')
+  const [thumbPromptOpen, setThumbPromptOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [remoteLoading, setRemoteLoading] = useState(false)
   const [remoteImporting, setRemoteImporting] = useState(false)
@@ -267,6 +278,8 @@ export function WechatMpArticlesPage() {
   const openCreate = () => {
     setEditing(null)
     setForm(emptyForm)
+    setThumbPrompt('')
+    setThumbPromptOpen(false)
     setSheetOpen(true)
   }
 
@@ -281,6 +294,8 @@ export function WechatMpArticlesPage() {
       thumbMediaId: row.thumbMediaId ?? '',
       thumbPreviewUrl: row.thumbPreviewUrl ?? '',
     })
+    setThumbPrompt('')
+    setThumbPromptOpen(false)
     setSheetOpen(true)
   }
 
@@ -315,6 +330,59 @@ export function WechatMpArticlesPage() {
       toast.error(msg)
     } finally {
       setUploadingThumb(false)
+    }
+  }
+
+  const generateThumb = async () => {
+    setGeneratingThumb(true)
+    try {
+      await post<{ status?: string; started?: boolean }>(
+        '/admin/wechat-mp-articles/generate-thumb',
+        {
+          title: form.title.trim(),
+          digest: form.digest.trim(),
+          prompt: thumbPrompt.trim() || undefined,
+        },
+        { timeout: 15_000 },
+      )
+
+      const deadline = Date.now() + 300_000
+      while (Date.now() < deadline) {
+        const res = await get<{
+          status?: string
+          error?: string
+          mediaId?: string
+          previewUrl?: string
+        }>('/admin/wechat-mp-articles/generate-thumb', { timeout: 15_000 })
+
+        const status = res.data?.status
+        if (status === 'done') {
+          const preview = res.data.previewUrl?.trim() || ''
+          if (!res.data.mediaId) {
+            throw new Error('封面生成完成但未返回素材 ID')
+          }
+          setForm((prev) => ({
+            ...prev,
+            thumbMediaId: res.data.mediaId!,
+            thumbPreviewUrl: preview,
+          }))
+          toast.success('封面已生成并上传至微信素材库')
+          return
+        }
+        if (status === 'failed') {
+          throw new Error(res.data.error || '封面生成失败')
+        }
+        await sleep(2000)
+      }
+      throw new Error('封面生成超时，请稍后重试')
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === 'object' && 'message' in e
+          ? String((e as { message: string }).message)
+          : '封面生成失败'
+      toast.error(msg)
+    } finally {
+      setGeneratingThumb(false)
     }
   }
 
@@ -612,14 +680,27 @@ export function WechatMpArticlesPage() {
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className={EDIT_SHEET_CLASS}>
-          <SheetHeader className='shrink-0 border-b px-6 py-5 text-start'>
+          <SheetHeader className={CONTENT_SHEET_HEADER_CLASS}>
             <SheetTitle>{editing ? '编辑图文' : '新建图文'}</SheetTitle>
             <SheetDescription>
               正文支持 Markdown，同步时会转为 HTML 推送到微信草稿箱。
             </SheetDescription>
           </SheetHeader>
-          <div className='min-h-0 flex-1 overflow-y-auto px-6 py-5'>
+          <div className={CONTENT_SHEET_BODY_CLASS}>
             <div className='space-y-5'>
+              <AiContentAssist
+                kind='wechat_mp_article'
+                title={form.title}
+                digest={form.digest}
+                onApply={(data) =>
+                  setForm((f) => ({
+                    ...f,
+                    title: data.title?.trim() || f.title,
+                    digest: data.digest?.trim() || f.digest,
+                    content: data.content?.trim() || f.content,
+                  }))
+                }
+              />
               <div className='space-y-2'>
                 <Label htmlFor='mp-title'>标题</Label>
                 <Input
@@ -676,8 +757,17 @@ export function WechatMpArticlesPage() {
                     )}
                     <div className='min-w-0 flex-1 space-y-3'>
                       <p className='text-xs leading-relaxed text-muted-foreground'>
-                        JPG / PNG，不超过 2MB。上传后同步至微信素材库，并在对象存储保留一份用于预览。
+                        JPG / PNG，不超过 2MB。可上传或 AI 生成；生成后会同步至微信素材库并保留预览。
                       </p>
+                      {thumbPromptOpen ? (
+                        <textarea
+                          value={thumbPrompt}
+                          onChange={(e) => setThumbPrompt(e.target.value)}
+                          rows={3}
+                          placeholder='可选：自定义封面画面描述；留空则根据标题与摘要自动生成'
+                          className='w-full rounded-md border border-input bg-background px-3 py-2 text-xs leading-relaxed'
+                        />
+                      ) : null}
                       <input
                         ref={thumbInputRef}
                         type='file'
@@ -694,7 +784,7 @@ export function WechatMpArticlesPage() {
                           type='button'
                           variant='outline'
                           size='sm'
-                          disabled={uploadingThumb}
+                          disabled={uploadingThumb || generatingThumb}
                           onClick={() => thumbInputRef.current?.click()}
                         >
                           {uploadingThumb ? (
@@ -703,6 +793,29 @@ export function WechatMpArticlesPage() {
                             <Upload className='size-4' />
                           )}
                           {form.thumbMediaId ? '更换封面' : '上传封面'}
+                        </Button>
+                        <Button
+                          type='button'
+                          variant='outline'
+                          size='sm'
+                          disabled={uploadingThumb || generatingThumb}
+                          onClick={() => void generateThumb()}
+                        >
+                          {generatingThumb ? (
+                            <Loader2 className='size-4 animate-spin' />
+                          ) : (
+                            <Sparkles className='size-4' />
+                          )}
+                          AI 生成封面
+                        </Button>
+                        <Button
+                          type='button'
+                          variant='ghost'
+                          size='sm'
+                          className='text-xs'
+                          onClick={() => setThumbPromptOpen((v) => !v)}
+                        >
+                          {thumbPromptOpen ? '收起描述' : '自定义画面'}
                         </Button>
                         {form.thumbMediaId ? (
                           <Badge variant='outline' className='text-xs'>
@@ -734,7 +847,7 @@ export function WechatMpArticlesPage() {
               </div>
             </div>
           </div>
-          <SheetFooter className='shrink-0 gap-2 border-t bg-background px-6 py-4 sm:flex-row sm:justify-end'>
+          <SheetFooter className={CONTENT_SHEET_FOOTER_CLASS}>
             <Button variant='outline' onClick={() => setSheetOpen(false)}>
               取消
             </Button>
@@ -748,14 +861,14 @@ export function WechatMpArticlesPage() {
 
       <Sheet open={!!detail} onOpenChange={(open) => !open && setDetail(null)}>
         <SheetContent className={EDIT_SHEET_CLASS}>
-          <SheetHeader className='shrink-0 border-b px-6 py-5 text-start'>
+          <SheetHeader className={CONTENT_SHEET_HEADER_CLASS}>
             <SheetTitle>{detail?.title}</SheetTitle>
             <SheetDescription>
               {detail ? statusLabel[detail.status] ?? detail.status : ''}
               {detail?.wechatMediaId ? ` · media_id: ${detail.wechatMediaId}` : ''}
             </SheetDescription>
           </SheetHeader>
-          <div className='min-h-0 flex-1 overflow-y-auto px-6 py-5'>
+          <div className={CONTENT_SHEET_BODY_CLASS}>
             {detail?.thumbPreviewUrl ? (
               <img
                 src={detail.thumbPreviewUrl}
