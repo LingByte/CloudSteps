@@ -156,9 +156,9 @@ export function AnnouncementPopupHost() {
         if (!nextOpen) dismiss();
       }}
     >
-      <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col gap-0 overflow-hidden p-0">
-        <DialogHeader className="px-6 pt-6 pb-3 shrink-0">
-          <DialogTitle className="text-base leading-snug pr-6">
+      <DialogContent className="sm:max-w-md max-h-[min(85dvh,640px)] flex flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="shrink-0 border-b border-border px-5 pt-5 pb-3">
+          <DialogTitle className="text-base leading-snug pr-8">
             {item?.title || t("announcements.title")}
           </DialogTitle>
           {item?.publishedAt ? (
@@ -167,16 +167,16 @@ export function AnnouncementPopupHost() {
             </p>
           ) : null}
         </DialogHeader>
-        <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-2">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 py-4">
           <div className="text-sm text-foreground leading-relaxed">
             {item?.content ? (
-              <MarkdownView content={item.content} />
+              <MarkdownView content={item.content} className="text-[15px]" />
             ) : (
               <p className="text-muted-foreground">{t("announcements.no_content")}</p>
             )}
           </div>
         </div>
-        <DialogFooter className="px-6 py-4 shrink-0 border-t border-border flex-col sm:flex-row gap-2">
+        <DialogFooter className="shrink-0 border-t border-border px-5 py-3.5 flex-col sm:flex-row gap-2 pb-[max(0.875rem,env(safe-area-inset-bottom))]">
           <CloudButton type="button" variant="outline" onClick={viewAll} className="w-full sm:w-auto">
             {moreCount > 0
               ? t("announcements.view_all_with_more", { count: moreCount })
