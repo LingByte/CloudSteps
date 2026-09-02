@@ -28,6 +28,8 @@ export const usePracticeFlowLockStore = create<PracticeFlowLockState>((set, get)
 }));
 
 const LOCKED_PREFIXES = [
+  "/word-training",
+  "/pre-training-check",
   "/word-practice",
   "/flash-review",
   "/listen-identify",
@@ -35,10 +37,17 @@ const LOCKED_PREFIXES = [
   "/review-check",
 ];
 
+/** 上课定时仅在这些路由展示；离开至区外且计时中 → 确认后结束定时 */
+export const TIMER_ZONE_PREFIXES = LOCKED_PREFIXES;
+
 export function isPracticeLockedPath(pathname: string): boolean {
   return LOCKED_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`)
   );
+}
+
+export function isTimerZonePath(pathname: string): boolean {
+  return isPracticeLockedPath(pathname);
 }
 
 export function allowPracticeLeaveOnce() {

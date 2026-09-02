@@ -43,7 +43,7 @@ type WordItem = {
   status: null | "correct" | "wrong";
 };
 
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 30;
 
 export default function PreTrainingCheck() {
   const { t } = useTranslation();

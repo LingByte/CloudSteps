@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router";
 import { Clock, Pause } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
@@ -16,6 +17,7 @@ import {
   usePracticeBillingStore,
 } from "../utils/practiceBilling";
 import { showToast } from "../utils/toast";
+import { isTimerZonePath } from "../utils/practiceFlowLock";
 
 const PRESETS = [30, 40, 45, 50, 60];
 const REMIND_PRESETS = [5, 10, 15, 20, 30];
@@ -270,11 +272,12 @@ export function ClassTimerBadge({ onClick }: { onClick: () => void }) {
 }
 
 /**
- * 全站上课定时：浮动倒计时（无顶栏入口的页面）+ 到点 / 最后提醒
- * 额度计费与计时器无关；刷新后若本地有未结课次会静默 ensure
+ * 单词训练流程内：顶栏倒计时 + 到点 / 最后提醒（不在区外浮动展示）
  */
 export function ClassSessionTimer() {
   const { t } = useTranslation();
+  const location = useLocation();
+  const inTimerZone = isTimerZonePath(location.pathname);
   const endsAt = useClassTimerStore((s) => s.endsAt);
   const markEndedNotified = useClassTimerStore((s) => s.markEndedNotified);
   const takeIntervalRemind = useClassTimerStore((s) => s.takeIntervalRemind);
@@ -349,6 +352,7 @@ export function ClassSessionTimer() {
     return () => window.clearInterval(id);
   }, [endsAt, markEndedNotified, takeIntervalRemind, t]);
 
+  if (!inTimerZone) return null;
   if (!endsAt && !endOpen && !intervalOpen) return null;
 
   return (

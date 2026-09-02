@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate } from "react-router";
+import { AppShell } from "../components/AppShell";
 import { Layout } from "../components/Layout";
 import Home from "../pages/Home";
 import AntiForgetting from "../pages/AntiForgetting";
@@ -55,6 +56,9 @@ import TrainingRecords from "../pages/TrainingRecords";
 
 export const router = createBrowserRouter(
   [
+  {
+    element: <AppShell />,
+    children: [
   {
     path: "/",
     element: (
@@ -393,6 +397,8 @@ export const router = createBrowserRouter(
         <CreateAntiForgetting />
       </RequireAuth>
     ),
+  },
+    ],
   },
   ],
   // 部署到 GitHub Pages 项目页时，Vite 的 base（import.meta.env.BASE_URL）
