@@ -5,23 +5,41 @@ import {
   Button,
   Card,
   Empty,
-  Progress,
-  Radio,
-  Result,
-  Space,
   Spin,
   Tag,
   Typography,
 } from "@arco-design/web-react";
 import { IconLeft, IconPlus } from "@arco-design/web-react/icon";
-import { ArrowRight } from "lucide-react";
-import { CloudButton } from "../components/cloudsteps";
+import { ReadingAnalysisPanel } from "../components/reading/ReadingAnalysisPanel";
 import {
+  ReadingAnswerSheet,
+  type QuestionFeedback,
+} from "../components/reading/ReadingAnswerSheet";
+import {
+  ReadingKnowledgePanel,
+  type ReadingKnowledgeItem,
+} from "../components/reading/ReadingKnowledgePanel";
+import { ReadingParagraphBlocks } from "../components/reading/ReadingParagraphBlocks";
+import { ReadingSessionShell } from "../components/reading/ReadingSessionShell";
+import {
+  READING_STAGE_ORDER,
+  ReadingStageRail,
+  type ReadingStageId,
+} from "../components/reading/ReadingStageRail";
+import {
+  ReadingWordsPanel,
+  type ReadingWordPreview,
+} from "../components/reading/ReadingWordsPanel";
+import {
+  checkCustomReadingAnswer,
+  getCustomReadingKnowledge,
   getCustomReadingPassage,
   listCustomReadingPassages,
   submitCustomReadingPassage,
 } from "../api/customReading";
 import {
+  checkReadingAnswer,
+  getReadingKnowledge,
   getReadingPassage,
   listReadingPassages,
   submitReadingPassage,
@@ -29,16 +47,68 @@ import {
   type ReadingPassageListItem,
   type ReadingSubmitResult,
 } from "../api/reading";
+import { synthesizeTts } from "../api/tts";
+import {
+  enrichCustomWordBookWords,
+  type CustomParsedWord,
+} from "../api/wordbooks";
+import { playSingleAudio } from "../utils/audioPlayer";
 import { formatApiMessage } from "../utils/apiMessage";
 import { cn } from "../utils/cn";
+import {
+  normalizeReadingWord,
+  splitParagraphForTts,
+  splitReadingParagraphs,
+} from "../utils/readingParagraphs";
 
-type Phase = "list" | "practice" | "result";
+type Phase =
+  | "list"
+  | "listen"
+  | "practice"
+  | "words"
+  | "reanswer"
+  | "analysis"
+  | "knowledge";
 type SourceTab = "system" | "custom";
 type LevelFilter = "" | "初阶" | "中阶" | "高阶";
 
 const LEVELS: LevelFilter[] = ["", "初阶", "中阶", "高阶"];
 
 type PassageItem = ReadingPassageListItem & { isCustom?: boolean };
+
+function formatElapsed(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function phaseToStage(phase: Phase): ReadingStageId {
+  switch (phase) {
+    case "practice":
+      return "answer";
+    case "words":
+      return "words";
+    case "reanswer":
+      return "reanswer";
+    case "analysis":
+      return "analysis";
+    case "knowledge":
+      return "knowledge";
+    default:
+      return "listen";
+  }
+}
+
+function shuffleKeys(keys: string[]): string[] {
+  const a = [...keys];
+  for (let i = a.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = a[i];
+    a[i] = a[j];
+    a[j] = tmp;
+  }
+  return a;
+}
 
 export default function ReadingComprehension() {
   const { t } = useTranslation();
@@ -55,8 +125,89 @@ export default function ReadingComprehension() {
   const [passage, setPassage] = useState<ReadingPassageDetail | null>(null);
   const [isCustomPassage, setIsCustomPassage] = useState(false);
   const [answers, setAnswers] = useState<Record<number, string>>({});
-  const [result, setResult] = useState<ReadingSubmitResult | null>(null);
+  const [feedback, setFeedback] = useState<Record<number, QuestionFeedback>>({});
+  const [optionOrder, setOptionOrder] = useState<Record<number, string[]>>({});
+  const [firstResult, setFirstResult] = useState<ReadingSubmitResult | null>(null);
+  const [secondResult, setSecondResult] = useState<ReadingSubmitResult | null>(null);
   const startedAtRef = useRef<number>(Date.now());
+  const listenStartedAtRef = useRef<number>(Date.now());
+
+  const [activePara, setActivePara] = useState<number | null>(null);
+  const [playingPara, setPlayingPara] = useState<number | null>(null);
+  const [loadingPara, setLoadingPara] = useState<number | null>(null);
+  const audioCacheRef = useRef<Record<string, string>>({});
+  const [elapsedSec, setElapsedSec] = useState(0);
+  const abortPlayRef = useRef<(() => void) | null>(null);
+
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [maxStageIdx, setMaxStageIdx] = useState(0);
+
+  const [preview, setPreview] = useState<ReadingWordPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const glossCacheRef = useRef<Record<string, CustomParsedWord>>({});
+  const advanceTimerRef = useRef<number | null>(null);
+
+  const [knowledgeItems, setKnowledgeItems] = useState<ReadingKnowledgeItem[]>([]);
+  const [knowledgeLoading, setKnowledgeLoading] = useState(false);
+
+  const clearAdvanceTimer = useCallback(() => {
+    if (advanceTimerRef.current != null) {
+      window.clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => clearAdvanceTimer(), [clearAdvanceTimer]);
+
+  useEffect(() => {
+    clearAdvanceTimer();
+  }, [phase, clearAdvanceTimer]);
+
+  const scheduleAdvanceToQuestion = useCallback(
+    (nextIndex: number, delayMs: number) => {
+      clearAdvanceTimer();
+      advanceTimerRef.current = window.setTimeout(() => {
+        advanceTimerRef.current = null;
+        setQuestionIndex(nextIndex);
+      }, delayMs);
+    },
+    [clearAdvanceTimer]
+  );
+
+  const stageDefs = useMemo(
+    () =>
+      [
+        { id: "listen" as const, label: t("reading.stage_listen") },
+        { id: "answer" as const, label: t("reading.stage_answer") },
+        { id: "words" as const, label: t("reading.stage_words") },
+        { id: "reanswer" as const, label: t("reading.stage_reanswer") },
+        { id: "analysis" as const, label: t("reading.stage_analysis") },
+        { id: "knowledge" as const, label: t("reading.stage_knowledge") },
+        { id: "done" as const, label: t("reading.stage_done") },
+      ] satisfies { id: ReadingStageId; label: string }[],
+    [t]
+  );
+
+  const paragraphs = useMemo(
+    () => (passage ? splitReadingParagraphs(passage.content) : []),
+    [passage]
+  );
+
+  const advanceMaxStage = useCallback((stage: ReadingStageId) => {
+    const idx = READING_STAGE_ORDER.indexOf(stage);
+    if (idx >= 0) setMaxStageIdx((prev) => Math.max(prev, idx));
+  }, []);
+
+  const unlockedStages = useMemo(() => {
+    return READING_STAGE_ORDER.slice(0, maxStageIdx + 1);
+  }, [maxStageIdx]);
+
+  const completedStages = useMemo(() => {
+    const current = phaseToStage(phase);
+    const curIdx = READING_STAGE_ORDER.indexOf(current);
+    return READING_STAGE_ORDER.filter((_, i) => i < curIdx && i <= maxStageIdx);
+  }, [phase, maxStageIdx]);
 
   const loadList = useCallback(async () => {
     setLoadingList(true);
@@ -97,18 +248,90 @@ export default function ReadingComprehension() {
     if (phase === "list") void loadList();
   }, [phase, loadList]);
 
+  useEffect(() => {
+    if (phase !== "listen") return;
+    setElapsedSec(0);
+    const timer = window.setInterval(() => {
+      setElapsedSec(Math.max(0, Math.floor((Date.now() - listenStartedAtRef.current) / 1000)));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [phase, passage?.id]);
+
+  useEffect(() => {
+    return () => {
+      abortPlayRef.current?.();
+      abortPlayRef.current = null;
+    };
+  }, []);
+
   const answeredCount = useMemo(
     () => Object.keys(answers).filter((k) => answers[Number(k)]).length,
     [answers]
   );
   const totalQuestions = passage?.questions?.length ?? 0;
   const allAnswered = totalQuestions > 0 && answeredCount === totalQuestions;
-  const percent =
-    totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
+
+  const stopPlayback = () => {
+    abortPlayRef.current?.();
+    abortPlayRef.current = null;
+    setPlayingPara(null);
+  };
+
+  const resolveChunkUrl = async (chunk: string): Promise<string> => {
+    const cached = audioCacheRef.current[chunk];
+    if (cached) return cached;
+    const res = await synthesizeTts(chunk, { lang: "en" });
+    if (res.code !== 200 || !res.data?.url) {
+      throw new Error(formatApiMessage(res.msg, "reading.tts_failed"));
+    }
+    const url = res.data.url;
+    audioCacheRef.current[chunk] = url;
+    return url;
+  };
+
+  const playParagraph = async (index: number) => {
+    const para = paragraphs[index];
+    if (!para) return;
+    stopPlayback();
+    setActivePara(index);
+    setLoadingPara(index);
+    setErr(null);
+    try {
+      const chunks = splitParagraphForTts(para);
+      const urls: string[] = [];
+      for (const chunk of chunks) {
+        urls.push(await resolveChunkUrl(chunk));
+      }
+      setLoadingPara(null);
+      setPlayingPara(index);
+      let i = 0;
+      const playNext = () => {
+        if (i >= urls.length) {
+          setPlayingPara(null);
+          abortPlayRef.current = null;
+          return;
+        }
+        const url = urls[i++];
+        abortPlayRef.current = playSingleAudio(url, playNext);
+      };
+      playNext();
+    } catch (e: unknown) {
+      setLoadingPara(null);
+      setPlayingPara(null);
+      const apiMsg =
+        e && typeof e === "object" && "msg" in e
+          ? String((e as { msg: string }).msg)
+          : e instanceof Error
+            ? e.message
+            : undefined;
+      setErr(formatApiMessage(apiMsg, "reading.tts_failed"));
+    }
+  };
 
   const openPassage = async (id: number, isCustom: boolean) => {
     setLoadingPassage(true);
     setErr(null);
+    stopPlayback();
     try {
       const res = isCustom ? await getCustomReadingPassage(id) : await getReadingPassage(id);
       if (res.code !== 200 || !res.data) {
@@ -118,9 +341,23 @@ export default function ReadingComprehension() {
       setPassage(res.data);
       setIsCustomPassage(isCustom);
       setAnswers({});
-      setResult(null);
+      setFeedback({});
+      setOptionOrder({});
+      setFirstResult(null);
+      setSecondResult(null);
+      setActivePara(null);
+      audioCacheRef.current = {};
+      glossCacheRef.current = {};
+      setPreview(null);
+      setQuestionIndex(0);
+      setPanelCollapsed(false);
+      setKnowledgeItems([]);
+      setMaxStageIdx(0);
       startedAtRef.current = Date.now();
-      setPhase("practice");
+      listenStartedAtRef.current = Date.now();
+      setPhase("listen");
+      advanceMaxStage("listen");
+      advanceMaxStage("answer");
     } catch (e: unknown) {
       const apiMsg =
         e && typeof e === "object" && "msg" in e ? String((e as { msg: string }).msg) : undefined;
@@ -130,8 +367,92 @@ export default function ReadingComprehension() {
     }
   };
 
-  const onSubmit = async () => {
-    if (!passage || !allAnswered) return;
+  const goToPractice = () => {
+    stopPlayback();
+    startedAtRef.current = Date.now();
+    setPanelCollapsed(false);
+    setPhase("practice");
+    advanceMaxStage("answer");
+  };
+
+  const goToWords = () => {
+    stopPlayback();
+    setPreview(null);
+    setPanelCollapsed(false);
+    setPhase("words");
+    advanceMaxStage("words");
+  };
+
+  const goToReanswer = () => {
+    stopPlayback();
+    setAnswers({});
+    setFeedback({});
+    setQuestionIndex(0);
+    setPanelCollapsed(false);
+    startedAtRef.current = Date.now();
+    if (passage) {
+      const next: Record<number, string[]> = {};
+      for (const q of passage.questions) {
+        next[q.id] = shuffleKeys((q.options || []).map((o) => o.key));
+      }
+      setOptionOrder(next);
+    } else {
+      setOptionOrder({});
+    }
+    setPhase("reanswer");
+    advanceMaxStage("reanswer");
+  };
+
+  const goToAnalysis = () => {
+    setQuestionIndex(0);
+    setPanelCollapsed(false);
+    setPhase("analysis");
+    advanceMaxStage("analysis");
+  };
+
+  const buildKnowledge = async () => {
+    if (!passage) return;
+    setKnowledgeLoading(true);
+    setKnowledgeItems([]);
+    setErr(null);
+    try {
+      const res = isCustomPassage
+        ? await getCustomReadingKnowledge(passage.id)
+        : await getReadingKnowledge(passage.id);
+      if (res.code !== 200 || !res.data) {
+        setErr(formatApiMessage(res.msg, "reading.knowledge_failed"));
+        return;
+      }
+      const items: ReadingKnowledgeItem[] = (res.data.items || [])
+        .filter((p) => (p.title || p.body || "").trim())
+        .map((p, i) => ({
+          kind: "point" as const,
+          id: `p-${i}`,
+          title: (p.title || "").trim() || t("reading.knowledge_point_fallback", { n: i + 1 }),
+          body: (p.body || "").trim(),
+        }));
+      setKnowledgeItems(items);
+    } catch (e: unknown) {
+      const apiMsg =
+        e && typeof e === "object" && "msg" in e ? String((e as { msg: string }).msg) : undefined;
+      setErr(formatApiMessage(apiMsg, "reading.knowledge_failed"));
+    } finally {
+      setKnowledgeLoading(false);
+    }
+  };
+
+  const goToKnowledge = () => {
+    setPanelCollapsed(false);
+    setPhase("knowledge");
+    advanceMaxStage("knowledge");
+    advanceMaxStage("done");
+    void buildKnowledge();
+  };
+
+  const submitAnswers = async (
+    attempt: "first" | "second"
+  ): Promise<ReadingSubmitResult | null> => {
+    if (!passage || !allAnswered) return null;
     setSubmitting(true);
     setErr(null);
     try {
@@ -151,27 +472,76 @@ export default function ReadingComprehension() {
         : await submitReadingPassage(passage.id, payload);
       if (res.code !== 200 || !res.data) {
         setErr(formatApiMessage(res.msg, "practice.submit_failed"));
-        return;
+        return null;
       }
-      setResult(res.data);
-      setPhase("result");
+      if (attempt === "first") setFirstResult(res.data);
+      else setSecondResult(res.data);
       void loadList();
+      return res.data;
     } catch (e: unknown) {
       const apiMsg =
         e && typeof e === "object" && "msg" in e ? String((e as { msg: string }).msg) : undefined;
       setErr(formatApiMessage(apiMsg, "practice.submit_failed"));
+      return null;
     } finally {
       setSubmitting(false);
     }
   };
 
+  const finishFirstAnswer = async () => {
+    if (!allAnswered) {
+      setErr(
+        t("practice.complete_all_questions", {
+          answered: answeredCount,
+          total: totalQuestions,
+        })
+      );
+      return;
+    }
+    if (!firstResult) {
+      const submitted = await submitAnswers("first");
+      if (!submitted) return;
+    }
+    goToWords();
+  };
+
+  const finishReanswer = async () => {
+    if (!allAnswered) {
+      setErr(
+        t("practice.complete_all_questions", {
+          answered: answeredCount,
+          total: totalQuestions,
+        })
+      );
+      return;
+    }
+    if (!secondResult) {
+      const submitted = await submitAnswers("second");
+      if (!submitted) return;
+    }
+    goToAnalysis();
+  };
+
   const backToList = () => {
+    stopPlayback();
     setPhase("list");
     setPassage(null);
     setIsCustomPassage(false);
     setAnswers({});
-    setResult(null);
+    setFeedback({});
+    setOptionOrder({});
+    setFirstResult(null);
+    setSecondResult(null);
     setErr(null);
+    setActivePara(null);
+    setPreview(null);
+    setKnowledgeItems([]);
+    setMaxStageIdx(0);
+  };
+
+  const finishSession = () => {
+    advanceMaxStage("done");
+    backToList();
   };
 
   const headerBack = () => {
@@ -179,15 +549,164 @@ export default function ReadingComprehension() {
       navigate(-1);
       return;
     }
-    if (phase === "result") {
-      backToList();
+    if (phase === "practice") {
+      setPhase("listen");
+      listenStartedAtRef.current = Date.now();
+      return;
+    }
+    if (phase === "words") {
+      setPhase("practice");
+      return;
+    }
+    if (phase === "reanswer") {
+      setPhase("words");
+      return;
+    }
+    if (phase === "analysis") {
+      setPhase("reanswer");
+      return;
+    }
+    if (phase === "knowledge") {
+      setPhase("analysis");
       return;
     }
     backToList();
   };
 
+  const onStageSelect = (id: ReadingStageId) => {
+    if (id === "done") {
+      if (unlockedStages.includes("done") || secondResult) finishSession();
+      return;
+    }
+    if (id === "listen") {
+      setPhase("listen");
+      listenStartedAtRef.current = Date.now();
+      return;
+    }
+    if (id === "answer") {
+      goToPractice();
+      return;
+    }
+    if (id === "words" && firstResult) {
+      goToWords();
+      return;
+    }
+    if (id === "reanswer" && firstResult) {
+      goToReanswer();
+      return;
+    }
+    if (id === "analysis" && secondResult) {
+      goToAnalysis();
+      return;
+    }
+    if (id === "knowledge" && secondResult) {
+      goToKnowledge();
+    }
+  };
+
+  const selectWord = async (raw: string) => {
+    const key = normalizeReadingWord(raw);
+    if (!key) return;
+    const surface = raw.trim();
+    setErr(null);
+    const cached = glossCacheRef.current[key];
+    if (cached) {
+      setPreview({
+        word: surface,
+        key,
+        phonetic: cached.phonetic,
+        translation: cached.translationShort || cached.translation,
+      });
+      return;
+    }
+    setPreviewLoading(true);
+    setPreview({ word: surface, key });
+    try {
+      const res = await enrichCustomWordBookWords([{ word: key }]);
+      const hit = res.data?.list?.[0];
+      if (res.code === 200 && hit) {
+        glossCacheRef.current[key] = hit;
+        setPreview({
+          word: surface,
+          key,
+          phonetic: hit.phonetic,
+          translation: hit.translationShort || hit.translation,
+        });
+      } else {
+        setPreview({ word: surface, key, translation: t("reading.word_no_gloss") });
+      }
+    } catch {
+      setPreview({ word: surface, key, translation: t("reading.word_no_gloss") });
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const speakPreview = async () => {
+    if (!preview?.word) return;
+    try {
+      const url = await resolveChunkUrl(preview.word);
+      stopPlayback();
+      abortPlayRef.current = playSingleAudio(url);
+    } catch {
+      setErr(formatApiMessage(undefined, "reading.tts_failed"));
+    }
+  };
+
+  const copyPreview = async () => {
+    if (!preview) return;
+    const text = [preview.word, preview.phonetic, preview.translation].filter(Boolean).join(" ");
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // ignore
+    }
+  };
+
   const levelLabel = (lv: LevelFilter) =>
     lv === "" ? t("reading.level_all") : lv;
+
+  const currentStage = phaseToStage(phase);
+  const inSession = phase !== "list";
+  const showSidePanel = phase !== "listen" && phase !== "list";
+
+  const passageCard = passage ? (
+    <Card className="!rounded-2xl shadow-sm">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="min-w-0">
+          <Typography.Title heading={5} className="!mb-1 !text-[#2D3748]">
+            {passage.title}
+          </Typography.Title>
+          <Typography.Text type="secondary" className="!text-sm">
+            {phase === "practice" || phase === "reanswer"
+              ? t("reading.answer_sheet_hint")
+              : phase === "words"
+                ? t("reading.words_hint")
+                : phase === "analysis"
+                  ? t("reading.analysis_hint")
+                  : phase === "knowledge"
+                    ? t("reading.knowledge_hint")
+                    : t("reading.listen_hint")}
+          </Typography.Text>
+        </div>
+        <div className="shrink-0 rounded-full bg-[#FFF7ED] border border-[#FED7AA] px-2.5 py-1 text-[11px] font-medium text-[#EA580C]">
+          {phase === "listen" ? `${formatElapsed(elapsedSec)} · ` : null}
+          {t("reading.paragraph_count", { count: paragraphs.length })}
+        </div>
+      </div>
+      <ReadingParagraphBlocks
+        paragraphs={paragraphs}
+        mode={phase === "words" ? "words" : "plain"}
+        activePara={activePara}
+        playingPara={playingPara}
+        loadingPara={loadingPara}
+        selectedWord={preview?.word}
+        onPlayParagraph={(idx) => void playParagraph(idx)}
+        onSelectWord={(w) => void selectWord(w)}
+        playLabel={(n) => t("reading.play_paragraph", { n })}
+      />
+    </Card>
+  ) : null;
 
   return (
     <div className="h-dvh overflow-hidden bg-[#F7F9FC] flex flex-col">
@@ -198,7 +717,7 @@ export default function ReadingComprehension() {
             <Typography.Text className="!font-medium !text-sm !text-[#2D3748]">
               {t("reading.title")}
             </Typography.Text>
-            {phase === "practice" && passage && (
+            {inSession && passage && (
               <Typography.Text type="secondary" className="block !text-[11px] truncate leading-tight">
                 {passage.title} · {passage.level}
                 {isCustomPassage && (
@@ -238,13 +757,21 @@ export default function ReadingComprehension() {
               )}
             </div>
           )}
-          {phase === "practice" && (
+          {(phase === "practice" || phase === "reanswer") && (
             <Typography.Text type="secondary" className="!text-[11px] shrink-0">
               {answeredCount}/{totalQuestions}
             </Typography.Text>
           )}
         </div>
-        {phase === "practice" && <Progress percent={percent} showText={false} size="small" className="!mb-0" />}
+        {inSession && (
+          <ReadingStageRail
+            stages={stageDefs}
+            current={currentStage}
+            unlocked={unlockedStages}
+            completed={completedStages}
+            onSelect={onStageSelect}
+          />
+        )}
         {phase === "list" && (
           <div className="px-3 pb-2 flex gap-1 overflow-x-auto scrollbar-hide">
             {LEVELS.map((lv) => (
@@ -305,7 +832,7 @@ export default function ReadingComprehension() {
                   key={`${p.isCustom ? "c" : "s"}-${p.id}`}
                   type="button"
                   onClick={() => void openPassage(p.id, !!p.isCustom)}
-                  className="w-full text-left bg-white border border-[#E2E8F0] rounded-lg px-3 py-2.5 hover:border-[#4ECDC4] transition-colors active:bg-[#F7FAFC]"
+                  className="w-full text-left bg-white border border-[#E2E8F0] rounded-lg px-3 py-2.5 hover:border-[var(--primary)] transition-colors active:bg-[#F7FAFC]"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
@@ -346,142 +873,188 @@ export default function ReadingComprehension() {
         </div>
       )}
 
-      {phase === "result" && result && (
-        <div className="flex-1 min-h-0 overflow-auto px-4 mt-6 flex items-start justify-center">
-          <Card className="w-full max-w-md !rounded-2xl shadow-sm">
-            <Result
-              status={result.score === 100 ? "success" : "info"}
-              title={`${result.correctCount} / ${result.questionCount}`}
-              subTitle={t("practice.score_subtitle", {
-                score: result.score,
-                seconds: result.durationSec,
-              })}
-            />
-            <div className="space-y-3 mt-2">
-              {(result.details || []).map((d, idx) => (
-                <div
-                  key={d.questionId}
-                  className={`rounded-xl border px-3 py-2.5 text-sm ${
-                    d.correct
-                      ? "border-green-200 bg-green-50"
-                      : "border-red-200 bg-red-50"
-                  }`}
-                >
-                  <div className="font-medium text-[#2D3748] mb-1">
-                    {idx + 1}. {d.stem}
-                  </div>
-                  <div className="text-[#718096]">
-                    {t("practice.your_answer", {
-                      answer: d.answer || t("practice.no_answer"),
-                    })}
-                    {!d.correct && (
-                      <span className="ml-2 text-[#4ECDC4]">
-                        {t("practice.correct_answer", { answer: d.rightAnswer })}
-                      </span>
-                    )}
-                  </div>
-                  {d.explanation && (
-                    <div className="text-xs text-[#A0AEC0] mt-1">
-                      {t("practice.explanation", { text: d.explanation })}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-            <Space className="mt-5 w-full justify-center">
-              <Button onClick={backToList}>{t("practice.back_to_list")}</Button>
-              <Button
-                type="primary"
-                onClick={() => {
-                  if (result.passageId) void openPassage(result.passageId, isCustomPassage);
-                }}
-              >
-                {t("practice.try_again")}
-              </Button>
-            </Space>
-          </Card>
-        </div>
-      )}
-
-      {phase === "practice" && passage && (
+      {phase === "listen" && passage && (
         <>
-          <div className="flex-1 min-h-0 overflow-auto px-3 mt-6 pb-24">
-            <Card
-              className="!rounded-xl shadow-sm !mb-3"
-              title={<span className="text-sm font-semibold">{t("practice.passage")}</span>}
-              extra={
-                <Typography.Text type="secondary" className="!text-xs">
-                  {passage.level}
-                </Typography.Text>
-              }
-            >
-              <Typography.Paragraph className="!mb-0 !text-[#2D3748] leading-7 whitespace-pre-line">
-                {passage.content}
-              </Typography.Paragraph>
-            </Card>
-
-            <Space direction="vertical" size={12} className="w-full">
-              {passage.questions.map((q, idx) => (
-                <Card
-                  key={q.id}
-                  className="!rounded-xl shadow-sm"
-                  title={
-                    <span className="text-sm font-medium text-[#2D3748]">
-                      {idx + 1}. {q.stem}
-                    </span>
-                  }
-                >
-                  <Radio.Group
-                    direction="vertical"
-                    value={answers[q.id]}
-                    onChange={(v) =>
-                      setAnswers((prev) => ({ ...prev, [q.id]: String(v) }))
-                    }
-                  >
-                    {(q.options || []).map((opt) => (
-                      <Radio key={opt.key} value={opt.key} className="!mb-2 !mr-0">
-                        <span className="text-sm">
-                          {opt.key}. {opt.text}
-                        </span>
-                      </Radio>
-                    ))}
-                  </Radio.Group>
-                </Card>
-              ))}
-            </Space>
-          </div>
-
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#E2E8F0] px-4 py-3 hidden sm:block">
-            <Button
-              type="primary"
-              long
-              size="large"
-              loading={submitting}
-              disabled={!allAnswered}
-              onClick={() => void onSubmit()}
-            >
-              {allAnswered
-                ? t("practice.submit")
-                : t("practice.complete_all_questions", {
-                    answered: answeredCount,
-                    total: totalQuestions,
-                  })}
+          <div className="flex-1 min-h-0 overflow-auto px-3 pt-3 pb-3">{passageCard}</div>
+          <div className="shrink-0 border-t border-[#E2E8F0] bg-white px-4 py-3">
+            <Button type="primary" long size="large" onClick={goToPractice}>
+              {t("reading.start_answer")}
             </Button>
           </div>
-
-          <CloudButton
-            type="button"
-            variant="brand"
-            size="iconRound"
-            onClick={() => void onSubmit()}
-            disabled={!allAnswered || submitting}
-            loading={submitting}
-            className="fixed right-3 bottom-20 z-50 size-11 shadow-lg sm:hidden"
-            aria-label={t("practice.submit")}
-          >
-            <ArrowRight size={20} />
-          </CloudButton>
         </>
+      )}
+
+      {showSidePanel && passage && (
+        <ReadingSessionShell
+          title={
+            phase === "practice"
+              ? t("reading.answer_sheet_title")
+              : phase === "reanswer"
+                ? t("reading.reanswer_sheet_title")
+                : phase === "words"
+                  ? t("reading.stage_words")
+                  : phase === "analysis"
+                    ? t("reading.analysis_title", { count: totalQuestions })
+                    : t("reading.knowledge_title", { count: knowledgeItems.length })
+          }
+          subtitle={
+            phase === "practice" || phase === "reanswer"
+              ? t("reading.answer_sheet_hint")
+              : phase === "words"
+                ? t("reading.words_hint")
+                : phase === "analysis"
+                  ? t("reading.analysis_sub")
+                  : t("reading.knowledge_sub", { count: knowledgeItems.length })
+          }
+          collapsed={panelCollapsed}
+          onToggleCollapse={() => setPanelCollapsed((v) => !v)}
+          collapseLabel={t("reading.collapse_answer")}
+          expandLabel={t("reading.expand_answer")}
+          passage={passageCard}
+        >
+          {(phase === "practice" || phase === "reanswer") && (
+            <ReadingAnswerSheet
+              questions={passage.questions}
+              answers={answers}
+              feedback={feedback}
+              optionOrder={phase === "reanswer" ? optionOrder : undefined}
+              revealAnswer={phase === "reanswer"}
+              currentIndex={questionIndex}
+              answeredCount={answeredCount}
+              onSelectIndex={(i) => {
+                clearAdvanceTimer();
+                setQuestionIndex(i);
+              }}
+              onAnswer={(qid, key) => {
+                void (async () => {
+                  clearAdvanceTimer();
+                  setAnswers((prev) => ({ ...prev, [qid]: key }));
+                  setErr(null);
+                  if (phase === "practice") setFirstResult(null);
+                  if (phase === "reanswer") setSecondResult(null);
+                  if (!passage) return;
+                  try {
+                    const res = isCustomPassage
+                      ? await checkCustomReadingAnswer(passage.id, {
+                          questionId: qid,
+                          answer: key,
+                        })
+                      : await checkReadingAnswer(passage.id, {
+                          questionId: qid,
+                          answer: key,
+                        });
+                    if (res.code !== 200 || !res.data) {
+                      setErr(formatApiMessage(res.msg, "reading.check_failed"));
+                      return;
+                    }
+                    setFeedback((prev) => ({
+                      ...prev,
+                      [qid]: {
+                        correct: res.data.correct,
+                        rightAnswer: res.data.rightAnswer,
+                        explanation: res.data.explanation,
+                      },
+                    }));
+                    const idx = passage.questions.findIndex((q) => q.id === qid);
+                    if (idx >= 0 && idx < passage.questions.length - 1) {
+                      scheduleAdvanceToQuestion(
+                        idx + 1,
+                        phase === "reanswer" ? 1400 : 900
+                      );
+                    }
+                  } catch (e: unknown) {
+                    const apiMsg =
+                      e && typeof e === "object" && "msg" in e
+                        ? String((e as { msg: string }).msg)
+                        : undefined;
+                    setErr(formatApiMessage(apiMsg, "reading.check_failed"));
+                  }
+                })();
+              }}
+              onPrevStep={() => {
+                if (phase === "practice") {
+                  setPhase("listen");
+                  listenStartedAtRef.current = Date.now();
+                } else {
+                  setPhase("words");
+                }
+              }}
+              onNextStep={() =>
+                void (phase === "practice" ? finishFirstAnswer() : finishReanswer())
+              }
+              prevStepLabel={t("reading.prev_step")}
+              prevQuestionLabel={t("reading.prev_question")}
+              nextQuestionLabel={t("reading.next_question")}
+              nextStepLabel={t("reading.next_step")}
+              answeredLabel={t("reading.answered_progress")}
+              correctTag={t("reading.correct_tag")}
+              yourAnswerLabel={t("reading.your_answer_short")}
+              rightAnswerLabel={t("reading.right_answer_short")}
+              nextDisabled={!allAnswered}
+              nextLoading={submitting}
+            />
+          )}
+
+          {phase === "words" && (
+            <ReadingWordsPanel
+              hint={t("reading.words_hint")}
+              preview={preview}
+              previewLoading={previewLoading}
+              onSpeak={() => void speakPreview()}
+              onCopy={() => void copyPreview()}
+              onPrevStep={() => setPhase("practice")}
+              onNextStep={goToReanswer}
+              prevLabel={t("reading.prev_step")}
+              nextLabel={t("reading.next_step")}
+              copyLabel={t("reading.copy_word")}
+              speakLabel={t("reading.speak_word")}
+              previewTag={t("reading.preview_tag")}
+            />
+          )}
+
+          {phase === "analysis" && firstResult && secondResult && (
+            <ReadingAnalysisPanel
+              questions={passage.questions}
+              firstDetails={firstResult.details || []}
+              secondDetails={secondResult.details || []}
+              firstScore={firstResult.score}
+              firstCorrect={firstResult.correctCount}
+              secondScore={secondResult.score}
+              secondCorrect={secondResult.correctCount}
+              currentIndex={questionIndex}
+              onSelectIndex={setQuestionIndex}
+              onPrevStep={() => setPhase("reanswer")}
+              onNextStep={goToKnowledge}
+              prevStepLabel={t("reading.prev_step")}
+              prevQuestionLabel={t("reading.prev_question")}
+              nextQuestionLabel={t("reading.next_question")}
+              nextStepLabel={t("reading.next_step")}
+              initialLabel={t("reading.score_initial")}
+              retryLabel={t("reading.score_retry")}
+              correctLabel={t("reading.correct_tag")}
+              yourFirstLabel={t("reading.your_first_answer")}
+              yourRetryLabel={t("reading.your_retry_answer")}
+              ideaTitle={t("reading.idea_title")}
+              ideaHint={t("reading.idea_hint")}
+              copyLabel={t("reading.copy_word")}
+            />
+          )}
+
+          {phase === "knowledge" && (
+            <ReadingKnowledgePanel
+              items={knowledgeItems}
+              loading={knowledgeLoading}
+              onPrevStep={() => setPhase("analysis")}
+              onFinish={finishSession}
+              prevLabel={t("reading.prev_step")}
+              finishLabel={t("reading.finish_session")}
+              emptyLabel={t("reading.knowledge_empty")}
+              pointTag={t("reading.knowledge_point_tag")}
+              wordTag={t("reading.knowledge_word_tag")}
+              copyLabel={t("reading.copy_word")}
+            />
+          )}
+        </ReadingSessionShell>
       )}
     </div>
   );

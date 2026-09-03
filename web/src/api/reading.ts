@@ -81,6 +81,33 @@ export const getReadingPassage = (id: number): Promise<ApiResponse<ReadingPassag
   return get(`/reading/passages/${id}`)
 }
 
+export type ReadingCheckResult = {
+  questionId: number
+  answer: string
+  correct: boolean
+  rightAnswer: string
+  explanation?: string
+  stem?: string
+}
+
+export const checkReadingAnswer = (
+  id: number,
+  data: { questionId: number; answer: string }
+): Promise<ApiResponse<ReadingCheckResult>> => {
+  return post(`/reading/passages/${id}/check`, data)
+}
+
+export type ReadingKnowledgePoint = {
+  title: string
+  body: string
+}
+
+export const getReadingKnowledge = (
+  id: number
+): Promise<ApiResponse<{ items: ReadingKnowledgePoint[] }>> => {
+  return get(`/reading/passages/${id}/knowledge`)
+}
+
 export const submitReadingPassage = (
   id: number,
   data: { answers: Array<{ questionId: number; answer: string }>; durationSec?: number }

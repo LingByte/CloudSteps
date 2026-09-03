@@ -1,18 +1,19 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
-
-	auth "github.com/LingByte/CloudStepsGo/pkg/middlewares"
-	"github.com/LingByte/ling-base/apidocs/humax"
-	lbconstants "github.com/LingByte/ling-base/common/constants"
-
+	"errors"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
 	"github.com/LingByte/CloudStepsGo/internal/models"
+	"github.com/LingByte/CloudStepsGo/pkg/llm"
+	auth "github.com/LingByte/CloudStepsGo/pkg/middlewares"
+	"github.com/LingByte/ling-base/apidocs/humax"
+	lbconstants "github.com/LingByte/ling-base/common/constants"
 	response "github.com/LingByte/ling-base/common/response/gin"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -39,6 +40,8 @@ func (h *Handlers) registerReadingRoutes(r *humax.Group) {
 		user.Use(auth.Required)
 		user.GET("/passages", h.handleReadingListPassages)
 		user.GET("/passages/:id", h.handleReadingGetPassage)
+		user.GET("/passages/:id/knowledge", h.handleReadingGetKnowledge)
+		user.POST("/passages/:id/check", h.handleReadingCheckAnswer)
 		user.POST("/passages/:id/submit", h.handleReadingSubmit)
 		user.GET("/records", h.handleReadingListRecords)
 		user.GET("/records/:id", h.handleReadingGetRecord)
@@ -217,6 +220,87 @@ func (h *Handlers) handleReadingGetPassage(c *gin.Context) {
 		"wordCount":        passage.WordCount,
 		"estimatedMinutes": passage.EstimatedMinutes,
 		"questions":        qs,
+	})
+}
+
+// GET /reading/passages/:id/knowledge — AI 知识点（无则生成入库，有则直接返回；空数组表示无要点）。
+func (h *Handlers) handleReadingGetKnowledge(c *gin.Context) {
+	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		response.FailI18n(c, "reading.invalid_id", nil)
+		return
+	}
+	var passage models.ReadingPassage
+	if err := db.Where("id = ? AND status = ?", id, models.ReadingStatusPublished).
+		First(&passage).Error; err != nil {
+		response.FailI18n(c, "reading.not_found_or_unpublished", nil)
+		return
+	}
+
+	cfg := llm.FromGlobal()
+	chat := models.KnowledgeChatFunc(nil)
+	if cfg.Enabled() {
+		chat = cfg.Chat
+	} else if !models.KnowledgeJSONReady(passage.KnowledgeJSON) {
+		response.FailI18n(c, "reading.knowledge_llm_unavailable", nil)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 90*time.Second)
+	defer cancel()
+	points, err := models.EnsureReadingPassageKnowledge(ctx, db, passage.ID, chat)
+	if err != nil {
+		if errors.Is(err, llm.ErrNotConfigured) || errors.Is(err, models.ErrKnowledgeChatRequired) {
+			response.FailI18n(c, "reading.knowledge_llm_unavailable", nil)
+			return
+		}
+		response.FailI18n(c, "reading.knowledge_generate_failed", err.Error())
+		return
+	}
+	response.SuccessI18n(c, "common.success", gin.H{"items": points})
+}
+
+// POST /reading/passages/:id/check — reveal correctness for one question after the user answers.
+func (h *Handlers) handleReadingCheckAnswer(c *gin.Context) {
+	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		response.FailI18n(c, "reading.invalid_id", nil)
+		return
+	}
+	var body struct {
+		QuestionID uint   `json:"questionId"`
+		Answer     string `json:"answer"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || body.QuestionID == 0 {
+		response.FailI18n(c, "common.invalid_params", nil)
+		return
+	}
+
+	var passage models.ReadingPassage
+	if err := db.Where("id = ? AND status = ?", id, models.ReadingStatusPublished).
+		First(&passage).Error; err != nil {
+		response.FailI18n(c, "reading.not_found_or_unpublished", nil)
+		return
+	}
+
+	var q models.ReadingQuestion
+	if err := db.Where("id = ? AND passage_id = ?", body.QuestionID, passage.ID).
+		First(&q).Error; err != nil {
+		response.FailI18n(c, "reading.no_questions", nil)
+		return
+	}
+
+	userAns := strings.TrimSpace(strings.ToUpper(body.Answer))
+	right := strings.TrimSpace(strings.ToUpper(q.Answer))
+	response.SuccessI18n(c, "common.success", gin.H{
+		"questionId":  q.ID,
+		"answer":      userAns,
+		"correct":     userAns != "" && userAns == right,
+		"rightAnswer": right,
+		"explanation": q.Explanation,
+		"stem":        q.Stem,
 	})
 }
 
@@ -634,6 +718,7 @@ func (h *Handlers) handleAdminUpdatePassage(c *gin.Context) {
 	if body.Content != nil {
 		passage.Content = *body.Content
 		passage.WordCount = countEnglishWords(*body.Content)
+		passage.KnowledgeJSON = ""
 	}
 	if body.Summary != nil {
 		passage.Summary = *body.Summary
@@ -719,6 +804,9 @@ func (h *Handlers) handleAdminUpsertQuestions(c *gin.Context) {
 			if err := tx.Unscoped().Where("passage_id = ?", passage.ID).Delete(&models.ReadingQuestion{}).Error; err != nil {
 				return err
 			}
+		}
+		if err := models.ClearReadingPassageKnowledge(tx, passage.ID); err != nil {
+			return err
 		}
 		for i, q := range body.Questions {
 			opts, _ := json.Marshal(q.Options)

@@ -15,10 +15,12 @@ const (
 // ReadingPassage 阅读理解文章
 type ReadingPassage struct {
 	common.BaseModel
-	Title            string `json:"title" gorm:"size:256;not null;index;comment:文章标题"`
-	Level            string `json:"level" gorm:"size:32;index;comment:难度 初阶/中阶/高阶"`
-	Content          string `json:"content" gorm:"type:text;not null;comment:正文"`
-	Summary          string `json:"summary" gorm:"size:512;comment:摘要"`
+	Title   string `json:"title" gorm:"size:256;not null;index;comment:文章标题"`
+	Level   string `json:"level" gorm:"size:32;index;comment:难度 初阶/中阶/高阶"`
+	Content string `json:"content" gorm:"type:text;not null;comment:正文"`
+	Summary string `json:"summary" gorm:"size:512;comment:摘要"`
+	// KnowledgeJSON AI 知识点缓存；空=未生成，"[]"=已生成但无要点，否则为 [{title,body}]。
+	KnowledgeJSON    string `json:"-" gorm:"type:text;comment:AI知识点JSON"`
 	Status           string `json:"status" gorm:"size:32;index;default:draft;comment:状态 draft/published"`
 	WordCount        int    `json:"wordCount" gorm:"default:0;comment:词数"`
 	EstimatedMinutes int    `json:"estimatedMinutes" gorm:"default:5;comment:预计分钟"`
