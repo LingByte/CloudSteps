@@ -13,6 +13,7 @@ type Props = {
   playingPara?: number | null;
   loadingPara?: number | null;
   selectedWord?: string | null;
+  pickedWordKeys?: string[];
   onPlayParagraph?: (index: number) => void;
   onSelectWord?: (word: string) => void;
   playLabel?: (n: number) => string;
@@ -25,11 +26,13 @@ export function ReadingParagraphBlocks({
   playingPara = null,
   loadingPara = null,
   selectedWord = null,
+  pickedWordKeys = [],
   onPlayParagraph,
   onSelectWord,
   playLabel,
 }: Props) {
   const selectedKey = selectedWord ? normalizeReadingWord(selectedWord) : "";
+  const picked = new Set(pickedWordKeys.map((k) => normalizeReadingWord(k)));
 
   return (
     <div className="space-y-3">
@@ -86,7 +89,8 @@ export function ReadingParagraphBlocks({
                       );
                     }
                     const key = normalizeReadingWord(tok.value);
-                    const isSelected = key === selectedKey;
+                    const isPreview = key === selectedKey;
+                    const isPicked = picked.has(key);
                     return (
                       <button
                         key={`${idx}-${ti}`}
@@ -94,9 +98,11 @@ export function ReadingParagraphBlocks({
                         onClick={() => onSelectWord?.(tok.value)}
                         className={cn(
                           "rounded-md px-1.5 py-0.5 transition-colors",
-                          isSelected
+                          isPreview
                             ? "bg-[var(--primary)] text-white"
-                            : "bg-[#F1F5F9] text-[#2D3748] hover:bg-[var(--primary-soft)]"
+                            : isPicked
+                              ? "bg-[var(--primary-soft)] text-[var(--primary-deep)] ring-1 ring-[var(--primary)]/40"
+                              : "bg-[#F1F5F9] text-[#2D3748] hover:bg-[var(--primary-soft)]"
                         )}
                       >
                         {tok.value}

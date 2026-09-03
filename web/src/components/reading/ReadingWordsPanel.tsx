@@ -14,6 +14,10 @@ type Props = {
   hint: string;
   preview: ReadingWordPreview | null;
   previewLoading?: boolean;
+  picked: ReadingWordPreview[];
+  drillLoading?: boolean;
+  onUnpick?: (key: string) => void;
+  onDrill?: () => void;
   onSpeak?: () => void;
   onCopy?: () => void;
   onPrevStep: () => void;
@@ -23,12 +27,19 @@ type Props = {
   copyLabel: string;
   speakLabel: string;
   previewTag: string;
+  pickedLabel: string;
+  drillLabel: string;
+  unpickLabel: string;
 };
 
 export function ReadingWordsPanel({
   hint,
   preview,
   previewLoading,
+  picked,
+  drillLoading,
+  onUnpick,
+  onDrill,
   onSpeak,
   onCopy,
   onPrevStep,
@@ -38,6 +49,9 @@ export function ReadingWordsPanel({
   copyLabel,
   speakLabel,
   previewTag,
+  pickedLabel,
+  drillLabel,
+  unpickLabel,
 }: Props) {
   return (
     <div className="space-y-3">
@@ -87,6 +101,35 @@ export function ReadingWordsPanel({
           <p className="text-sm text-[#94A3B8] py-2">{hint}</p>
         )}
       </div>
+
+      {picked.length > 0 ? (
+        <div className="rounded-xl border border-[#E2E8F0] bg-white px-3 py-2.5">
+          <p className="text-[11px] text-[#64748B] mb-2">{pickedLabel}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {picked.map((w) => (
+              <button
+                key={w.key}
+                type="button"
+                onClick={() => onUnpick?.(w.key)}
+                className="rounded-full bg-[var(--primary-soft)] text-[var(--primary-deep)] text-[11px] px-2 py-0.5 hover:bg-[#FEE2E2] hover:text-[#B91C1C]"
+                title={unpickLabel}
+              >
+                {w.word} ×
+              </button>
+            ))}
+          </div>
+          {onDrill ? (
+            <Button
+              className="mt-2.5 w-full"
+              type="primary"
+              loading={drillLoading}
+              onClick={onDrill}
+            >
+              {drillLabel}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="flex items-center gap-2">
         <Button className="flex-1 !inline-flex !items-center !justify-center !gap-1" onClick={onPrevStep}>

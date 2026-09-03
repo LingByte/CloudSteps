@@ -60,6 +60,15 @@ import {
   splitParagraphForTts,
   splitReadingParagraphs,
 } from "../utils/readingParagraphs";
+import { beginReviewPractice } from "../utils/reviewPractice";
+import { allowPracticeLeaveOnce } from "../utils/practiceFlowLock";
+import {
+  clearReadingSessionSnapshot,
+  loadReadingSessionSnapshot,
+  saveReadingSessionSnapshot,
+  stableReadingWordId,
+  type ReadingSessionSnapshot,
+} from "../utils/readingSessionSnapshot";
 
 type Phase =
   | "list"
@@ -144,6 +153,8 @@ export default function ReadingComprehension() {
   const [maxStageIdx, setMaxStageIdx] = useState(0);
 
   const [preview, setPreview] = useState<ReadingWordPreview | null>(null);
+  const [pickedWords, setPickedWords] = useState<ReadingWordPreview[]>([]);
+  const [drillLoading, setDrillLoading] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const glossCacheRef = useRef<Record<string, CustomParsedWord>>({});
   const advanceTimerRef = useRef<number | null>(null);
@@ -244,9 +255,34 @@ export default function ReadingComprehension() {
     }
   }, [levelFilter, sourceTab]);
 
+  const [sessionReady, setSessionReady] = useState(false);
+
   useEffect(() => {
+    const snap = loadReadingSessionSnapshot();
+    if (snap?.passage) {
+      setPassage(snap.passage as ReadingPassageDetail);
+      setIsCustomPassage(Boolean(snap.isCustomPassage));
+      setSourceTab((snap.sourceTab as SourceTab) || "system");
+      setAnswers(snap.answers || {});
+      setOptionOrder(snap.optionOrder || {});
+      setFirstResult((snap.firstResult as ReadingSubmitResult | null) || null);
+      setSecondResult((snap.secondResult as ReadingSubmitResult | null) || null);
+      setQuestionIndex(snap.questionIndex || 0);
+      setMaxStageIdx(snap.maxStageIdx || 0);
+      setPickedWords(snap.pickedWords || []);
+      startedAtRef.current = snap.startedAt || Date.now();
+      const nextPhase = (snap.phase as Phase) || "words";
+      setPhase(nextPhase === "list" ? "words" : nextPhase);
+      setPreview(null);
+      clearReadingSessionSnapshot();
+    }
+    setSessionReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!sessionReady) return;
     if (phase === "list") void loadList();
-  }, [phase, loadList]);
+  }, [sessionReady, phase, loadList]);
 
   useEffect(() => {
     if (phase !== "listen") return;
@@ -349,6 +385,7 @@ export default function ReadingComprehension() {
       audioCacheRef.current = {};
       glossCacheRef.current = {};
       setPreview(null);
+      setPickedWords([]);
       setQuestionIndex(0);
       setPanelCollapsed(false);
       setKnowledgeItems([]);
@@ -535,8 +572,10 @@ export default function ReadingComprehension() {
     setErr(null);
     setActivePara(null);
     setPreview(null);
+    setPickedWords([]);
     setKnowledgeItems([]);
     setMaxStageIdx(0);
+    clearReadingSessionSnapshot();
   };
 
   const finishSession = () => {
@@ -609,9 +648,22 @@ export default function ReadingComprehension() {
     if (!key) return;
     const surface = raw.trim();
     setErr(null);
+
+    const already = pickedWords.some((w) => w.key === key);
+    if (already) {
+      setPickedWords((prev) => prev.filter((w) => w.key !== key));
+      setPreview((cur) => (cur?.key === key ? null : cur));
+      return;
+    }
+
+    const applyPick = (item: ReadingWordPreview) => {
+      setPreview(item);
+      setPickedWords((prev) => (prev.some((w) => w.key === item.key) ? prev : [...prev, item]));
+    };
+
     const cached = glossCacheRef.current[key];
     if (cached) {
-      setPreview({
+      applyPick({
         word: surface,
         key,
         phonetic: cached.phonetic,
@@ -626,19 +678,60 @@ export default function ReadingComprehension() {
       const hit = res.data?.list?.[0];
       if (res.code === 200 && hit) {
         glossCacheRef.current[key] = hit;
-        setPreview({
+        applyPick({
           word: surface,
           key,
           phonetic: hit.phonetic,
           translation: hit.translationShort || hit.translation,
         });
       } else {
-        setPreview({ word: surface, key, translation: t("reading.word_no_gloss") });
+        applyPick({ word: surface, key, translation: t("reading.word_no_gloss") });
       }
     } catch {
-      setPreview({ word: surface, key, translation: t("reading.word_no_gloss") });
+      applyPick({ word: surface, key, translation: t("reading.word_no_gloss") });
     } finally {
       setPreviewLoading(false);
+    }
+  };
+
+  const startWordDrill = () => {
+    if (!passage || pickedWords.length === 0 || drillLoading) return;
+    const snap: ReadingSessionSnapshot = {
+      phase: "words",
+      sourceTab,
+      isCustomPassage,
+      passage,
+      answers,
+      optionOrder,
+      firstResult,
+      secondResult,
+      questionIndex,
+      maxStageIdx,
+      pickedWords,
+      startedAt: startedAtRef.current,
+    };
+    saveReadingSessionSnapshot(snap);
+    const words = pickedWords.map((w) => ({
+      id: stableReadingWordId(w.key),
+      word: w.word,
+      phonetic: w.phonetic,
+      translation: w.translation,
+    }));
+    setDrillLoading(true);
+    try {
+      beginReviewPractice({
+        sessionId: 0,
+        wordBookId: 0,
+        words,
+        returnPath: "/reading-comprehension",
+      });
+      allowPracticeLeaveOnce();
+      navigate("/word-practice");
+    } catch (e: unknown) {
+      clearReadingSessionSnapshot();
+      const msg = e instanceof Error ? e.message : undefined;
+      setErr(formatApiMessage(msg, "reading.drill_failed"));
+      setDrillLoading(false);
     }
   };
 
@@ -701,6 +794,7 @@ export default function ReadingComprehension() {
         playingPara={playingPara}
         loadingPara={loadingPara}
         selectedWord={preview?.word}
+        pickedWordKeys={pickedWords.map((w) => w.key)}
         onPlayParagraph={(idx) => void playParagraph(idx)}
         onSelectWord={(w) => void selectWord(w)}
         playLabel={(n) => t("reading.play_paragraph", { n })}
@@ -919,6 +1013,7 @@ export default function ReadingComprehension() {
               feedback={feedback}
               optionOrder={phase === "reanswer" ? optionOrder : undefined}
               revealAnswer={phase === "reanswer"}
+              showOutcome={phase === "reanswer"}
               currentIndex={questionIndex}
               answeredCount={answeredCount}
               onSelectIndex={(i) => {
@@ -930,7 +1025,15 @@ export default function ReadingComprehension() {
                   clearAdvanceTimer();
                   setAnswers((prev) => ({ ...prev, [qid]: key }));
                   setErr(null);
-                  if (phase === "practice") setFirstResult(null);
+                  if (phase === "practice") {
+                    setFirstResult(null);
+                    if (!passage) return;
+                    const idx = passage.questions.findIndex((q) => q.id === qid);
+                    if (idx >= 0 && idx < passage.questions.length - 1) {
+                      scheduleAdvanceToQuestion(idx + 1, 450);
+                    }
+                    return;
+                  }
                   if (phase === "reanswer") setSecondResult(null);
                   if (!passage) return;
                   try {
@@ -957,10 +1060,7 @@ export default function ReadingComprehension() {
                     }));
                     const idx = passage.questions.findIndex((q) => q.id === qid);
                     if (idx >= 0 && idx < passage.questions.length - 1) {
-                      scheduleAdvanceToQuestion(
-                        idx + 1,
-                        phase === "reanswer" ? 1400 : 900
-                      );
+                      scheduleAdvanceToQuestion(idx + 1, 1400);
                     }
                   } catch (e: unknown) {
                     const apiMsg =
@@ -1000,6 +1100,13 @@ export default function ReadingComprehension() {
               hint={t("reading.words_hint")}
               preview={preview}
               previewLoading={previewLoading}
+              picked={pickedWords}
+              drillLoading={drillLoading}
+              onUnpick={(key) => {
+                setPickedWords((prev) => prev.filter((w) => w.key !== key));
+                setPreview((cur) => (cur?.key === key ? null : cur));
+              }}
+              onDrill={startWordDrill}
               onSpeak={() => void speakPreview()}
               onCopy={() => void copyPreview()}
               onPrevStep={() => setPhase("practice")}
@@ -1009,6 +1116,9 @@ export default function ReadingComprehension() {
               copyLabel={t("reading.copy_word")}
               speakLabel={t("reading.speak_word")}
               previewTag={t("reading.preview_tag")}
+              pickedLabel={t("reading.picked_words", { count: pickedWords.length })}
+              drillLabel={t("reading.drill_words")}
+              unpickLabel={t("reading.unpick_word")}
             />
           )}
 

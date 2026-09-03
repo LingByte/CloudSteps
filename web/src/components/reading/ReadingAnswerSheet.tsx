@@ -16,8 +16,10 @@ type Props = {
   feedback: Record<number, QuestionFeedback>;
   /** questionId → option keys in display order (for 再答乱序). */
   optionOrder?: Record<number, string[]>;
-  /** When false (初答), only show ✓/✗ for the pick — never reveal the right key/explanation. */
+  /** When false (初答), never reveal the right key/explanation. */
   revealAnswer?: boolean;
+  /** When false (初答), do not color ✓/✗ or lock options. */
+  showOutcome?: boolean;
   currentIndex: number;
   answeredCount: number;
   onSelectIndex: (index: number) => void;
@@ -60,6 +62,7 @@ export function ReadingAnswerSheet({
   feedback,
   optionOrder,
   revealAnswer = false,
+  showOutcome = true,
   currentIndex,
   answeredCount,
   onSelectIndex,
@@ -98,7 +101,7 @@ export function ReadingAnswerSheet({
             </span>
             {questions.map((item, idx) => {
               const answered = Boolean(answers[item.id]);
-              const itemFb = feedback[item.id];
+              const itemFb = showOutcome ? feedback[item.id] : undefined;
               const active = idx === currentIndex;
               return (
                 <button
@@ -128,15 +131,16 @@ export function ReadingAnswerSheet({
           <div className="space-y-2">
             {options.map((opt) => {
               const selected = answers[q.id] === opt.key;
-              const showRightMark = Boolean(revealAnswer && fb && opt.key === fb.rightAnswer);
-              const isWrongPick = Boolean(fb && selected && !fb.correct);
-              const isRightPick = Boolean(fb && selected && fb.correct);
+              const showRightMark = Boolean(showOutcome && revealAnswer && fb && opt.key === fb.rightAnswer);
+              const isWrongPick = Boolean(showOutcome && fb && selected && !fb.correct);
+              const isRightPick = Boolean(showOutcome && fb && selected && fb.correct);
+              const locked = Boolean(showOutcome && fb);
               return (
                 <button
                   key={opt.key}
                   type="button"
                   onClick={() => onAnswer(q.id, opt.key)}
-                  disabled={Boolean(fb)}
+                  disabled={locked}
                   className={cn(
                     "w-full text-left rounded-xl border px-3 py-2.5 text-sm transition-colors",
                     showRightMark || isRightPick
@@ -146,7 +150,7 @@ export function ReadingAnswerSheet({
                         : selected
                           ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary-deep)]"
                           : "border-[#E2E8F0] bg-white text-[#2D3748] hover:border-[var(--primary)]/50",
-                    fb && "cursor-default"
+                    locked && "cursor-default"
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -165,7 +169,7 @@ export function ReadingAnswerSheet({
             })}
           </div>
 
-          {fb ? (
+          {showOutcome && fb ? (
             <div
               className={cn(
                 "rounded-xl border px-3 py-2.5 text-sm",
