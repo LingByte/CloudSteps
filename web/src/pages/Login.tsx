@@ -10,6 +10,7 @@ import {
   registerUser,
   type CaptchaFields,
   type LoginResponseData,
+  type RegisterResponseData,
   type User,
 } from "../api/auth";
 import { useAuthStore } from "../stores/authStore";
@@ -23,7 +24,7 @@ const fieldClass =
 
 type Screen = "login" | "register";
 
-function pickToken(data?: LoginResponseData | null) {
+function pickToken(data?: LoginResponseData | RegisterResponseData | null) {
   return (
     data?.token ||
     data?.authToken ||
@@ -59,6 +60,10 @@ export default function Login() {
   const nextPath = useMemo(() => {
     const params = new URLSearchParams(location.search);
     return params.get("next") || "/";
+  }, [location.search]);
+
+  const inviteCode = useMemo(() => {
+    return (new URLSearchParams(location.search).get("inviteCode") || "").trim();
   }, [location.search]);
 
   const refreshCaptcha = useCallback(() => {
@@ -156,6 +161,7 @@ export default function Login() {
           displayName: identity,
           timezone,
           source: "web",
+          inviteCode: inviteCode || undefined,
           ...captcha,
         });
         if (reg.code !== 200) {
@@ -163,28 +169,13 @@ export default function Login() {
           refreshCaptcha();
           return;
         }
-        const autoLogin = await loginWithPassword({
-          email: identity,
-          password,
-          timezone,
-          authToken: true,
-        });
-        if (autoLogin.code === 200) {
-          const token = pickToken(autoLogin.data);
-          if (token) {
-            const userForStore = (autoLogin.data?.user || {}) as User;
-            const ok = await doLogin(token, userForStore);
-            if (ok) {
-              navigate(nextPath, { replace: true });
-              return;
-            }
-          }
+        const token = pickToken(reg.data);
+        if (!token) {
+          setErrorText(t("login.register_success_login"));
+          refreshCaptcha();
+          return;
         }
-        setScreen("login");
-        setShowWechat(false);
-        setPassword("");
-        refreshCaptcha();
-        setErrorText(t("login.register_success_login"));
+        await finishLogin(token, reg.data?.user || reg.data);
         return;
       }
 
@@ -248,9 +239,13 @@ export default function Login() {
               <ArrowLeft className="size-4" />
               {t("login.back_to_password")}
             </button>
+            {inviteCode ? (
+              <p className="text-sm text-primary">{t("login.invite_code_applied", { code: inviteCode })}</p>
+            ) : null}
 
             <WechatLoginPanel
               active
+              inviteCode={inviteCode}
               onSuccess={async (token, rawUser) => {
                 await finishLogin(token, rawUser);
               }}
@@ -270,6 +265,9 @@ export default function Login() {
               <h2 className="text-lg font-semibold text-foreground">{title}</h2>
               {screen === "register" ? (
                 <p className="mt-1.5 text-sm text-muted-foreground">{t("login.register_hint")}</p>
+              ) : null}
+              {inviteCode ? (
+                <p className="mt-1.5 text-sm text-primary">{t("login.invite_code_applied", { code: inviteCode })}</p>
               ) : null}
             </div>
 

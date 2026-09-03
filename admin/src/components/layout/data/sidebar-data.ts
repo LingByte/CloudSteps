@@ -21,6 +21,7 @@ import {
   BookOpen,
   BookMarked,
   Mic2,
+  Ticket,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -109,6 +110,11 @@ export const sidebarData: SidebarData = {
           title: '用户反馈',
           url: '/user-feedback',
           icon: MessagesSquare,
+        },
+        {
+          title: '邀请记录',
+          url: '/invite-records',
+          icon: Ticket,
         },
       ],
     },

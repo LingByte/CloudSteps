@@ -48,6 +48,7 @@ import { Route as AuthenticatedNotificationTemplatesIndexRouteImport } from './r
 import { Route as AuthenticatedNotificationChannelsIndexRouteImport } from './routes/_authenticated/notification-channels/index'
 import { Route as AuthenticatedMailTemplatesIndexRouteImport } from './routes/_authenticated/mail-templates/index'
 import { Route as AuthenticatedMailLogsIndexRouteImport } from './routes/_authenticated/mail-logs/index'
+import { Route as AuthenticatedInviteRecordsIndexRouteImport } from './routes/_authenticated/invite-records/index'
 import { Route as AuthenticatedInboxNotificationsIndexRouteImport } from './routes/_authenticated/inbox-notifications/index'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
 import { Route as AuthenticatedCoachingIndexRouteImport } from './routes/_authenticated/coaching/index'
@@ -287,6 +288,12 @@ const AuthenticatedMailLogsIndexRoute =
     path: '/mail-logs/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedInviteRecordsIndexRoute =
+  AuthenticatedInviteRecordsIndexRouteImport.update({
+    id: '/invite-records/',
+    path: '/invite-records/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedInboxNotificationsIndexRoute =
   AuthenticatedInboxNotificationsIndexRouteImport.update({
     id: '/inbox-notifications/',
@@ -480,6 +487,7 @@ export interface FileRoutesByFullPath {
   '/coaching/': typeof AuthenticatedCoachingIndexRoute
   '/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/inbox-notifications/': typeof AuthenticatedInboxNotificationsIndexRoute
+  '/invite-records/': typeof AuthenticatedInviteRecordsIndexRoute
   '/mail-logs/': typeof AuthenticatedMailLogsIndexRoute
   '/mail-templates/': typeof AuthenticatedMailTemplatesIndexRoute
   '/notification-channels/': typeof AuthenticatedNotificationChannelsIndexRoute
@@ -543,6 +551,7 @@ export interface FileRoutesByTo {
   '/coaching': typeof AuthenticatedCoachingIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/inbox-notifications': typeof AuthenticatedInboxNotificationsIndexRoute
+  '/invite-records': typeof AuthenticatedInviteRecordsIndexRoute
   '/mail-logs': typeof AuthenticatedMailLogsIndexRoute
   '/mail-templates': typeof AuthenticatedMailTemplatesIndexRoute
   '/notification-channels': typeof AuthenticatedNotificationChannelsIndexRoute
@@ -611,6 +620,7 @@ export interface FileRoutesById {
   '/_authenticated/coaching/': typeof AuthenticatedCoachingIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/_authenticated/inbox-notifications/': typeof AuthenticatedInboxNotificationsIndexRoute
+  '/_authenticated/invite-records/': typeof AuthenticatedInviteRecordsIndexRoute
   '/_authenticated/mail-logs/': typeof AuthenticatedMailLogsIndexRoute
   '/_authenticated/mail-templates/': typeof AuthenticatedMailTemplatesIndexRoute
   '/_authenticated/notification-channels/': typeof AuthenticatedNotificationChannelsIndexRoute
@@ -677,6 +687,7 @@ export interface FileRouteTypes {
     | '/coaching/'
     | '/help-center/'
     | '/inbox-notifications/'
+    | '/invite-records/'
     | '/mail-logs/'
     | '/mail-templates/'
     | '/notification-channels/'
@@ -740,6 +751,7 @@ export interface FileRouteTypes {
     | '/coaching'
     | '/help-center'
     | '/inbox-notifications'
+    | '/invite-records'
     | '/mail-logs'
     | '/mail-templates'
     | '/notification-channels'
@@ -807,6 +819,7 @@ export interface FileRouteTypes {
     | '/_authenticated/coaching/'
     | '/_authenticated/help-center/'
     | '/_authenticated/inbox-notifications/'
+    | '/_authenticated/invite-records/'
     | '/_authenticated/mail-logs/'
     | '/_authenticated/mail-templates/'
     | '/_authenticated/notification-channels/'
@@ -1124,6 +1137,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMailLogsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/invite-records/': {
+      id: '/_authenticated/invite-records/'
+      path: '/invite-records'
+      fullPath: '/invite-records/'
+      preLoaderRoute: typeof AuthenticatedInviteRecordsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/inbox-notifications/': {
       id: '/_authenticated/inbox-notifications/'
       path: '/inbox-notifications'
@@ -1360,6 +1380,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCoachingIndexRoute: typeof AuthenticatedCoachingIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
   AuthenticatedInboxNotificationsIndexRoute: typeof AuthenticatedInboxNotificationsIndexRoute
+  AuthenticatedInviteRecordsIndexRoute: typeof AuthenticatedInviteRecordsIndexRoute
   AuthenticatedMailLogsIndexRoute: typeof AuthenticatedMailLogsIndexRoute
   AuthenticatedMailTemplatesIndexRoute: typeof AuthenticatedMailTemplatesIndexRoute
   AuthenticatedNotificationChannelsIndexRoute: typeof AuthenticatedNotificationChannelsIndexRoute
@@ -1405,6 +1426,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
   AuthenticatedInboxNotificationsIndexRoute:
     AuthenticatedInboxNotificationsIndexRoute,
+  AuthenticatedInviteRecordsIndexRoute: AuthenticatedInviteRecordsIndexRoute,
   AuthenticatedMailLogsIndexRoute: AuthenticatedMailLogsIndexRoute,
   AuthenticatedMailTemplatesIndexRoute: AuthenticatedMailTemplatesIndexRoute,
   AuthenticatedNotificationChannelsIndexRoute:

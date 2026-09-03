@@ -19,6 +19,7 @@ export interface RegisterUserForm extends CaptchaFields {
   locale?: string
   timezone?: string
   source?: string
+  inviteCode?: string
 }
 
 // 邮箱验证码注册表单类型
@@ -34,6 +35,7 @@ export interface EmailRegisterForm extends CaptchaFields {
   locale?: string
   timezone?: string
   source?: string
+  inviteCode?: string
 }
 
 // 验证码响应类型
@@ -119,9 +121,13 @@ export interface LoginResponseData {
 
 // 注册响应数据类型
 export interface RegisterResponseData {
+  token?: string
+  authToken?: string
+  user?: LoginResponseData['user']
   createdAt?: string
   updatedAt?: string
-  email: string
+  email?: string
+  username?: string
   emailNotifications?: boolean
   firstName?: string
   lastName?: string
@@ -233,6 +239,7 @@ export const registerUser = async (data: RegisterUserForm): Promise<ApiResponse<
     captchaType: data.captchaType,
     captchaValue: data.captchaValue,
     source: data.source || 'web',
+    inviteCode: data.inviteCode,
   })
 }
 
@@ -251,6 +258,7 @@ export const registerUserByEmail = async (data: EmailRegisterForm): Promise<ApiR
     captchaType: data.captchaType,
     captchaValue: data.captchaValue,
     source: data.source || 'web',
+    inviteCode: data.inviteCode,
   })
 }
 
@@ -414,8 +422,12 @@ export interface WechatLoginStatusData {
   user?: User
 }
 
-export const startWechatLoginSession = async (): Promise<ApiResponse<WechatLoginSessionData>> => {
-  return post<WechatLoginSessionData>('/auth/wechat/login/session')
+export const startWechatLoginSession = async (
+  inviteCode?: string,
+): Promise<ApiResponse<WechatLoginSessionData>> => {
+  return post<WechatLoginSessionData>('/auth/wechat/login/session', {
+    inviteCode: inviteCode?.trim() || '',
+  })
 }
 
 export const verifyWechatLoginCode = async (payload: {

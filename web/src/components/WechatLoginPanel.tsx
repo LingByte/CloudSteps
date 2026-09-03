@@ -8,12 +8,13 @@ import type { User } from "../api/auth";
 
 type WechatLoginPanelProps = {
   active?: boolean;
+  inviteCode?: string;
   onSuccess: (token: string, user?: User) => void | Promise<void>;
 };
 
 type WechatPhase = "form" | "entering";
 
-export function WechatLoginPanel({ active = true, onSuccess }: WechatLoginPanelProps) {
+export function WechatLoginPanel({ active = true, inviteCode, onSuccess }: WechatLoginPanelProps) {
   const { t } = useTranslation();
   const [sessionId, setSessionId] = useState("");
   const [loginCode, setLoginCode] = useState("");
@@ -77,7 +78,7 @@ export function WechatLoginPanel({ active = true, onSuccess }: WechatLoginPanelP
     setStatus("pending");
     stopPoll();
     try {
-      const res = await startWechatLoginSession();
+      const res = await startWechatLoginSession(inviteCode);
       if (res.code !== 200 || !res.data?.sessionId) {
         setErrorText(formatApiMessage(res.msg, "login.wechat_unavailable"));
         return;
@@ -101,7 +102,7 @@ export function WechatLoginPanel({ active = true, onSuccess }: WechatLoginPanelP
     } finally {
       setBooting(false);
     }
-  }, [pollOnce, stopPoll]);
+  }, [inviteCode, pollOnce, stopPoll]);
 
   useEffect(() => {
     if (!active) {

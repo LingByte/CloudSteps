@@ -155,6 +155,16 @@ export default function CoachCenter() {
         : t("coach_center.not_checked_in_today");
 
   const featureList = useMemo(() => {
+    // 本期不上线充值入口；/recharge 页面与 Recharge.tsx 逻辑保留
+    const showRechargeEntry = false;
+    const recharge = {
+      id: 6,
+      icon: Wallet,
+      label: "账户充值",
+      description: "充值余额，解锁学习服务",
+      tint: "mint" as const,
+      path: "/recharge",
+    };
     const base = [
       {
         id: 4,
@@ -179,14 +189,7 @@ export default function CoachCenter() {
         tint: "sky" as const,
         path: "/invite-code",
       },
-      {
-        id: 6,
-        icon: Wallet,
-        label: "账户充值",
-        description: "充值余额，解锁学习服务",
-        tint: "mint" as const,
-        path: "/recharge",
-      },
+      ...(showRechargeEntry ? [recharge] : []),
     ];
     if (!isCoach) return base;
     return [
