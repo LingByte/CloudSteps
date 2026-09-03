@@ -78,3 +78,6 @@ go.work.sum
 
 # Local secrets (use configs/config.example.yaml as template)
 configs/config.yaml
+# Asset-gen secrets / venv
+tools/asset_gen/.env
+tools/asset_gen/.venv/
