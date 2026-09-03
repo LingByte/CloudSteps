@@ -240,6 +240,8 @@
   "auth.notification_deleted": "通知已删除",
   "auth.notifications_deleted": "通知已批量删除",
   "reading.no_questions": "该文章暂无题目",
+  "reading.knowledge_llm_unavailable": "知识点生成服务未配置，请稍后重试",
+  "reading.knowledge_generate_failed": "知识点生成失败，请稍后重试",
   "reading.import_too_many": "单次最多导入 20 篇",
   "reading.import_parse_failed": "文本格式解析失败，请检查模板",
   "reading.save_question_failed": "保存题目失败",
@@ -330,5 +332,15 @@
   "auth.avatar_too_large": "图片过大，请选择不超过 %dMB 的图片",
   "storage.file_too_large": "文件过大，请选择不超过 %dMB 的文件",
   "wordbook.recalculated": "已重新计算词数：%d 词",
-  "wordbook.audio_purged": "已检查 %d 条，清理重复音频 %d 条"
+  "wordbook.audio_purged": "已检查 %d 条，清理重复音频 %d 条",
+  "invite.query_failed": "邀请码查询失败",
+  "invite.rotate_failed": "更换邀请码失败",
+  "invite.rotated": "已生成新的邀请码",
+  "invite.invalid": "邀请码无效或已失效",
+  "invite.self": "不能使用自己的邀请码",
+  "invite.already_bound": "该账号已绑定邀请人",
+  "invite.apply_failed": "绑定邀请码失败",
+  "invite.reward_query_failed": "邀请奖励设置查询失败",
+  "invite.reward_save_failed": "邀请奖励设置保存失败",
+  "invite.reward_saved": "邀请奖励已保存"
 }

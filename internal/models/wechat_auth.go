@@ -20,12 +20,13 @@ const (
 
 // WechatLoginSession 网页端轮询登录会话（存 cache）。
 type WechatLoginSession struct {
-	SessionID string    `json:"sessionId"`
-	Status    string    `json:"status"`
-	OpenID    string    `json:"openId,omitempty"`
-	UserID    uint      `json:"userId,omitempty"`
-	Token     string    `json:"token,omitempty"`
-	ExpiresAt time.Time `json:"expiresAt"`
+	SessionID  string    `json:"sessionId"`
+	Status     string    `json:"status"`
+	OpenID     string    `json:"openId,omitempty"`
+	UserID     uint      `json:"userId,omitempty"`
+	Token      string    `json:"token,omitempty"`
+	InviteCode string    `json:"inviteCode,omitempty"`
+	ExpiresAt  time.Time `json:"expiresAt"`
 }
 
 // WechatLoginCode 网页登录验证码（存 cache，映射到 sessionId）。

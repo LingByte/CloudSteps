@@ -76,6 +76,7 @@ type RegisterRequest struct {
 	CaptchaValue string `json:"captchaValue,omitempty"`
 	Timezone     string `json:"timezone,omitempty"`
 	Source       string `json:"source,omitempty"`
+	InviteCode   string `json:"inviteCode,omitempty" doc:"邀请码（可选）"`
 }
 
 // SendEmailCodeRequest 发送邮箱验证码。
@@ -181,6 +182,11 @@ func EnrichOpenAPI(api huma.API) {
 		{http.MethodGet, "/api/auth/captcha", "获取图形验证码", nil, nil},
 		{http.MethodGet, "/api/auth/salt", "获取密码加密盐", nil, nil},
 
+		{http.MethodGet, "/api/invite/me", "我的邀请码与记录", nil, models.InviteOverview{}},
+		{http.MethodPost, "/api/invite/rotate", "更换邀请码", nil, models.InviteOverview{}},
+		{http.MethodGet, "/api/admin/invite/records", "后台邀请记录", nil, models.AdminInviteList{}},
+		{http.MethodGet, "/api/admin/invite/reward", "邀请奖励设置", nil, models.InviteRewardSetting{}},
+		{http.MethodPut, "/api/admin/invite/reward", "保存邀请奖励设置", models.InviteRewardSetting{}, models.InviteRewardSetting{}},
 		{http.MethodGet, "/api/teacher/checkin", "教师签到状态", nil, CheckInStatusData{}},
 		{http.MethodPost, "/api/teacher/checkin", "教师每日签到", nil, CheckInStatusData{}},
 

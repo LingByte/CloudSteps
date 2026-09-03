@@ -62,6 +62,7 @@ type UserOperatorForm struct {
 	AuthToken   bool   `json:"authToken,omitempty"`
 	Timezone    string `json:"timezone,omitempty"`
 	Source      string `json:"source,omitempty"`
+	InviteCode  string `json:"inviteCode,omitempty"`
 	captcha.CaptchaFields
 }
 
@@ -74,6 +75,7 @@ type RegisterUserForm struct {
 	Locale      string `json:"locale"`
 	Timezone    string `json:"timezone"`
 	Source      string `json:"source"`
+	InviteCode  string `json:"inviteCode,omitempty"`
 	captcha.CaptchaFields
 	MouseTrack       string `json:"mouseTrack"`
 	FormFillTime     int64  `json:"formFillTime"`
@@ -168,6 +170,9 @@ func Login(c *gin.Context, user *User) {
 		logger.Error("user.login", zap.Error(err))
 		response.AbortWithStatusJSON(c, http.StatusInternalServerError, err)
 		return
+	}
+	if user.LoginCount >= 2 {
+		MaybeActivateInvitee(db, user.ID)
 	}
 
 	// Update profile completeness

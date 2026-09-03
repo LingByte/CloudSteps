@@ -75,6 +75,11 @@ const (
 	// ── 教师签到 ──
 	TABLE_TEACHER_CHECKINS = "teacher_checkins"
 
+	TABLE_USER_INVITE_CODES         = "user_invite_codes"
+	TABLE_USER_INVITE_RECORDS       = "user_invite_records"
+	TABLE_INVITE_REWARD_SETTINGS    = "invite_reward_settings"
+	TABLE_INVITE_REWARD_GRANTS      = "invite_reward_grants"
+
 	// ── 系统指标 ──
 	SYS_METRIC_TABLE_NAME = "sys_metrics"
 )

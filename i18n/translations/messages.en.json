@@ -240,6 +240,8 @@
   "auth.notification_deleted": "Notification deleted",
   "auth.notifications_deleted": "Notifications deleted successfully",
   "reading.no_questions": "No questions for this article",
+  "reading.knowledge_llm_unavailable": "Knowledge generation is not configured",
+  "reading.knowledge_generate_failed": "Failed to generate knowledge points",
   "reading.import_too_many": "Maximum 20 passages per import",
   "reading.import_parse_failed": "Failed to parse import text. Check the template.",
   "reading.save_question_failed": "Failed to save question",
@@ -330,5 +332,15 @@
   "auth.avatar_too_large": "Image too large, please select one under %dMB",
   "storage.file_too_large": "File too large, please select one under %dMB",
   "wordbook.recalculated": "Word count recalculated: %d words",
-  "wordbook.audio_purged": "Checked %d items, cleaned %d duplicate audio files"
+  "wordbook.audio_purged": "Checked %d items, cleaned %d duplicate audio files",
+  "invite.query_failed": "Failed to load invite code",
+  "invite.rotate_failed": "Failed to rotate invite code",
+  "invite.rotated": "New invite code generated",
+  "invite.invalid": "Invite code is invalid or expired",
+  "invite.self": "You cannot use your own invite code",
+  "invite.already_bound": "This account is already bound to an inviter",
+  "invite.apply_failed": "Failed to apply invite code",
+  "invite.reward_query_failed": "Failed to load invite reward settings",
+  "invite.reward_save_failed": "Failed to save invite reward settings",
+  "invite.reward_saved": "Invite rewards saved"
 }

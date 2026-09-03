@@ -48,3 +48,11 @@ _Avoid_: UserWordState (that is learning progress); treating one user's overlay 
 Public registration grants the new **teacher** `SignupTeachingPoolMinutes` (1000) into `teacher_teaching_pools` — a **total** pool across all students, default 0 before gift. Student hours remain per-row in `student_teacher_coaching_quotas`. Monthly `teacher_coaching_usage_periods` is stats-only, not the signup gift.
 _Avoid_: self-pair student rows; monthly cap as teaching limit
 
+**Invite reward**:
+Teaching-pool minutes given to the inviter and/or invitee when an invite record is registered or later activated. Amounts are set in admin.
+_Avoid_: signup coaching quota; check-in reward; treating the invite record itself as the ledger
+
+**Invite reward grant**:
+The one-time issuance of an invite reward for a given invite record, trigger, and beneficiary.
+_Avoid_: granting again after the setting changes; using the invite code string as the grant key
+

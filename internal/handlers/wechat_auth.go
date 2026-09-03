@@ -148,6 +148,17 @@ func (h *Handlers) handleWechatLoginStartSession(c *gin.Context) {
 		response.FailI18n(c, "wechat.not_configured", errors.New("wechat login disabled"))
 		return
 	}
+	var req struct {
+		InviteCode string `json:"inviteCode"`
+	}
+	_ = c.ShouldBindJSON(&req)
+	inviteCode := models.NormalizeInviteCode(req.InviteCode)
+	if inviteCode != "" {
+		db := c.MustGet(lbconstants.DbField).(*gorm.DB)
+		if err := previewInviteCode(db, inviteCode); err != nil {
+			inviteCode = ""
+		}
+	}
 	sessionID, err := models.NewWechatLoginSessionID()
 	if err != nil {
 		response.FailI18n(c, "common.operation_failed", err)
@@ -156,9 +167,10 @@ func (h *Handlers) handleWechatLoginStartSession(c *gin.Context) {
 	ttl := h.wechatLoginSessionTTL()
 	loginCode := models.NewWechatLoginCode()
 	sess := &models.WechatLoginSession{
-		SessionID: sessionID,
-		Status:    models.WechatLoginSessionPending,
-		ExpiresAt: time.Now().Add(ttl),
+		SessionID:  sessionID,
+		Status:     models.WechatLoginSessionPending,
+		InviteCode: inviteCode,
+		ExpiresAt:  time.Now().Add(ttl),
 	}
 	h.setWechatLoginSession(c.Request.Context(), sess)
 	h.setWechatLoginCode(c.Request.Context(), loginCode, sessionID)
@@ -184,9 +196,19 @@ func (h *Handlers) completeWechatSessionLogin(c *gin.Context, db *gorm.DB, sess 
 		return errors.New("session expired")
 	}
 
+	_, lookupErr := models.GetUserByWechatOpenID(db, openID)
+	created := errors.Is(lookupErr, gorm.ErrRecordNotFound)
+	if lookupErr != nil && !created {
+		return lookupErr
+	}
 	user, err := models.FindOrCreateWechatUser(db, openID)
 	if err != nil {
 		return err
+	}
+	if created && strings.TrimSpace(sess.InviteCode) != "" {
+		if err := applyInviteAfterRegister(db, user.ID, sess.InviteCode); err != nil {
+			logger.Warn("wechat invite apply failed", zap.Uint("userId", user.ID), zap.Error(err))
+		}
 	}
 	if err := models.CheckUserAllowLogin(db, user); err != nil {
 		return err
