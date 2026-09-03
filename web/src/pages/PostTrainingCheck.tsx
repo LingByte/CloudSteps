@@ -423,9 +423,11 @@ export default function PostTrainingCheck() {
       setSubmitting(true);
       try {
         if (mode === "review") {
-          const res = await completeReviewSession(sessionId, results);
-          if (res.code !== 200) {
-            throw new Error(formatApiMessage(res.msg, "practice.submit_failed"));
+          if (sessionId && sessionId !== "0") {
+            const res = await completeReviewSession(sessionId, results);
+            if (res.code !== 200) {
+              throw new Error(formatApiMessage(res.msg, "practice.submit_failed"));
+            }
           }
           const returnPath = getReviewReturnPath("/word-training");
           clearReviewPracticeSession();

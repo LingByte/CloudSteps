@@ -24,11 +24,12 @@ export function beginReviewPractice(opts: {
   returnPath: string;
 }) {
   const { sessionId, wordBookId, words, returnPath } = opts;
-  if (!sessionId || words.length === 0) {
+  if (words.length === 0) {
     throw new Error(i18n.t("review.empty_session"));
   }
   sessionStorage.setItem("lb_mode", "review");
-  sessionStorage.setItem("lb_review_session_id", String(sessionId));
+  // sessionId 0 = ad-hoc drill (e.g. reading pick-words); skip server complete on finish
+  sessionStorage.setItem("lb_review_session_id", String(sessionId || 0));
   sessionStorage.setItem("lb_review_wordbook_id", String(wordBookId));
   sessionStorage.setItem("lb_review_words", JSON.stringify(words));
   sessionStorage.setItem("lb_review_batch_idx", "0");
