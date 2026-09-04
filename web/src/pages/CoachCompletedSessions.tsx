@@ -88,8 +88,11 @@ export default function CoachCompletedSessions() {
             {t("coach_sessions.title")}
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-{t("coach_sessions.subtitle", { total: total > 0 ? t("coach_sessions.total_count", { count: total }) : "" })}
+            {t("coach_sessions.subtitle", {
+              total: total > 0 ? t("coach_sessions.total_count", { count: total }) : "",
+            })}
           </p>
+          <p className="text-[11px] text-muted-soft mt-0.5">{t("coach_sessions.billing_only_hint")}</p>
         </div>
         <CloudButton
           variant="outline"
@@ -274,9 +277,19 @@ export default function CoachCompletedSessions() {
               </div>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-2">
             <CloudButton type="button" variant="outline" onClick={() => setDetail(null)}>
               {t("practice.close")}
+            </CloudButton>
+            <CloudButton
+              type="button"
+              variant="brand"
+              onClick={() => {
+                setDetail(null);
+                navigate("/training-records");
+              }}
+            >
+              {t("coach_sessions.view_training_records")}
             </CloudButton>
           </DialogFooter>
         </DialogContent>

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router";
 import { CloudButton } from "../components/cloudsteps";
 import { CloudCard, CloudSelect, CloudDatePicker } from "../components/cloudsteps/arco";
 import { BookOpen, RotateCcw, X, Volume2, Download } from "lucide-react";
@@ -21,6 +22,7 @@ import { getTrainingStudent } from "../utils/trainingStudent";
 import { useTranslation } from "react-i18next";
 import i18n from "../i18n";
 import { formatApiMessage } from "../utils/apiMessage";
+import { normalizeSnowflakeId } from "../utils/json-snowflake";
 
 type Tab = "study" | "review";
 type ExportFormat = "excel" | "pdf";
@@ -83,6 +85,8 @@ function groupSessionsClient(items: StudySessionListItem[]): StudySessionListIte
     }
     prev.wordCount = (prev.wordCount || 0) + (item.wordCount || 0);
     prev.correctCount = (prev.correctCount || 0) + (item.correctCount || 0);
+    prev.screenedKnownCount = (prev.screenedKnownCount || 0) + (item.screenedKnownCount || 0);
+    prev.screenedUnknownCount = (prev.screenedUnknownCount || 0) + (item.screenedUnknownCount || 0);
     prev.sessionCount = (prev.sessionCount || 0) + 1;
     const id = item.id;
     if (id && !prev.sessionIds?.includes(id)) {
@@ -100,6 +104,7 @@ function groupSessionsClient(items: StudySessionListItem[]): StudySessionListIte
 
 export default function TrainingRecords() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const role = useAuthStore((s) => s.user?.role) || "user";
   const isCoach = role === "user" || role === "admin" || role === "teacher";
 
@@ -144,15 +149,16 @@ export default function TrainingRecords() {
   }, [studentId, students]);
 
   const wordBookOptions = useMemo(() => {
-    const map = new Map<number, string>();
+    const map = new Map<string, string>();
     for (const item of list) {
-      if (item.wordBookId && item.wordBookName) map.set(item.wordBookId, item.wordBookName);
+      const id = normalizeSnowflakeId(item.wordBookId);
+      if (id && item.wordBookName) map.set(id, item.wordBookName);
     }
     return [
       { label: t("training_records.all_wordbooks"), value: "" },
-      ...Array.from(map.entries()).map(([id, name]) => ({ label: name, value: String(id) })),
+      ...Array.from(map.entries()).map(([id, name]) => ({ label: name, value: id })),
     ];
-  }, [list]);
+  }, [list, t]);
 
   const filterParams = useCallback(() => {
     const params: {
@@ -163,7 +169,7 @@ export default function TrainingRecords() {
       date?: string;
       dateFrom?: string;
       dateTo?: string;
-      wordBookId?: number;
+      wordBookId?: string | number;
     } = {
       // 后端正课会话 session_type 存的是 learn（不是 study）
       sessionType: tab === "study" ? "learn" : tab,
@@ -179,7 +185,7 @@ export default function TrainingRecords() {
       if (dateFrom) params.dateFrom = dateFrom;
       if (dateTo) params.dateTo = dateTo;
     }
-    if (wordBookId) params.wordBookId = Number(wordBookId);
+    if (wordBookId) params.wordBookId = wordBookId;
     return params;
   }, [tab, dateMode, dateDay, dateFrom, dateTo, wordBookId]);
 
@@ -682,6 +688,15 @@ export default function TrainingRecords() {
                   {(item.sessionCount || 0) > 1 && (
                     <span>{t("training_records.groups", { count: item.sessionCount })}</span>
                   )}
+                  {tab === "study" &&
+                    ((item.screenedKnownCount || 0) > 0 || (item.screenedUnknownCount || 0) > 0) && (
+                      <span>
+                        {t("training_records.screened_summary", {
+                          known: item.screenedKnownCount || 0,
+                          unknown: item.screenedUnknownCount || 0,
+                        })}
+                      </span>
+                    )}
                   <span>{t("training_records.words_count", { count: item.wordCount })}</span>
                   <span>{t("training_records.correct_count", { count: item.correctCount })}</span>
                   {item.wordCount > 0 && (
@@ -951,29 +966,72 @@ export default function TrainingRecords() {
                 </CloudButton>
               </div>
 
-              <div className="px-4 py-2.5 border-b border-border shrink-0 grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-lg bg-muted/50 py-1.5">
-                  <div className="text-sm font-semibold text-foreground">
-                    {detailLoading ? "…" : detailWords.length}
+              <div className="px-4 py-2.5 border-b border-border shrink-0 space-y-2">
+                {tab === "study" && (
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <div className="rounded-lg bg-muted/50 py-1.5">
+                      <div className="text-sm font-semibold text-foreground">
+                        {detailSession?.screenedKnownCount ?? 0}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {t("session_report.stat.screened_known")}
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-muted/50 py-1.5">
+                      <div className="text-sm font-semibold text-foreground">
+                        {detailSession?.screenedUnknownCount ?? 0}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {t("session_report.stat.screened_unknown")}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[11px] text-muted-foreground">{t("practice.words_unit")}</div>
-                </div>
-                <div className="rounded-lg bg-muted/50 py-1.5">
-                  <div className="text-sm font-semibold text-foreground">
-                    {detailSession?.correctCount ?? 0}
+                )}
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-lg bg-muted/50 py-1.5">
+                    <div className="text-sm font-semibold text-foreground">
+                      {detailLoading ? "…" : detailWords.length}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">{t("practice.words_unit")}</div>
                   </div>
-                  <div className="text-[11px] text-muted-foreground">{t("training_records.correct_label")}</div>
-                </div>
-                <div className="rounded-lg bg-muted/50 py-1.5">
-                  <div className="text-sm font-semibold text-foreground">
-                    {detailSession && detailSession.wordCount > 0
-                      ? `${Math.round(
-                          (detailSession.correctCount / detailSession.wordCount) * 100
-                        )}%`
-                      : "—"}
+                  <div className="rounded-lg bg-muted/50 py-1.5">
+                    <div className="text-sm font-semibold text-foreground">
+                      {detailSession?.correctCount ?? 0}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">{t("training_records.correct_label")}</div>
                   </div>
-                  <div className="text-[11px] text-muted-foreground">{t("training_records.accuracy_label")}</div>
+                  <div className="rounded-lg bg-muted/50 py-1.5">
+                    <div className="text-sm font-semibold text-foreground">
+                      {detailSession && detailSession.wordCount > 0
+                        ? `${Math.round(
+                            (detailSession.correctCount / detailSession.wordCount) * 100
+                          )}%`
+                        : "—"}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">{t("training_records.accuracy_label")}</div>
+                  </div>
                 </div>
+                {tab === "study" &&
+                  (() => {
+                    const reportId = normalizeSnowflakeId(
+                      detailSession?.id ?? detailSession?.sessionIds?.[0],
+                    );
+                    if (!reportId) return null;
+                    return (
+                      <CloudButton
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => {
+                          setDetailOpen(false);
+                          navigate(`/session-report/${encodeURIComponent(reportId)}`);
+                        }}
+                      >
+                        {t("training_records.view_session_report")}
+                      </CloudButton>
+                    );
+                  })()}
               </div>
 
               <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3">
