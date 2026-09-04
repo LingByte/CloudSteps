@@ -30,7 +30,7 @@ type adminInboxMessageRow struct {
 }
 
 type inboxMessageCreateReq struct {
-	UserID      uint   `json:"userId" binding:"required"`
+	UserID      string `json:"userId" binding:"required"`
 	Title       string `json:"title" binding:"required,max=255"`
 	Content     string `json:"content" binding:"required"`
 	ActionURL   string `json:"actionUrl" binding:"max=512"`
@@ -131,7 +131,12 @@ func (h *Handlers) handleAdminCreateInboxMessage(c *gin.Context) {
 		response.FailI18n(c, "common.invalid_params", err)
 		return
 	}
-	user, err := models.GetUserByUID(h.db, req.UserID)
+	userID := parseQueryUintID(req.UserID)
+	if userID == 0 {
+		response.FailI18n(c, "common.invalid_params", nil)
+		return
+	}
+	user, err := models.GetUserByUID(h.db, userID)
 	if err != nil {
 		response.FailI18n(c, "auth.user_not_found", err)
 		return
@@ -230,8 +235,9 @@ func (h *Handlers) findInboxMessage(c *gin.Context) (*notify.InternalNotificatio
 }
 
 type inboxUserLabel struct {
-	Name  string
-	Email string
+	Name   string
+	Email  string
+	Avatar string
 }
 
 func loadInboxUserLabels(db *gorm.DB, rows []notify.InternalNotification) map[string]inboxUserLabel {
@@ -266,8 +272,9 @@ func loadInboxUserLabels(db *gorm.DB, rows []notify.InternalNotification) map[st
 			name = u.Username
 		}
 		out[strconv.FormatUint(uint64(u.ID), 10)] = inboxUserLabel{
-			Name:  name,
-			Email: u.Username,
+			Name:   name,
+			Email:  u.Username,
+			Avatar: u.Avatar,
 		}
 	}
 	return out

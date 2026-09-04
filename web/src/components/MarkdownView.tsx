@@ -3,13 +3,16 @@ import remarkGfm from "remark-gfm";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "../utils/cn";
+import { resolveMediaUrl } from "../utils/mediaUrl";
 
 type MarkdownViewProps = {
   content: string;
   className?: string;
+  /** 聊天气泡内更紧凑的排版 */
+  compact?: boolean;
 };
 
-export function MarkdownView({ content, className }: MarkdownViewProps) {
+export function MarkdownView({ content, className, compact }: MarkdownViewProps) {
   const { t } = useTranslation();
 
   if (!content.trim()) {
@@ -28,7 +31,7 @@ export function MarkdownView({ content, className }: MarkdownViewProps) {
         "[&_h3]:mt-2 [&_h3]:text-base [&_h3]:font-medium",
         "[&_li]:my-0.5",
         "[&_ol]:my-2 [&_ol]:list-decimal [&_ol]:ps-5",
-        "[&_p]:my-2",
+        compact ? "[&_p]:my-1" : "[&_p]:my-2",
         "[&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-[#F7FAFC] [&_pre]:p-3",
         "[&_pre_code]:bg-transparent [&_pre_code]:p-0",
         "[&_strong]:font-semibold",
@@ -36,10 +39,25 @@ export function MarkdownView({ content, className }: MarkdownViewProps) {
         "[&_td]:border [&_td]:border-[#E2E8F0] [&_td]:px-2 [&_td]:py-1",
         "[&_th]:border [&_th]:border-[#E2E8F0] [&_th]:bg-[#F7FAFC] [&_th]:px-2 [&_th]:py-1 [&_th]:text-start",
         "[&_ul]:my-2 [&_ul]:list-disc [&_ul]:ps-5",
+        "[&_img]:my-1.5 [&_img]:max-h-64 [&_img]:max-w-full [&_img]:rounded-lg [&_img]:object-contain",
         className,
       )}
     >
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          img: ({ src, alt }) => {
+            const resolved = resolveMediaUrl(src) || src || "";
+            return (
+              <a href={resolved} target="_blank" rel="noreferrer" className="block">
+                <img src={resolved} alt={alt || ""} loading="lazy" />
+              </a>
+            );
+          },
+        }}
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }

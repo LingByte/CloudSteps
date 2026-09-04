@@ -17,6 +17,7 @@ import { CloudButton, CloudImageWithFallback } from "../components/cloudsteps";
 import { CloudCard } from "../components/cloudsteps/arco";
 import { getTeacherTeachingPool } from "../api/coaching";
 import { getCheckInStatus, postCheckIn } from "../api/checkin";
+import { getFeedbackUnreadCount } from "../api/feedback";
 import { useAuthStore } from "../stores/authStore";
 import { teacherAvatarSrc } from "../utils/avatar";
 import { formatTeachingMinutes } from "../utils/formatMinutes";
@@ -70,10 +71,22 @@ export default function CoachCenter() {
   const [checkedInToday, setCheckedInToday] = useState<boolean | null>(null);
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [checkInSubmitting, setCheckInSubmitting] = useState(false);
+  const [feedbackUnread, setFeedbackUnread] = useState(0);
 
   useEffect(() => {
     void refreshUserInfo();
   }, [refreshUserInfo]);
+
+  const loadFeedbackUnread = useCallback(async () => {
+    try {
+      const res = await getFeedbackUnreadCount();
+      if (res.code === 200 && res.data) {
+        setFeedbackUnread(Math.max(0, Number(res.data.count) || 0));
+      }
+    } catch {
+      /* keep previous */
+    }
+  }, []);
 
   const loadPool = useCallback(async () => {
     setPoolLoading(true);
@@ -108,6 +121,18 @@ export default function CoachCenter() {
     void loadPool();
     void loadCheckInStatus();
   }, [isCoach, loadPool, loadCheckInStatus]);
+
+  useEffect(() => {
+    void loadFeedbackUnread();
+  }, [loadFeedbackUnread]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void loadFeedbackUnread();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [loadFeedbackUnread]);
 
   const onCheckInToday = async () => {
     if (checkInSubmitting || checkedInToday) return;
@@ -173,6 +198,7 @@ export default function CoachCenter() {
         description: t("coach_center.feedback_desc"),
         tint: "mint" as const,
         path: "/feedback",
+        badge: feedbackUnread,
       },
       {
         id: 3,
@@ -203,7 +229,7 @@ export default function CoachCenter() {
       },
       ...base,
     ];
-  }, [isCoach, t]);
+  }, [isCoach, t, feedbackUnread]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 h-full gap-2 overflow-hidden">
@@ -330,8 +356,17 @@ export default function CoachCenter() {
                   <Icon size={16} />
                 </div>
                 <span className="flex-1 min-w-0">
-                  <span className="block text-sm font-medium text-foreground leading-snug">
-                    {feature.label}
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    <span className="block text-sm font-medium text-foreground leading-snug truncate">
+                      {feature.label}
+                    </span>
+                    {"badge" in feature &&
+                    typeof feature.badge === "number" &&
+                    feature.badge > 0 ? (
+                      <span className="inline-flex min-w-4 h-4 px-1 items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground tabular-nums shrink-0">
+                        {feature.badge > 99 ? "99+" : feature.badge}
+                      </span>
+                    ) : null}
                   </span>
                   {"description" in feature && feature.description ? (
                     <span className="block text-[10px] text-muted-foreground mt-0.5 leading-snug truncate">

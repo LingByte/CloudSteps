@@ -35,6 +35,7 @@ type feedbackTicketDTO struct {
 	Content          string             `json:"content"`
 	Contact          string             `json:"contact,omitempty"`
 	Status           string             `json:"status"`
+	UserUnread       bool               `json:"userUnread"`
 	LastRepliedAt    *time.Time         `json:"lastRepliedAt,omitempty"`
 	LastReplierRole  string             `json:"lastReplierRole,omitempty"`
 	LastReplyPreview string             `json:"lastReplyPreview,omitempty"`
@@ -49,6 +50,9 @@ func (h *Handlers) registerFeedbackRoutes(r *humax.Group) {
 	{
 		g.GET("", h.handleListMyFeedback)
 		g.POST("", h.handleCreateFeedback)
+		g.GET("/unread-count", h.handleFeedbackUnreadCount)
+		g.POST("/read-all", h.handleMarkMyFeedbackReadAll)
+		g.POST("/images", h.handleUploadFeedbackImage)
 		g.GET("/:id", h.handleGetMyFeedback)
 		g.POST("/:id/replies", h.handleReplyMyFeedback)
 	}
@@ -119,6 +123,13 @@ func (h *Handlers) handleGetMyFeedback(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if ticket.UserUnread {
+		if err := h.db.Model(ticket).Update("user_unread", false).Error; err != nil {
+			response.FailI18n(c, "common.operation_failed", err)
+			return
+		}
+		ticket.UserUnread = false
+	}
 	replies, err := loadFeedbackReplies(h.db, ticket.ID)
 	if err != nil {
 		response.FailI18n(c, "common.query_failed", err)
@@ -154,6 +165,37 @@ func (h *Handlers) handleReplyMyFeedback(c *gin.Context) {
 	response.SuccessI18n(c, "msg.4bea887d", toFeedbackTicketDTO(ticket, replies))
 }
 
+func (h *Handlers) handleFeedbackUnreadCount(c *gin.Context) {
+	user := auth.CurrentUser(c)
+	if user == nil {
+		response.FailI18n(c, "common.login_required", nil)
+		return
+	}
+	var count int64
+	if err := h.db.Model(&models.FeedbackTicket{}).
+		Where("user_id = ? AND user_unread = ?", user.ID, true).
+		Count(&count).Error; err != nil {
+		response.FailI18n(c, "common.query_failed", err)
+		return
+	}
+	response.SuccessI18n(c, "common.ok", gin.H{"count": count})
+}
+
+func (h *Handlers) handleMarkMyFeedbackReadAll(c *gin.Context) {
+	user := auth.CurrentUser(c)
+	if user == nil {
+		response.FailI18n(c, "common.login_required", nil)
+		return
+	}
+	if err := h.db.Model(&models.FeedbackTicket{}).
+		Where("user_id = ? AND user_unread = ?", user.ID, true).
+		Update("user_unread", false).Error; err != nil {
+		response.FailI18n(c, "common.operation_failed", err)
+		return
+	}
+	response.SuccessI18n(c, "common.ok", nil)
+}
+
 func (h *Handlers) findOwnedFeedback(c *gin.Context, userID uint) (*models.FeedbackTicket, bool) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil || id == 0 {
@@ -186,18 +228,22 @@ func appendFeedbackReply(db *gorm.DB, ticket *models.FeedbackTicket, authorID ui
 	}
 	now := time.Now()
 	preview := models.PreviewFeedback(reply.Content, models.FeedbackPreviewMaxRunes)
+	updates := map[string]any{
+		"reply_count":        gorm.Expr("reply_count + 1"),
+		"last_replier_role":  role,
+		"last_replied_at":    now,
+		"last_reply_preview": preview,
+		"update_by":          operator,
+		"updated_at":         now,
+	}
+	if role == models.FeedbackRoleAdmin {
+		updates["user_unread"] = true
+	}
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(reply).Error; err != nil {
 			return err
 		}
-		return tx.Model(ticket).Updates(map[string]any{
-			"reply_count":        gorm.Expr("reply_count + 1"),
-			"last_replier_role":  role,
-			"last_replied_at":    now,
-			"last_reply_preview": preview,
-			"update_by":          operator,
-			"updated_at":         now,
-		}).Error
+		return tx.Model(ticket).Updates(updates).Error
 	})
 	if err != nil {
 		return nil, err
@@ -206,6 +252,9 @@ func appendFeedbackReply(db *gorm.DB, ticket *models.FeedbackTicket, authorID ui
 	ticket.LastReplierRole = role
 	ticket.LastRepliedAt = &now
 	ticket.LastReplyPreview = preview
+	if role == models.FeedbackRoleAdmin {
+		ticket.UserUnread = true
+	}
 	return reply, nil
 }
 
@@ -215,6 +264,7 @@ func toFeedbackTicketDTO(ticket *models.FeedbackTicket, replies []models.Feedbac
 		Content:          ticket.Content,
 		Contact:          ticket.Contact,
 		Status:           ticket.Status,
+		UserUnread:       ticket.UserUnread,
 		LastRepliedAt:    ticket.LastRepliedAt,
 		LastReplierRole:  ticket.LastReplierRole,
 		LastReplyPreview: ticket.LastReplyPreview,

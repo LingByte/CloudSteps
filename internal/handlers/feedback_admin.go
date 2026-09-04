@@ -16,9 +16,10 @@ import (
 
 type adminFeedbackTicketDTO struct {
 	feedbackTicketDTO
-	UserID    uint   `json:"userId"`
-	UserName  string `json:"userName,omitempty"`
-	UserEmail string `json:"userEmail,omitempty"`
+	UserID     uint   `json:"userId"`
+	UserName   string `json:"userName,omitempty"`
+	UserEmail  string `json:"userEmail,omitempty"`
+	UserAvatar string `json:"userAvatar,omitempty"`
 }
 
 func (h *Handlers) registerFeedbackAdminRoutes(r *humax.Group) {
@@ -27,6 +28,7 @@ func (h *Handlers) registerFeedbackAdminRoutes(r *humax.Group) {
 	g := admin.Group("feedbacks")
 	{
 		g.GET("", h.handleAdminListFeedback)
+		g.POST("/images", h.handleUploadFeedbackImage)
 		g.GET("/:id", h.handleAdminGetFeedback)
 		g.POST("/:id/replies", h.handleAdminReplyFeedback)
 		g.POST("/:id/close", h.handleAdminCloseFeedback)
@@ -38,6 +40,7 @@ func (h *Handlers) handleAdminListFeedback(c *gin.Context) {
 	status := strings.TrimSpace(c.Query("status"))
 	userID := strings.TrimSpace(c.Query("userId"))
 	keyword := strings.TrimSpace(c.Query("keyword"))
+	userUnread := strings.TrimSpace(c.Query("userUnread"))
 
 	q := h.db.Model(&models.FeedbackTicket{})
 	if status == models.FeedbackStatusOpen || status == models.FeedbackStatusClosed {
@@ -45,6 +48,11 @@ func (h *Handlers) handleAdminListFeedback(c *gin.Context) {
 	}
 	if userID != "" {
 		q = q.Where("user_id = ?", userID)
+	}
+	if userUnread == "true" || userUnread == "1" {
+		q = q.Where("user_unread = ?", true)
+	} else if userUnread == "false" || userUnread == "0" {
+		q = q.Where("user_unread = ?", false)
 	}
 	if keyword != "" {
 		like := "%" + keyword + "%"
@@ -182,6 +190,7 @@ func toAdminFeedbackDTO(ticket *models.FeedbackTicket, replies []models.Feedback
 		UserID:            ticket.UserID,
 		UserName:          label.Name,
 		UserEmail:         label.Email,
+		UserAvatar:        label.Avatar,
 	}
 }
 
@@ -214,7 +223,7 @@ func loadFeedbackUserLabels(db *gorm.DB, rows []models.FeedbackTicket) map[uint]
 		if name == "" {
 			name = u.Username
 		}
-		out[u.ID] = inboxUserLabel{Name: name, Email: u.Username}
+		out[u.ID] = inboxUserLabel{Name: name, Email: u.Username, Avatar: u.Avatar}
 	}
 	return out
 }

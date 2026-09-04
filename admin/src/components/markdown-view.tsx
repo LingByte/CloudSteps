@@ -32,10 +32,25 @@ export function MarkdownView({ content, className }: MarkdownViewProps) {
         '[&_td]:border [&_td]:px-2 [&_td]:py-1',
         '[&_th]:border [&_th]:bg-muted [&_th]:px-2 [&_th]:py-1 [&_th]:text-start',
         '[&_ul]:my-2 [&_ul]:list-disc [&_ul]:ps-5',
+        '[&_img]:my-1.5 [&_img]:max-h-72 [&_img]:max-w-full [&_img]:rounded-lg [&_img]:object-contain',
         className
       )}
     >
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          img: ({ src, alt }) => {
+            const url = src || ''
+            return (
+              <a href={url} target='_blank' rel='noreferrer' className='block'>
+                <img src={url} alt={alt || ''} loading='lazy' />
+              </a>
+            )
+          },
+        }}
+      >
+        {content}
+      </ReactMarkdown>
     </div>
   )
 }

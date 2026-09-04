@@ -160,15 +160,14 @@ export function InboxNotificationsPage() {
       return
     }
 
-    const uid = Number(form.userId)
-    if (!uid || !form.title.trim() || !form.content.trim()) {
+    if (!form.userId.trim() || !form.title.trim() || !form.content.trim()) {
       toast.error('请选择用户，并填写标题与正文')
       return
     }
     setSaving(true)
     try {
       await post('/admin/inbox-messages', {
-        userId: uid,
+        userId: form.userId.trim(),
         title: form.title.trim(),
         content: form.content,
         actionUrl: form.actionUrl.trim() || undefined,

@@ -12,6 +12,7 @@ export type FeedbackTicket = {
   content: string;
   contact?: string;
   status: "open" | "closed" | string;
+  userUnread?: boolean;
   lastRepliedAt?: string;
   lastReplierRole?: string;
   lastReplyPreview?: string;
@@ -30,6 +31,11 @@ export type ListFeedbackResponse = {
 export const listFeedback = (params?: { page?: number; pageSize?: number }) =>
   get<ListFeedbackResponse>("/feedback", { params });
 
+export const getFeedbackUnreadCount = () =>
+  get<{ count: number }>("/feedback/unread-count");
+
+export const markFeedbackReadAll = () => post<null>("/feedback/read-all");
+
 export const getFeedback = (id: number) => get<FeedbackTicket>(`/feedback/${id}`);
 
 export const createFeedback = (body: { content: string; contact?: string }) =>
@@ -37,3 +43,11 @@ export const createFeedback = (body: { content: string; contact?: string }) =>
 
 export const replyFeedback = (id: number, content: string) =>
   post<FeedbackTicket>(`/feedback/${id}/replies`, { content });
+
+export const uploadFeedbackImage = (file: File) => {
+  const form = new FormData();
+  form.append("file", file);
+  return post<{ url: string; width?: number; height?: number }>("/feedback/images", form, {
+    timeout: 120_000,
+  });
+};

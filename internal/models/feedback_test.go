@@ -6,8 +6,8 @@ import (
 )
 
 func TestNormalizeFeedbackContent(t *testing.T) {
-	if _, err := NormalizeFeedbackContent("  hi  "); err != ErrFeedbackContentInvalid {
-		t.Fatalf("short content: got %v", err)
+	if _, err := NormalizeFeedbackContent("   "); err != ErrFeedbackContentInvalid {
+		t.Fatalf("empty content: got %v", err)
 	}
 	got, err := NormalizeFeedbackContent("  课程显示不对  ")
 	if err != nil {
@@ -28,6 +28,23 @@ func TestPreviewFeedback(t *testing.T) {
 	long := strings.Repeat("字", 10)
 	if got := PreviewFeedback(long, 4); got != "字字字字…" {
 		t.Fatalf("got %q", got)
+	}
+	if got := PreviewFeedback("看这张图 ![截图](https://cdn.example/a.jpg) 谢谢", 40); got != "看这张图 谢谢 [图片]" {
+		t.Fatalf("got %q", got)
+	}
+	encoded, err := EncodeFeedbackContent("修好了", []string{"https://cdn.example/b.jpg"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := PreviewFeedback(encoded, 40); got != "修好了 [图片]" {
+		t.Fatalf("json preview got %q from %s", got, encoded)
+	}
+}
+
+func TestParseFeedbackContentLegacyMarkdown(t *testing.T) {
+	p := ParseFeedbackContent("问题见图 ![image](https://cdn.lingecho.com/a.jpg)")
+	if p.Text != "问题见图" || len(p.Images) != 1 || p.Images[0] != "https://cdn.lingecho.com/a.jpg" {
+		t.Fatalf("got %+v", p)
 	}
 }
 
