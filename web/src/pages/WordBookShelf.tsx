@@ -29,24 +29,6 @@ function pickGradient(tag: string): string {
   return COVER_GRADIENTS[hashStr(tag) % COVER_GRADIENTS.length];
 }
 
-interface CoverInfo {
-  tag: string;
-  t1: string;
-  t2: string;
-  cat: string;
-}
-
-function parseCover(desc?: string): CoverInfo | null {
-  if (!desc) return null;
-  try {
-    const obj = JSON.parse(desc);
-    if (obj && (obj.t1 || obj.t2 || obj.tag)) return obj;
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 const PAGE_SIZE = 12;
 
 const CUSTOM_GROUP: WordBookGroup = { key: "custom", label: "shelf.group_custom" };
@@ -235,8 +217,7 @@ export default function WordBookShelf() {
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                 {books.map((b) => {
-                  const cover = parseCover(b.description);
-                  const gradient = pickGradient(cover?.tag || b.name);
+                  const gradient = pickGradient(b.name);
                   const coverImage = resolveMediaUrl(b.coverUrl);
                   return (
                     <Link
@@ -323,8 +304,7 @@ export default function WordBookShelf() {
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {books.map((b) => {
-              const cover = parseCover(b.description);
-              const gradient = pickGradient(cover?.tag || b.name);
+              const gradient = pickGradient(b.name);
               const coverImage = resolveMediaUrl(b.coverUrl);
               return (
                 <Link
@@ -348,20 +328,6 @@ export default function WordBookShelf() {
                           alt=""
                           className="absolute inset-0 w-full h-full object-cover"
                         />
-                      ) : cover ? (
-                        <div className='flex h-full w-full flex-col items-center justify-center'>
-                          <span className="text-white/90 text-xs font-medium tracking-wide">
-                            {cover.t1}
-                          </span>
-                          <span className="text-white text-base font-bold mt-0.5">
-                            {cover.t2}
-                          </span>
-                          {cover.tag && (
-                            <span className="absolute bottom-1.5 right-2 text-[9px] text-white/60">
-                              {cover.tag}
-                            </span>
-                          )}
-                        </div>
                       ) : (
                         <div className="flex h-full w-full items-center justify-center px-2">
                           <span className="text-white text-sm font-bold text-center line-clamp-2">

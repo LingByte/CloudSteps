@@ -2,6 +2,8 @@ package models
 
 import (
 	"database/sql"
+	"encoding/json"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -93,6 +95,41 @@ func TestUserWordProgress_TableName(t *testing.T) {
 	if (UserWordProgress{}).TableName() != constants.TABLE_USER_WORD_PROGRESS {
 		t.Fatalf("UserWordProgress table name = %q, want %q",
 			(UserWordProgress{}).TableName(), constants.TABLE_USER_WORD_PROGRESS)
+	}
+}
+
+func TestToPublicWordBook_omitsAdminFields(t *testing.T) {
+	b := WordBook{
+		Name:        "CET4",
+		Description: "admin-only intro text",
+		Level:       "B1",
+		WordCount:   100,
+		CoverURL:    "https://cdn.example/cover.png",
+		IsActive:    true,
+		Category:    CategoryVocabulary,
+		Language:    "en",
+		SourceName:  "hxword:1",
+		SourceURL:   "https://example.com",
+		LicenseNote: "internal",
+		Author:      "hxword",
+		Publisher:   "hxword",
+	}
+	b.ID = 42
+	pub := ToPublicWordBook(b)
+	if pub.ID != 42 || pub.Name != "CET4" || pub.WordCount != 100 || pub.CoverURL == "" {
+		t.Fatalf("public payload missing learner fields: %+v", pub)
+	}
+	raw, err := json.Marshal(pub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(raw)
+	for _, forbidden := range []string{
+		"description", "sourceName", "sourceUrl", "licenseNote", "author", "publisher", "admin-only",
+	} {
+		if strings.Contains(s, forbidden) {
+			t.Fatalf("public json still contains %q: %s", forbidden, s)
+		}
 	}
 }
 

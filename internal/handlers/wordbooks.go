@@ -196,7 +196,7 @@ func (h *Handlers) handleListWordBooks(c *gin.Context) {
 	}
 
 	response.SuccessI18n(c, "common.success", gin.H{
-		"list":     books,
+		"list":     models.ToPublicWordBooks(books),
 		"total":    total,
 		"page":     page,
 		"pageSize": pageSize,
@@ -222,7 +222,7 @@ func (h *Handlers) handleGetWordBook(c *gin.Context) {
 			return
 		}
 	}
-	response.SuccessI18n(c, "common.success", book)
+	response.SuccessI18n(c, "common.success", models.ToPublicWordBook(*book))
 }
 
 // handleGetWordDetail GET /words/:id — 返回单个单词的完整词典数据

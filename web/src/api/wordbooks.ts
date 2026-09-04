@@ -6,7 +6,6 @@ export interface WordBookItem {
   level?: string
   wordCount?: number
   category?: string
-  description?: string
   coverUrl?: string
   ownerUserId?: number
 }
@@ -43,11 +42,7 @@ export const listWordBooks = async (params?: {
   })
 }
 
-export interface WordBookDetail extends WordBookItem {
-  description?: string
-  category?: string
-  ownerUserId?: number
-}
+export interface WordBookDetail extends WordBookItem {}
 
 export const getWordBook = async (id: number): Promise<ApiResponse<WordBookDetail>> => {
   return get<WordBookDetail>(`/wordbooks/${id}`)
