@@ -1209,6 +1209,8 @@
   "practice.simple_tip_off": "当前全部：点击切回简易",
   "practice.select_five": "选择5个",
   "practice.start_learning": "开始识记",
+  "practice.start_learning_count": "记 {{count}} 个",
+  "practice.screened_count": "已筛 {{count}} 个",
   "practice.starting": "启动中…",
   "practice.submitting": "提交中…",
   "practice.preparing": "准备中…",

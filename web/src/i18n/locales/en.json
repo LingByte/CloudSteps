@@ -1491,6 +1491,8 @@
   "practice.simple_tip_off": "Full mode: tap for simple",
   "practice.select_five": "Select 5",
   "practice.start_learning": "Start learning",
+  "practice.start_learning_count": "Learn {{count}} words",
+  "practice.screened_count": "{{count}} screened",
   "practice.starting": "Starting…",
   "practice.submitting": "Submitting…",
   "practice.preparing": "Preparing…",

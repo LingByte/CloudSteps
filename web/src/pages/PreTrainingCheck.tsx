@@ -1,4 +1,4 @@
-import { Volume2, Check, X, Shuffle, Loader2, ArrowDownAZ, BookOpen, PanelTop, ArrowRight } from "lucide-react";
+import { Volume2, Check, X, Shuffle, Loader2, ArrowDownAZ, BookOpen, PanelTop } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 
@@ -677,25 +677,20 @@ export default function PreTrainingCheck() {
             type="button"
             variant="brand"
             size="pill"
-            className="hidden sm:flex shrink-0"
+            className="shrink-0 max-sm:px-2.5 max-sm:text-xs tabular-nums"
             onClick={handleStartLearning}
             disabled={selectedCount === 0}
             loading={starting}
             loadingText={t("practice.starting")}
+            aria-label={
+              selectedCount > 0
+                ? t("practice.start_learning_count", { count: selectedCount })
+                : t("practice.start_learning")
+            }
           >
-            {t("practice.start_learning")}
-            {selectedCount > 0 ? `（${selectedCount}）` : ""}
-          </CloudButton>
-          <CloudButton
-            type="button"
-            variant="brand"
-            size="iconRound"
-            onClick={handleStartLearning}
-            disabled={selectedCount === 0 || starting}
-            className="shrink-0 size-10 sm:hidden"
-            aria-label={t("practice.start_learning")}
-          >
-            <ArrowRight size={20} />
+            {selectedCount > 0
+              ? t("practice.start_learning_count", { count: selectedCount })
+              : t("practice.start_learning")}
           </CloudButton>
         </div>
       </div>
