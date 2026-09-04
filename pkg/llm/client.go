@@ -110,3 +110,44 @@ func (c Config) Chat(ctx context.Context, systemPrompt, userPrompt string) (stri
 	}
 	return text, nil
 }
+
+// ChatStream runs a single-turn streaming chat. onDelta is called for each content delta.
+// Returns the full concatenated assistant text when the stream completes.
+func (c Config) ChatStream(ctx context.Context, systemPrompt, userPrompt string, onDelta func(delta string)) (string, error) {
+	if !c.Enabled() {
+		return "", ErrNotConfigured
+	}
+	if onDelta == nil {
+		onDelta = func(string) {}
+	}
+	client := c.relayClient()
+	stream, err := client.ChatStream(ctx, &relay.ChatRequest{
+		Model: c.Model,
+		Messages: []relay.Message{
+			{Role: "system", Content: systemPrompt},
+			{Role: "user", Content: userPrompt},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if stream == nil || stream.Ch == nil {
+		return "", ErrEmptyResponse
+	}
+
+	var b strings.Builder
+	for chunk := range stream.Ch {
+		if chunk.Err != nil {
+			return strings.TrimSpace(b.String()), chunk.Err
+		}
+		if chunk.Delta != "" {
+			b.WriteString(chunk.Delta)
+			onDelta(chunk.Delta)
+		}
+	}
+	text := strings.TrimSpace(b.String())
+	if text == "" {
+		return "", ErrEmptyResponse
+	}
+	return text, nil
+}

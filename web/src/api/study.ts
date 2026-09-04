@@ -1,4 +1,6 @@
 import { get, post, put, ApiResponse } from '../utils/request'
+import { getApiBaseURL } from '../config/apiConfig'
+import { getStoredLocale } from '../i18n'
 
 export interface StudyWordItem {
   id: number
@@ -201,6 +203,108 @@ export const getStudySessionDetail = async (
   sessionId: number
 ): Promise<ApiResponse<StudySessionDetail>> => {
   return get<StudySessionDetail>(`/study/session/${sessionId}`)
+}
+
+export interface StudySessionReport {
+  sessionId: string
+  wordBookId: number
+  wordBookName: string
+  studentName: string
+  status: string
+  startedAt: string
+  completedAt?: string
+  durationMinutes: number
+  screenedKnownCount: number
+  screenedUnknownCount: number
+  wordCount: number
+  correctCount: number
+  forgotCount: number
+  accuracyPercent: number
+  remainPending: number
+  forgotWords?: string[]
+  reportSummary?: string
+  aiAvailable: boolean
+}
+
+export const getStudySessionReport = async (
+  sessionId: string | number
+): Promise<ApiResponse<StudySessionReport>> => {
+  const id = String(sessionId).trim()
+  return get<StudySessionReport>(`/study/session/${id}/report`)
+}
+
+type ReportStreamEvent = {
+  type: 'delta' | 'done' | 'error' | 'cached'
+  text?: string
+}
+
+/** Stream AI classroom report via SSE (fetch + ReadableStream; supports Authorization). */
+export async function streamStudySessionReport(
+  sessionId: string | number,
+  handlers: {
+    onDelta?: (delta: string) => void
+    onDone?: (full: string) => void
+    onError?: (code: string) => void
+  },
+  signal?: AbortSignal
+): Promise<void> {
+  const id = String(sessionId).trim()
+  const token =
+    (typeof localStorage !== 'undefined' && localStorage.getItem('auth_token')) || ''
+  const res = await fetch(`${getApiBaseURL()}/study/session/${id}/report/stream`, {
+    method: 'GET',
+    headers: {
+      Accept: 'text/event-stream',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      'Accept-Language': getStoredLocale(),
+    },
+    signal,
+  })
+  if (!res.ok || !res.body) {
+    handlers.onError?.('http_error')
+    return
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let full = ''
+
+  const consumeEvent = (raw: string) => {
+    const lines = raw.split('\n')
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue
+      const payload = line.slice(5).trim()
+      if (!payload) continue
+      try {
+        const evt = JSON.parse(payload) as ReportStreamEvent
+        if (evt.type === 'delta' && evt.text) {
+          full += evt.text
+          handlers.onDelta?.(evt.text)
+        } else if (evt.type === 'cached' && evt.text) {
+          full = evt.text
+          handlers.onDelta?.(evt.text)
+        } else if (evt.type === 'done') {
+          if (evt.text) full = evt.text
+          handlers.onDone?.(full)
+        } else if (evt.type === 'error') {
+          handlers.onError?.(evt.text || 'ai_generate_failed')
+        }
+      } catch {
+        // ignore malformed chunk
+      }
+    }
+  }
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const parts = buffer.split('\n\n')
+    buffer = parts.pop() || ''
+    for (const part of parts) consumeEvent(part)
+  }
+  if (buffer.trim()) consumeEvent(buffer)
 }
 
 export type UpdatePracticeTimeRequest = {

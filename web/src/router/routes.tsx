@@ -30,6 +30,7 @@ import WordPractice from "../pages/WordPractice";
 import FlashReview from "../pages/FlashReview";
 import PostTrainingCheck from "../pages/PostTrainingCheck";
 import ListenIdentify from "../pages/ListenIdentify";
+import SessionReport from "../pages/SessionReport";
 import CreateAntiForgetting from "../pages/CreateAntiForgetting";
 import Notifications from "../pages/Notifications";
 import Announcements from "../pages/Announcements";
@@ -387,6 +388,14 @@ export const router = createBrowserRouter(
     element: (
       <RequireAuth>
         <PostTrainingCheck />
+      </RequireAuth>
+    ),
+  },
+  {
+    path: "/session-report/:sessionId",
+    element: (
+      <RequireAuth>
+        <SessionReport />
       </RequireAuth>
     ),
   },

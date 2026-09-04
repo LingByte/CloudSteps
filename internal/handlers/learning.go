@@ -35,6 +35,8 @@ func (h *Handlers) registerLearningRoutes(r *humax.Group) {
 		study.PUT("/sessions/practice-time", h.handleStudySessionsPracticeTime)
 		study.POST("/session/start", h.handleStudySessionStart)
 		study.POST("/session/:id/complete", h.handleStudySessionComplete)
+		study.GET("/session/:id/report", h.handleStudySessionReport)
+		study.GET("/session/:id/report/stream", h.handleStudySessionReportStream)
 		study.GET("/session/:id", h.handleStudySessionGet)
 	}
 

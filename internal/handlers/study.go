@@ -346,13 +346,15 @@ func (h *Handlers) handleStudySessionStart(c *gin.Context) {
 
 	// Create session
 	session := models.StudySession{
-		UserID:      user.ID,
-		StudentID:   sessionStudentID,
-		WordBookID:  body.WordBookID,
-		SessionType: "learn",
-		Status:      "in_progress",
-		StartedAt:   now,
-		WordCount:   len(selectedIDs),
+		UserID:               user.ID,
+		StudentID:            sessionStudentID,
+		WordBookID:           body.WordBookID,
+		SessionType:          "learn",
+		Status:               "in_progress",
+		StartedAt:            now,
+		WordCount:            len(selectedIDs),
+		ScreenedKnownCount:   len(body.KnownIDs),
+		ScreenedUnknownCount: len(unknownIDs),
 	}
 	if err := db.Create(&session).Error; err != nil {
 		response.FailI18n(c, "coaching.create_session_failed", err)

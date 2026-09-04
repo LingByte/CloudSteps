@@ -85,10 +85,14 @@ func Models() []any {
 
 // PostMigrate 在 AutoMigrate 之后执行的兜底修复：
 //   - 确保 users.email 列存在
+//   - 确保 study_sessions 课堂报告相关列存在（不依赖 -init）
 //   - 删除 users.username 唯一索引（允许软删后同用户名重新注册）
 //   - 修正 scenario_dialogue 表字符集为 utf8mb4
 func PostMigrate(db *gorm.DB) error {
 	if err := ensureUsersEmailColumn(db); err != nil {
+		return err
+	}
+	if err := ensureStudySessionReportColumns(db); err != nil {
 		return err
 	}
 	if err := dropUsersUsernameUniqueIndex(db); err != nil {
@@ -142,6 +146,83 @@ func ensureUsersEmailColumn(db *gorm.DB) error {
 		}
 	}
 	logger.Info("users.email column ensured via explicit ALTER TABLE")
+	return nil
+}
+
+// ensureStudySessionReportColumns adds classroom-report columns without requiring -init AutoMigrate.
+func ensureStudySessionReportColumns(db *gorm.DB) error {
+	driver := configs.Global.Database.Driver
+	if driver != "mysql" && driver != "sqlite" {
+		return nil
+	}
+
+	table := "study_sessions"
+	type colDef struct {
+		Name   string
+		MySQL  string
+		SQLite string
+	}
+	cols := []colDef{
+		{Name: "screened_known_count", MySQL: "INT NOT NULL DEFAULT 0 COMMENT '本课筛词熟词数'", SQLite: "INTEGER NOT NULL DEFAULT 0"},
+		{Name: "screened_unknown_count", MySQL: "INT NOT NULL DEFAULT 0 COMMENT '本课筛词生词/新词数'", SQLite: "INTEGER NOT NULL DEFAULT 0"},
+		{Name: "report_summary", MySQL: "TEXT NULL COMMENT '课堂报告 AI 摘要缓存'", SQLite: "TEXT"},
+	}
+
+	existing := map[string]bool{}
+	if driver == "mysql" {
+		type colRow struct {
+			ColumnName string `gorm:"column:column_name"`
+		}
+		var rows []colRow
+		if err := db.Raw(`
+			SELECT column_name
+			FROM information_schema.columns
+			WHERE table_schema = DATABASE() AND table_name = ?
+		`, table).Scan(&rows).Error; err != nil {
+			logger.Warn("check study_sessions columns failed, will try ALTER TABLE", zap.Error(err))
+		} else {
+			for _, r := range rows {
+				existing[strings.ToLower(r.ColumnName)] = true
+			}
+		}
+		for _, c := range cols {
+			if existing[c.Name] {
+				continue
+			}
+			stmt := "ALTER TABLE `" + table + "` ADD COLUMN `" + c.Name + "` " + c.MySQL
+			if err := db.Exec(stmt).Error; err != nil {
+				if !strings.Contains(err.Error(), "Duplicate column") {
+					return err
+				}
+			} else {
+				logger.Info("study_sessions column ensured", zap.String("column", c.Name))
+			}
+		}
+		return nil
+	}
+
+	var pragmaCols []struct {
+		Name string `gorm:"column:name"`
+	}
+	if err := db.Raw("PRAGMA table_info(" + table + ")").Scan(&pragmaCols).Error; err != nil {
+		return err
+	}
+	for _, c := range pragmaCols {
+		existing[strings.ToLower(c.Name)] = true
+	}
+	for _, c := range cols {
+		if existing[c.Name] {
+			continue
+		}
+		stmt := "ALTER TABLE " + table + " ADD COLUMN " + c.Name + " " + c.SQLite
+		if err := db.Exec(stmt).Error; err != nil {
+			if !strings.Contains(strings.ToLower(err.Error()), "duplicate column") {
+				return err
+			}
+		} else {
+			logger.Info("study_sessions column ensured", zap.String("column", c.Name))
+		}
+	}
 	return nil
 }
 

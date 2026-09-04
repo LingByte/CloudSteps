@@ -328,15 +328,20 @@ export default function PostTrainingCheck() {
   };
 
   const finishTrainingAndCreateReview = () => {
+    const reportSessionId = sessionId;
     sessionStorage.removeItem("lb_study_batch_idx");
     sessionStorage.removeItem("lb_study_batch_results");
     sessionStorage.removeItem("lb_study_total_batches");
     sessionStorage.removeItem(CHECK_PHASE_KEY);
     clearStudyRecheck();
-    // 整段识记练完 → 抗遗忘；并结算本段练习额度
+    // 整段识记练完 → 课堂报告 → 抗遗忘；并结算本段练习额度
     stampLessonPracticeWindow();
     allowPracticeLeaveOnce();
     void finishPracticeBilling().finally(() => {
+      if (reportSessionId) {
+        navigate(`/session-report/${reportSessionId}`, { replace: true });
+        return;
+      }
       navigate("/create-anti-forgetting", { replace: true });
     });
   };
