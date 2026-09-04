@@ -212,6 +212,9 @@ export interface StudySessionReport {
   wordBookId: number
   wordBookName: string
   studentName: string
+  studentAvatar?: string
+  coachName?: string
+  coachAvatar?: string
   status: string
   startedAt: string
   completedAt?: string

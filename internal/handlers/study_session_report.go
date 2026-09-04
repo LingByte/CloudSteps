@@ -23,6 +23,9 @@ type studySessionReportDTO struct {
 	WordBookID           uint     `json:"wordBookId"`
 	WordBookName         string   `json:"wordBookName"`
 	StudentName          string   `json:"studentName"`
+	StudentAvatar        string   `json:"studentAvatar,omitempty"`
+	CoachName            string   `json:"coachName,omitempty"`
+	CoachAvatar          string   `json:"coachAvatar,omitempty"`
 	Status               string   `json:"status"`
 	StartedAt            string   `json:"startedAt"`
 	CompletedAt          string   `json:"completedAt,omitempty"`
@@ -81,19 +84,40 @@ func buildStudySessionReport(db *gorm.DB, session *models.StudySession) studySes
 	}
 
 	studentName := ""
-	nameUserID := session.UserID
+	studentAvatar := ""
+	coachName := ""
+	coachAvatar := ""
+	studentUserID := session.UserID
+	coachUserID := session.UserID
 	if session.StudentID > 0 {
-		nameUserID = session.StudentID
+		studentUserID = session.StudentID
+		coachUserID = session.UserID
 	}
-	var u models.User
-	if err := db.Select("id", "display_name", "username", "email").Where("id = ?", nameUserID).First(&u).Error; err == nil {
-		studentName = strings.TrimSpace(u.DisplayName)
-		if studentName == "" {
-			studentName = strings.TrimSpace(u.Username)
+
+	loadUserLabel := func(id uint) (name, avatar string) {
+		if id == 0 {
+			return "", ""
 		}
-		if studentName == "" {
-			studentName = strings.TrimSpace(u.Email)
+		var u models.User
+		if err := db.Select("id", "display_name", "username", "email", "avatar").Where("id = ?", id).First(&u).Error; err != nil {
+			return "", ""
 		}
+		name = strings.TrimSpace(u.DisplayName)
+		if name == "" {
+			name = strings.TrimSpace(u.Username)
+		}
+		if name == "" {
+			name = strings.TrimSpace(u.Email)
+		}
+		return name, strings.TrimSpace(u.Avatar)
+	}
+
+	studentName, studentAvatar = loadUserLabel(studentUserID)
+	if coachUserID != studentUserID {
+		coachName, coachAvatar = loadUserLabel(coachUserID)
+	} else {
+		// 自练：陪练与学员同一账号
+		coachName, coachAvatar = studentName, studentAvatar
 	}
 
 	end := time.Now().UTC()
@@ -161,6 +185,9 @@ func buildStudySessionReport(db *gorm.DB, session *models.StudySession) studySes
 		WordBookID:           session.WordBookID,
 		WordBookName:         wbName,
 		StudentName:          studentName,
+		StudentAvatar:        studentAvatar,
+		CoachName:            coachName,
+		CoachAvatar:          coachAvatar,
 		Status:               session.Status,
 		StartedAt:            session.StartedAt.UTC().Format(time.RFC3339),
 		CompletedAt:          completedAt,

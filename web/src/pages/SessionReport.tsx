@@ -3,7 +3,7 @@ import { toPng } from "html-to-image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useTranslation } from "react-i18next";
-import { CloudButton } from "../components/cloudsteps";
+import { CloudButton, CloudImageWithFallback } from "../components/cloudsteps";
 import {
   getStudySessionReport,
   streamStudySessionReport,
@@ -11,7 +11,7 @@ import {
 } from "../api/study";
 import { formatApiMessage } from "../utils/apiMessage";
 import { showToast } from "../utils/toast";
-import reportBg from "../assets/images/session-report-bg.jpg";
+import { teacherAvatarSrc } from "../utils/avatar";
 import { buildSessionReportCopyText } from "../utils/sessionReportCopy";
 
 function formatReportDate(iso?: string) {
@@ -22,6 +22,14 @@ function formatReportDate(iso?: string) {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+function formatReportDateTime(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function buildCoachFallback(
@@ -39,27 +47,60 @@ function buildCoachFallback(
   return t("session_report.fallback.low", { name, accuracy: acc, forgot: report.forgotCount });
 }
 
-function Metric({
-  label,
-  value,
-  emphasize,
-}: {
-  label: string;
-  value: string | number;
-  emphasize?: boolean;
-}) {
+function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-center">
-      <p
-        className={
-          emphasize
-            ? "text-[26px] font-semibold tabular-nums tracking-tight text-[#1A1A1A]"
-            : "text-[22px] font-semibold tabular-nums tracking-tight text-[#1A1A1A]"
-        }
-      >
-        {value}
-      </p>
-      <p className="mt-1 text-[11px] tracking-wide text-[#8A857C]">{label}</p>
+    <h2 className="mb-1 px-0.5 text-[12px] font-semibold tracking-tight text-[#6B7280]">
+      {children}
+    </h2>
+  );
+}
+
+function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-xl bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+type WordRow = { word: string; gloss: string };
+
+function parseWordLabel(raw: string): WordRow {
+  const text = raw.trim();
+  const m = text.match(/^(\S+)\s+(.+)$/);
+  if (!m) return { word: text, gloss: "" };
+  return { word: m[1], gloss: m[2].trim() };
+}
+
+function WordList({
+  title,
+  items,
+  tone,
+}: {
+  title: string;
+  items: string[];
+  tone: "ok" | "warn";
+}) {
+  if (items.length === 0) return null;
+  const rows = items.map(parseWordLabel);
+  const dot = tone === "ok" ? "bg-emerald-500" : "bg-amber-500";
+  return (
+    <div>
+      <p className="mb-1.5 text-[11px] font-medium text-[#6B7280]">{title}</p>
+      <ul className="divide-y divide-[#F0F0F0] rounded-lg border border-[#ECECEC] bg-[#FAFAFA]">
+        {rows.map((row) => (
+          <li
+            key={`${tone}-${row.word}-${row.gloss}`}
+            className="flex min-w-0 items-center gap-2 px-2.5 py-2"
+          >
+            <span className={`size-1.5 shrink-0 rounded-full ${dot}`} aria-hidden />
+            <span className="shrink-0 text-[13px] font-semibold text-[#111827]">{row.word}</span>
+            {row.gloss ? (
+              <span className="min-w-0 flex-1 truncate text-[12px] text-[#6B7280]">{row.gloss}</span>
+            ) : null}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -203,12 +244,17 @@ export default function SessionReport() {
     () => formatReportDate(report?.completedAt || report?.startedAt),
     [report]
   );
+  const coachAt = useMemo(
+    () => formatReportDateTime(report?.completedAt || report?.startedAt),
+    [report]
+  );
 
-  const screenTotal = report
-    ? report.screenedKnownCount + report.screenedUnknownCount
-    : 0;
   const noteBusy = streaming || typing;
-  const forgotWords = report?.forgotWords?.slice(0, 6) ?? [];
+  const forgotWords = report?.forgotWords?.slice(0, 5) ?? [];
+  const studiedWords = report?.studiedWords?.slice(0, 8) ?? [];
+  const studentName = report?.studentName || t("session_report.student_fallback");
+  const coachName = report?.coachName || t("session_report.coach_fallback");
+  const bookName = report?.wordBookName || t("session_report.wordbook_fallback");
 
   const copyAll = async () => {
     if (!report) return;
@@ -224,23 +270,12 @@ export default function SessionReport() {
   const saveImage = async () => {
     if (!posterRef.current || !report) return;
     setSavingImage(true);
-    const el = posterRef.current;
-    const prev = {
-      backgroundImage: el.style.backgroundImage,
-      backgroundSize: el.style.backgroundSize,
-      backgroundPosition: el.style.backgroundPosition,
-      padding: el.style.padding,
-    };
     try {
       await new Promise((r) => requestAnimationFrame(() => r(null)));
-      el.style.backgroundImage = `url(${reportBg})`;
-      el.style.backgroundSize = "cover";
-      el.style.backgroundPosition = "center";
-      el.style.padding = "20px 16px";
-      const dataUrl = await toPng(el, {
+      const dataUrl = await toPng(posterRef.current, {
         cacheBust: true,
         pixelRatio: 2,
-        backgroundColor: "#F4F1EA",
+        backgroundColor: "#F5F5F5",
       });
       const link = document.createElement("a");
       const name = ["课堂报告", report.studentName || "", reportDate || ""]
@@ -253,157 +288,92 @@ export default function SessionReport() {
     } catch {
       showToast.error(t("session_report.save_image_failed"));
     } finally {
-      el.style.backgroundImage = prev.backgroundImage;
-      el.style.backgroundSize = prev.backgroundSize;
-      el.style.backgroundPosition = prev.backgroundPosition;
-      el.style.padding = prev.padding;
       setSavingImage(false);
     }
   };
 
   return (
-    <div className="relative min-h-dvh bg-[#E8E4DC]">
-      <img
-        aria-hidden
-        src={reportBg}
-        alt=""
-        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
-      />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/30 via-white/45 to-white/60" />
-
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-[#F5F5F5]">
       <button
         type="button"
         onClick={() => void saveImage()}
         disabled={!report || savingImage || loading}
-        className="absolute right-4 top-4 z-30 inline-flex h-9 items-center gap-1.5 rounded-full bg-white/75 px-3 text-[12px] font-medium text-[#5C574F] shadow-sm backdrop-blur-md transition hover:bg-white disabled:opacity-50"
+        className="absolute right-3 top-2.5 z-30 inline-flex h-8 items-center gap-1 rounded-full bg-white px-2.5 text-[11px] font-medium text-[#5C574F] shadow-sm transition hover:bg-white disabled:opacity-50"
         aria-label={t("session_report.save_image")}
       >
         {savingImage ? (
-          <Loader2 size={14} className="animate-spin" />
+          <Loader2 size={13} className="animate-spin" />
         ) : (
-          <Download size={14} />
+          <Download size={13} />
         )}
         {t("session_report.save_image")}
       </button>
 
-      <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-lg flex-col px-4 pb-[calc(5.25rem+env(safe-area-inset-bottom))] pt-5">
-        <div ref={posterRef} className="relative flex-1">
-          <div className="relative pb-6 pt-1">
-            <div className="min-w-0 pr-16">
-              <p className="text-[11px] tracking-[0.18em] text-[#8A857C] uppercase">
-                CloudSteps
-              </p>
-              <h1
-                id="session-report-title"
-                className="mt-1 text-[24px] font-semibold tracking-tight text-[#1A1A1A]"
-              >
-                {t("session_report.feedback_title")}
-              </h1>
-              <p className="mt-1.5 text-[12px] text-[#8A857C]">
-                {[reportDate, report?.studentName, report?.wordBookName]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
+      <div className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col px-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-2">
+        <div ref={posterRef} className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#F5F5F5]">
+          <h1
+            id="session-report-title"
+            className="shrink-0 pr-14 text-center text-[13px] font-medium tracking-wide text-[#6B7280]"
+          >
+            {t("session_report.feedback_title")}
+          </h1>
+
+          {loading ? (
+            <div className="flex flex-1 items-center justify-center gap-2 text-sm text-[#8A857C]">
+              <Loader2 className="animate-spin text-[var(--primary)]" size={18} />
+              {t("session_report.loading")}
             </div>
-
-            {loading ? (
-              <div className="flex items-center justify-center gap-2 py-20 text-sm text-[#8A857C]">
-                <Loader2 className="animate-spin text-[var(--primary)]" size={18} />
-                {t("session_report.loading")}
-              </div>
-            ) : !report ? (
-              <p className="py-16 text-center text-sm text-[#8A857C]">
-                {t("session_report.load_failed")}
-              </p>
-            ) : (
-              <div className="mt-6 space-y-4">
-                <div className="grid grid-cols-3 gap-2 rounded-2xl bg-white/55 px-2 py-4 backdrop-blur-[2px]">
-                  <Metric
-                    label={t("session_report.stat.duration")}
-                    value={`${report.durationMinutes}`}
-                  />
-                  <Metric
-                    label={t("session_report.stat.accuracy")}
-                    value={`${Math.round(report.accuracyPercent)}%`}
-                    emphasize
-                  />
-                  <Metric
-                    label={t("session_report.stat.studied")}
-                    value={report.wordCount}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="rounded-2xl bg-white/55 px-3.5 py-3.5">
-                    <p className="text-[11px] text-[#8A857C]">{t("session_report.dim.screen")}</p>
-                    <div className="mt-2.5 flex items-end justify-between gap-2">
-                      <div>
-                        <p className="text-[22px] font-semibold tabular-nums text-[#1A1A1A]">
-                          {report.screenedKnownCount}
-                        </p>
-                        <p className="text-[11px] text-[#8A857C]">
-                          {t("session_report.stat.screened_known")}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[22px] font-semibold tabular-nums text-[#1A1A1A]">
-                          {report.screenedUnknownCount}
-                        </p>
-                        <p className="text-[11px] text-[#8A857C]">
-                          {t("session_report.stat.screened_unknown")}
-                        </p>
-                      </div>
+          ) : !report ? (
+            <p className="flex flex-1 items-center justify-center text-sm text-[#8A857C]">
+              {t("session_report.load_failed")}
+            </p>
+          ) : (
+            <div className="mt-2 flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
+              <section className="shrink-0">
+                <SectionLabel>{t("session_report.section.basic")}</SectionLabel>
+                <Card>
+                  <div className="flex items-center gap-2.5">
+                    <CloudImageWithFallback
+                      src={teacherAvatarSrc(report.studentAvatar)}
+                      alt={studentName}
+                      className="size-10 shrink-0 rounded-full object-cover bg-[#EEE]"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[14px] font-semibold leading-tight text-[#1A1A1A]">
+                        {studentName}
+                      </p>
+                      <p className="mt-0.5 truncate text-[11px] text-[#6B7280]">
+                        {bookName}
+                        <span className="mx-1 text-[#D1D5DB]">·</span>
+                        {reportDate || "—"}
+                        <span className="mx-1 text-[#D1D5DB]">·</span>
+                        {t("session_report.duration_training", {
+                          minutes: report.durationMinutes,
+                        })}
+                      </p>
                     </div>
-                    <p className="mt-2 text-[11px] text-[#A4A097]">
-                      {t("session_report.screen_total_inline", { total: screenTotal })}
+                  </div>
+                  <div className="mt-2 flex items-center gap-2 border-t border-[#F3F4F6] pt-2">
+                    <CloudImageWithFallback
+                      src={teacherAvatarSrc(report.coachAvatar)}
+                      alt={coachName}
+                      className="size-5 shrink-0 rounded-full object-cover bg-[#EEE]"
+                    />
+                    <p className="min-w-0 flex-1 truncate text-[11px] text-[#4B5563]">
+                      {t("session_report.coach_line", { name: coachName })}
                     </p>
+                    <p className="shrink-0 text-[10px] text-[#9CA3AF]">{coachAt || "—"}</p>
                   </div>
+                </Card>
+              </section>
 
-                  <div className="rounded-2xl bg-white/55 px-3.5 py-3.5">
-                    <p className="text-[11px] text-[#8A857C]">{t("session_report.dim.check")}</p>
-                    <div className="mt-2.5 flex items-end justify-between gap-2">
-                      <div>
-                        <p className="text-[22px] font-semibold tabular-nums text-[#1A1A1A]">
-                          {report.correctCount}
-                        </p>
-                        <p className="text-[11px] text-[#8A857C]">
-                          {t("session_report.stat.remembered")}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[22px] font-semibold tabular-nums text-[#1A1A1A]">
-                          {report.forgotCount}
-                        </p>
-                        <p className="text-[11px] text-[#8A857C]">
-                          {t("session_report.stat.forgot")}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="mt-2 text-[11px] text-[#A4A097]">
-                      {t("session_report.of_studied", { total: report.wordCount })}
+              <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <SectionLabel>{t("session_report.section.note")}</SectionLabel>
+                <Card className="flex min-h-0 flex-1 flex-col overflow-hidden !bg-white">
+                  <div className="flex shrink-0 items-center justify-between gap-2">
+                    <p className="text-[13px] font-semibold text-[#1A1A1A]">
+                      {t("session_report.note_heading")}
                     </p>
-                  </div>
-                </div>
-
-                {forgotWords.length > 0 ? (
-                  <div className="rounded-2xl bg-white/50 px-3.5 py-3">
-                    <p className="text-[11px] text-[#8A857C]">{t("session_report.dim.reinforce")}</p>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {forgotWords.map((w) => (
-                        <span
-                          key={w}
-                          className="rounded-lg bg-white/75 px-2 py-1 text-[11px] text-[#37352F]"
-                        >
-                          {w}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="rounded-2xl bg-white/55 px-3.5 py-3.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[11px] text-[#8A857C]">{t("session_report.dim.note")}</p>
                     {noteBusy ? (
                       <span className="inline-flex items-center gap-1 text-[10px] text-[#A4A097]">
                         <Loader2 size={11} className="animate-spin" />
@@ -411,51 +381,84 @@ export default function SessionReport() {
                       </span>
                     ) : null}
                   </div>
-                  <div ref={noteBoxRef} className="mt-2 min-h-[72px]">
-                    {noteShown.trim() ? (
-                      <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-[#4A453C]">
-                        {noteShown}
-                        {noteBusy ? (
-                          <span className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[2px] animate-pulse bg-[#37352F] align-baseline" />
-                        ) : null}
-                      </p>
-                    ) : (
-                      <p className="text-[13px] text-[#C2BDB3]">
-                        {t("session_report.note_placeholder")}
-                      </p>
-                    )}
+
+                  <div className="mt-2 shrink-0 rounded-lg bg-[#F8F8F8] px-2.5 py-2 text-[11px] leading-relaxed text-[#4B5563]">
+                    <p className="line-clamp-2">
+                      {t("session_report.note_stats", {
+                        screened: report.screenedKnownCount + report.screenedUnknownCount,
+                        known: report.screenedKnownCount,
+                        newWords: Math.max(report.screenedUnknownCount, report.wordCount),
+                        studied: report.wordCount,
+                        remembered: report.correctCount,
+                        forgot: report.forgotCount,
+                        accuracy: Math.round(report.accuracyPercent),
+                      })}
+                    </p>
+                    <div ref={noteBoxRef} className="mt-1.5">
+                      {noteShown.trim() ? (
+                        <p className="line-clamp-2 whitespace-pre-wrap text-[#374151]">
+                          {t("session_report.note_eval_prefix")}
+                          {noteShown}
+                          {noteBusy ? (
+                            <span className="ml-0.5 inline-block h-[1em] w-[2px] translate-y-[2px] animate-pulse bg-[#37352F] align-baseline" />
+                          ) : null}
+                        </p>
+                      ) : (
+                        <p className="text-[#C2BDB3]">{t("session_report.note_placeholder")}</p>
+                      )}
+                    </div>
                   </div>
+
+                  <div className="mt-2 min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain">
+                    <WordList
+                      title={t("session_report.studied_list_title")}
+                      items={studiedWords}
+                      tone="ok"
+                    />
+                    <WordList
+                      title={t("session_report.forgot_list_title")}
+                      items={forgotWords}
+                      tone="warn"
+                    />
+                  </div>
+
                   {aiError && aiError !== "llm_not_configured" ? (
-                    <p className="mt-2 text-[11px] text-[var(--warning)]">
+                    <p className="mt-1 shrink-0 text-[10px] text-[var(--warning)]">
                       {t("session_report.ai_failed_hint")}
                     </p>
                   ) : null}
+                </Card>
+              </section>
+
+              <section className="shrink-0">
+                <div className="inline-flex max-w-full items-center rounded-full bg-[#E8F8EF] px-3 py-1 text-[11px] font-medium text-[#1F8A4C]">
+                  <span className="truncate">【{bookName}】</span>
                 </div>
-              </div>
-            )}
-          </div>
+              </section>
+            </div>
+          )}
         </div>
       </div>
 
       <div
-        className="fixed inset-x-0 bottom-0 z-20 px-4 pt-2"
-        style={{ paddingBottom: "max(0.85rem, env(safe-area-inset-bottom))" }}
+        className="shrink-0 px-3 pt-1"
+        style={{ paddingBottom: "max(0.65rem, env(safe-area-inset-bottom))" }}
       >
-        <div className="mx-auto flex max-w-lg items-center gap-3 rounded-2xl bg-white/85 p-2 shadow-[0_10px_30px_rgba(42,38,32,0.12)] backdrop-blur-md">
+        <div className="mx-auto flex max-w-lg items-center gap-2 rounded-xl bg-white p-1.5 shadow-[0_8px_24px_rgba(42,38,32,0.1)]">
           <CloudButton
             type="button"
             variant="ghost"
-            className="h-11 shrink-0 rounded-xl px-3.5 text-[#5C574F] hover:bg-black/5"
+            className="h-10 shrink-0 rounded-lg px-3 text-[#5C574F] hover:bg-black/5"
             onClick={() => void copyAll()}
             disabled={!report}
           >
-            <Copy size={16} />
+            <Copy size={15} />
             {t("session_report.copy_content")}
           </CloudButton>
           <CloudButton
             type="button"
             variant="brand"
-            className="h-11 flex-1 rounded-xl text-[15px] font-medium"
+            className="h-10 flex-1 rounded-lg text-[14px] font-medium"
             onClick={goNext}
           >
             {t("session_report.continue")}
