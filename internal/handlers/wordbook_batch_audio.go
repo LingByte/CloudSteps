@@ -2,10 +2,8 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,9 +18,6 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
-
-var posPrefixRe = regexp.MustCompile(`(?i)^[a-z]+\.\s+`)
-var englishGlossRe = regexp.MustCompile(`(?i)[a-z][a-z\s\-']*`)
 
 type wordBookBatchAudioJob struct {
 	mu            sync.Mutex
@@ -540,7 +535,8 @@ func synthesizeWordBookAudioURLsWithRetry(ctx context.Context, word, translation
 }
 
 func synthesizeWordBookAudioURLs(ctx context.Context, word, translation string, segGap time.Duration) (string, error) {
-	texts := buildWordAudioTexts(word, translation)
+	_ = translation // 英文音色只念单词；释义不进 TTS（与 admin lingecho-tts 一致）
+	texts := buildWordAudioTexts(word)
 	urls := make([]string, 0, len(texts))
 	for i, text := range texts {
 		if ctx.Err() != nil {
@@ -564,44 +560,11 @@ func synthesizeWordBookAudioURLs(ctx context.Context, word, translation string, 
 	return strings.Join(urls, ";"), nil
 }
 
-func buildWordAudioTexts(word, translation string) []string {
+// buildWordAudioTexts 词库音频两槽：0=单词一遍，1=单词三遍连读。
+func buildWordAudioTexts(word string) []string {
 	w := strings.TrimSpace(word)
 	if w == "" {
 		return nil
 	}
-	zh := pickChineseGloss(w, translation)
-	return []string{w, w, zh}
-}
-
-func pickChineseGloss(word, translation string) string {
-	translation = strings.TrimSpace(translation)
-	if translation == "" {
-		return word
-	}
-	var items []string
-	if err := json.Unmarshal([]byte(translation), &items); err == nil && len(items) > 0 {
-		translation = items[0]
-	}
-	gloss := stripPosFromGloss(translation, word)
-	gloss = englishGlossRe.ReplaceAllString(gloss, " ")
-	fields := strings.Fields(gloss)
-	if len(fields) == 0 {
-		return word
-	}
-	gloss = strings.TrimSpace(fields[0])
-	if i := strings.IndexAny(gloss, "；;，,"); i >= 0 {
-		gloss = strings.TrimSpace(gloss[:i])
-	}
-	if gloss == "" {
-		return word
-	}
-	return gloss
-}
-
-func stripPosFromGloss(s, word string) string {
-	s = strings.TrimSpace(posPrefixRe.ReplaceAllString(s, ""))
-	if s == "" {
-		return word
-	}
-	return s
+	return []string{w, w + " " + w + " " + w}
 }
