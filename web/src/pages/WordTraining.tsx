@@ -72,6 +72,7 @@ export default function WordTraining() {
   const [wordBooks, setWordBooks] = useState<CachedWordBook[]>(initialBooks);
   const [studentWordBooks, setStudentWordBooks] = useState<StudentWordBookItem[]>([]);
   const [studentBooksLoading, setStudentBooksLoading] = useState(false);
+  const [continueLoading, setContinueLoading] = useState(false);
   const userPickedByStudent = useRef<Record<string, string>>({});
   const [selectedWordBookId, setSelectedWordBookId] = useState<string>(() =>
     normalizeSnowflakeId(initialPick?.id)
@@ -549,15 +550,22 @@ export default function WordTraining() {
             variant="brand"
             size="pillLg"
             className="flex-1"
-            disabled={!selectedWordBookId}
+            disabled={!selectedWordBookId || continueLoading}
+            loading={continueLoading}
+            loadingText={t("practice.starting")}
             onClick={() => {
               void (async () => {
-                if (!selectedWordBookId) return;
-                if (isCoach) {
-                  const link = await ensurePracticeBillingActive();
-                  if (!link) return;
+                if (!selectedWordBookId || continueLoading) return;
+                setContinueLoading(true);
+                try {
+                  if (isCoach) {
+                    const link = await ensurePracticeBillingActive();
+                    if (!link) return;
+                  }
+                  navigate("/pre-training-check");
+                } finally {
+                  setContinueLoading(false);
                 }
-                navigate("/pre-training-check");
               })();
             }}
           >
