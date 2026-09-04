@@ -51,7 +51,12 @@ export default function CaptchaWidget({ onChange, className }: CaptchaWidgetProp
     (v: any) => {
       setValue(v);
       if (captcha && v != null && v !== "") {
-        onChange({ captchaId: captcha.id, captchaType: captcha.type, captchaValue: v });
+        // Math captcha backend expects a numeric JSON value; strings become 0 via intValue().
+        const captchaValue =
+          captcha.type === "math" && typeof v === "string" && /^-?\d+$/.test(v)
+            ? Number(v)
+            : v;
+        onChange({ captchaId: captcha.id, captchaType: captcha.type, captchaValue });
       } else {
         onChange(null);
       }
@@ -107,7 +112,7 @@ export default function CaptchaWidget({ onChange, className }: CaptchaWidgetProp
           inputMode="numeric"
           autoComplete="off"
           value={value ?? ""}
-          onChange={(e) => reportValue(e.target.value.trim())}
+          onChange={(e) => reportValue(e.target.value)}
           placeholder={t("ui.answer")}
           className={inputClass}
         />

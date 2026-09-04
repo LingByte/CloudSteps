@@ -196,7 +196,7 @@ func (h *Handlers) handleUserSigninByUsername(c *gin.Context) {
 			return
 		}
 
-		err := captcha.ValidatePayload(form.CaptchaID, form.CaptchaType, form.CaptchaValue)
+		err := validateCaptchaPayload(form.CaptchaID, form.CaptchaType, form.CaptchaValue)
 		if err != nil {
 			response.FailI18n(c, "common.captcha_invalid", nil)
 			return
@@ -343,7 +343,7 @@ func (h *Handlers) handleUserSigninByPassword(c *gin.Context) {
 				return
 			}
 
-			err := captcha.ValidatePayload(form.CaptchaID, form.CaptchaType, form.CaptchaValue)
+			err := validateCaptchaPayload(form.CaptchaID, form.CaptchaType, form.CaptchaValue)
 			if err != nil {
 				logger.Warn("Login failed: invalid captcha code", zap.String("email", form.Username), zap.Uint("userID", user.ID), zap.String("ip", clientIP), zap.String("captchaID", form.CaptchaID), zap.Error(err))
 				response.FailI18n(c, "common.captcha_invalid", nil)
@@ -464,7 +464,7 @@ func (h *Handlers) handleUserSignup(c *gin.Context) {
 			return
 		}
 
-		err := captcha.ValidatePayload(form.CaptchaID, form.CaptchaType, form.CaptchaValue)
+		err := validateCaptchaPayload(form.CaptchaID, form.CaptchaType, form.CaptchaValue)
 		if err != nil {
 			if utils.GlobalRegistrationGuard != nil {
 				utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, false, "invalid captcha")
@@ -595,7 +595,7 @@ func (h *Handlers) handleUserSignupByEmail(c *gin.Context) {
 			return
 		}
 
-		err := captcha.ValidatePayload(form.CaptchaID, form.CaptchaType, form.CaptchaValue)
+		err := validateCaptchaPayload(form.CaptchaID, form.CaptchaType, form.CaptchaValue)
 		if err != nil {
 			if utils.GlobalRegistrationGuard != nil {
 				utils.GlobalRegistrationGuard.RecordRegistrationAttempt(clientIP, form.Username, false, "invalid captcha")
@@ -1373,7 +1373,7 @@ func (h *Handlers) handleVerifyCaptcha(c *gin.Context) {
 		return
 	}
 
-	if err := captcha.ValidatePayload(req.ID, string(req.Type), req.Value); err != nil {
+	if err := validateCaptchaPayload(req.ID, string(req.Type), req.Value); err != nil {
 		response.FailI18n(c, "msg.f08c2d84", err)
 		return
 	}

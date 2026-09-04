@@ -55,14 +55,18 @@ export function CaptchaChallenge({
 
   const report = (raw: string) => {
     setAnswer(raw)
-    if (!captcha || raw === '') {
+    if (!captcha || raw.trim() === '') {
       onChange(null)
       return
     }
+    const trimmed = raw.trim()
+    // Math captcha backend expects a numeric JSON value; strings become 0 via intValue().
+    const captchaValue =
+      captcha.type === 'math' && /^-?\d+$/.test(trimmed) ? Number(trimmed) : trimmed
     onChange({
       captchaId: captcha.id,
       captchaType: captcha.type,
-      captchaValue: raw.trim(),
+      captchaValue,
     })
   }
 

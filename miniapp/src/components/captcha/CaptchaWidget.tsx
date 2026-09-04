@@ -114,10 +114,20 @@ export default function CaptchaWidget({ onChange }: CaptchaWidgetProps) {
     (v: any) => {
       setValue(v)
       if (captcha && v != null && v !== '') {
+        const trimmed = typeof v === 'string' ? v.trim() : v
+        if (trimmed === '') {
+          onChange(null)
+          return
+        }
+        // Math captcha backend expects a numeric JSON value; strings become 0 via intValue().
+        const captchaValue =
+          captcha.type === 'math' && typeof trimmed === 'string' && /^-?\d+$/.test(trimmed)
+            ? Number(trimmed)
+            : trimmed
         onChange({
           captchaId: captcha.id,
           captchaType: captcha.type,
-          captchaValue: v,
+          captchaValue,
         })
       } else {
         onChange(null)
