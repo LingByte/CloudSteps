@@ -34,9 +34,9 @@
 
 @font-face {
   font-family: "payment-iconfont";
-  src: url("../../download%20(4)/font_5228186_75je4ry4ypr/iconfont.woff2") format("woff2"),
-       url("../../download%20(4)/font_5228186_75je4ry4ypr/iconfont.woff") format("woff"),
-       url("../../download%20(4)/font_5228186_75je4ry4ypr/iconfont.ttf") format("truetype");
+  src: url("/fonts/payment/iconfont.woff2") format("woff2"),
+       url("/fonts/payment/iconfont.woff") format("woff"),
+       url("/fonts/payment/iconfont.ttf") format("truetype");
 }
 
 .payment-iconfont {
