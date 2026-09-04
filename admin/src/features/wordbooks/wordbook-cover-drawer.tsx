@@ -39,7 +39,7 @@ Do not imitate real publisher or textbook covers; no third-party logos; copyrigh
 Mood: friendly, bright, professional.`
 
 type WordBookBrief = {
-  id: number
+  id: string | number
   name: string
   level?: string
   description?: string
@@ -69,12 +69,12 @@ type WordbookCoverDrawerProps = {
       prompt: string
       size: string
       referenceFile?: File | null
-      referenceBookId?: number | null
+      referenceBookId?: string | number | null
     }
   ) => Promise<boolean>
   onSave: (book: WordBookBrief) => Promise<void>
   onClear: (book: WordBookBrief) => Promise<void>
-  onRefreshJob: (bookId: number) => Promise<CoverJob | undefined>
+  onRefreshJob: (bookId: string | number) => Promise<CoverJob | undefined>
 }
 
 function Section({
@@ -126,7 +126,9 @@ export function WordbookCoverDrawer({
   const [configured, setConfigured] = useState(false)
   const [model, setModel] = useState('')
   const [referenceFile, setReferenceFile] = useState<File | null>(null)
-  const [referenceBookId, setReferenceBookId] = useState<number | null>(null)
+  const [referenceBookId, setReferenceBookId] = useState<string | number | null>(
+    null
+  )
   const [referencePreview, setReferencePreview] = useState('')
   const [coverCandidates, setCoverCandidates] = useState<WordBookBrief[]>([])
   const [loadingCoverCandidates, setLoadingCoverCandidates] = useState(false)
@@ -176,7 +178,7 @@ export function WordbookCoverDrawer({
     }
   }, [book, job?.prompt, job?.size])
 
-  const loadCoverCandidates = useCallback(async (currentBookId: number) => {
+  const loadCoverCandidates = useCallback(async (currentBookId: string | number) => {
     setLoadingCoverCandidates(true)
     try {
       const all: WordBookBrief[] = []
@@ -198,7 +200,7 @@ export function WordbookCoverDrawer({
       setCoverCandidates(
         all.filter(
           (b) =>
-            b.id !== currentBookId &&
+            String(b.id) !== String(currentBookId) &&
             typeof b.coverUrl === 'string' &&
             b.coverUrl.trim() !== ''
         )
@@ -252,9 +254,8 @@ export function WordbookCoverDrawer({
       setReferencePreview('')
       return
     }
-    const id = Number(value)
-    const picked = coverCandidates.find((b) => b.id === id)
-    setReferenceBookId(id)
+    const picked = coverCandidates.find((b) => String(b.id) === value)
+    setReferenceBookId(picked?.id ?? value)
     setReferenceFile(null)
     setReferencePreview(picked?.coverUrl?.trim() || '')
   }
@@ -464,7 +465,7 @@ export function WordbookCoverDrawer({
                     </SelectTrigger>
                     <SelectContent>
                       {coverCandidates.map((b) => (
-                        <SelectItem key={b.id} value={String(b.id)}>
+                        <SelectItem key={String(b.id)} value={String(b.id)}>
                           {b.name}
                           {b.level ? ` · ${b.level}` : ''}
                         </SelectItem>

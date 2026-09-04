@@ -33,11 +33,8 @@ export function WordBookWordsPage({ bookId }: { bookId: string }) {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Word | null>(null)
   const pageSize = 30
-  const bookIdNum = Number(bookId)
   const { jobs, toggleBatchAudio, startPurgeAudio } = useWordBookAudioJobs(
-    bookName && Number.isFinite(bookIdNum)
-      ? [{ id: bookIdNum, name: bookName }]
-      : []
+    bookName ? [{ id: bookId, name: bookName }] : []
   )
 
   const load = async (nextPage = page) => {
@@ -86,18 +83,18 @@ export function WordBookWordsPage({ bookId }: { bookId: string }) {
             </Link>
           </Button>
           <AudioJobButtons
-            job={jobs[bookIdNum]}
+            job={jobs[bookId]}
             size='default'
             onBatch={() =>
               void toggleBatchAudio({
-                id: bookIdNum,
+                id: bookId,
                 name: bookName || `词库 #${bookId}`,
               })
             }
             onPurge={() => {
               if (!confirm('清除本词库全部音频？')) return
               void startPurgeAudio({
-                id: bookIdNum,
+                id: bookId,
                 name: bookName || `词库 #${bookId}`,
               })
             }}

@@ -1,5 +1,7 @@
+import type { BookId } from './audio-jobs'
+
 export type CoverJob = {
-  bookId: number
+  bookId: BookId
   status: string
   prompt?: string
   size?: string

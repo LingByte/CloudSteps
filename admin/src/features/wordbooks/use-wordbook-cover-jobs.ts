@@ -1,35 +1,38 @@
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { get, post } from '@/lib/api'
+import { type BookId, bookKey } from './audio-jobs'
 import { type CoverJob, isCoverJobActive, sameCoverJob } from './cover-jobs'
 
-type BookRef = { id: number; name: string }
+type BookRef = { id: BookId; name: string }
 
-function bookName(books: BookRef[], id: number): string {
-  return books.find((b) => b.id === id)?.name || `词库 #${id}`
+function bookName(books: BookRef[], id: BookId): string {
+  const key = bookKey(id)
+  return books.find((b) => bookKey(b.id) === key)?.name || `词库 #${key}`
 }
 
 export function useWordbookCoverJobs(books: BookRef[]) {
-  const [jobs, setJobs] = useState<Record<number, CoverJob>>({})
+  const [jobs, setJobs] = useState<Record<string, CoverJob>>({})
   const booksRef = useRef(books)
   booksRef.current = books
-  const prevStatusRef = useRef<Record<number, string>>({})
+  const prevStatusRef = useRef<Record<string, string>>({})
 
-  const setBookJob = (bookId: number, job: CoverJob | null) => {
+  const setBookJob = (bookId: BookId, job: CoverJob | null) => {
+    const key = bookKey(bookId)
     setJobs((prev) => {
       if (!job) {
-        if (!(bookId in prev)) return prev
+        if (!(key in prev)) return prev
         const next = { ...prev }
-        delete next[bookId]
+        delete next[key]
         return next
       }
-      if (sameCoverJob(prev[bookId], job)) return prev
-      return { ...prev, [bookId]: job }
+      if (sameCoverJob(prev[key], job)) return prev
+      return { ...prev, [key]: job }
     })
     if (job) {
-      prevStatusRef.current[bookId] = job.status
+      prevStatusRef.current[key] = job.status
     } else {
-      delete prevStatusRef.current[bookId]
+      delete prevStatusRef.current[key]
     }
   }
 
@@ -62,11 +65,11 @@ export function useWordbookCoverJobs(books: BookRef[]) {
           let changed = false
 
           for (const j of remote) {
-            const bookId = Number(j.bookId)
-            if (!Number.isFinite(bookId)) continue
+            if (j.bookId == null || j.bookId === '') continue
+            const key = bookKey(j.bookId)
 
             const job: CoverJob = {
-              bookId,
+              bookId: j.bookId,
               status: j.status || 'idle',
               prompt: j.prompt,
               size: j.size,
@@ -77,13 +80,13 @@ export function useWordbookCoverJobs(books: BookRef[]) {
               revisedPrompt: j.revisedPrompt,
             }
 
-            const prevStatus = prevStatusRef.current[bookId]
+            const prevStatus = prevStatusRef.current[key]
             if (
               prevStatus &&
               isCoverJobActive(prevStatus) &&
               job.status === 'done'
             ) {
-              const name = bookName(booksRef.current, bookId)
+              const name = bookName(booksRef.current, key)
               toast.success(`${name}：封面预览已生成，可保存为正式封面`)
             }
             if (
@@ -91,22 +94,23 @@ export function useWordbookCoverJobs(books: BookRef[]) {
               isCoverJobActive(prevStatus) &&
               job.status === 'failed'
             ) {
-              const name = bookName(booksRef.current, bookId)
+              const name = bookName(booksRef.current, key)
               toast.error(`${name}：${job.error || '封面生成失败'}`)
             }
-            prevStatusRef.current[bookId] = job.status
+            prevStatusRef.current[key] = job.status
 
-            if (!sameCoverJob(next[bookId], job)) {
-              next[bookId] = job
+            if (!sameCoverJob(next[key], job)) {
+              next[key] = job
               changed = true
             }
           }
 
           const remoteIds = new Set(
-            remote.map((j) => Number(j.bookId)).filter(Number.isFinite)
+            remote
+              .filter((j) => j.bookId != null && j.bookId !== '')
+              .map((j) => bookKey(j.bookId))
           )
-          for (const idStr of Object.keys(next)) {
-            const id = Number(idStr)
+          for (const id of Object.keys(next)) {
             if (!remoteIds.has(id) && isCoverJobActive(next[id]?.status)) {
               delete next[id]
               delete prevStatusRef.current[id]
@@ -134,7 +138,7 @@ export function useWordbookCoverJobs(books: BookRef[]) {
     }
   }, [])
 
-  const refreshBookJob = async (bookId: number) => {
+  const refreshBookJob = async (bookId: BookId) => {
     try {
       const res = await get<CoverJob>(`/wordbooks/${bookId}/generate-cover`)
       const data = res.data
@@ -163,10 +167,10 @@ export function useWordbookCoverJobs(books: BookRef[]) {
       prompt: string
       size: string
       referenceFile?: File | null
-      referenceBookId?: number | null
+      referenceBookId?: BookId | null
     }
   ) => {
-    const existing = jobs[book.id]
+    const existing = jobs[bookKey(book.id)]
     if (existing && isCoverJobActive(existing.status)) {
       toast.info(`「${book.name}」封面生成任务进行中`)
       return 'busy'
@@ -177,7 +181,11 @@ export function useWordbookCoverJobs(books: BookRef[]) {
     form.append('size', opts.size.trim() || '1792x1024')
     if (opts.referenceFile) {
       form.append('referenceImage', opts.referenceFile)
-    } else if (opts.referenceBookId && opts.referenceBookId > 0) {
+    } else if (
+      opts.referenceBookId != null &&
+      opts.referenceBookId !== '' &&
+      opts.referenceBookId !== 0
+    ) {
       form.append('referenceBookId', String(opts.referenceBookId))
     }
 
@@ -197,12 +205,13 @@ export function useWordbookCoverJobs(books: BookRef[]) {
   }
 
   const saveCover = async (book: BookRef) => {
+    const key = bookKey(book.id)
     const res = await post<{ coverUrl?: string }>(
       `/wordbooks/${book.id}/generate-cover/save`
     )
     const coverUrl = res.data?.coverUrl
     setBookJob(book.id, {
-      ...jobs[book.id],
+      ...jobs[key],
       bookId: book.id,
       status: 'done',
       previewUrl: coverUrl,

@@ -26,6 +26,7 @@ import { Switch } from '@/components/ui/switch'
 import { AdminPage } from '@/components/admin-page'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { AudioJobButtons } from './audio-job-buttons'
+import { bookKey } from './audio-jobs'
 import { coverJobButtonLabel } from './cover-jobs'
 import {
   buildDescriptionFromForm,
@@ -111,7 +112,7 @@ export function WordBooksPage() {
   const [editing, setEditing] = useState<WordBook | null>(null)
   const [form, setForm] = useState<WordBookEditForm>(emptyWordBookForm())
   const [saving, setSaving] = useState(false)
-  const [publishingId, setPublishingId] = useState<number | null>(null)
+  const [publishingId, setPublishingId] = useState<string | number | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<WordBook | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -385,7 +386,7 @@ export function WordBooksPage() {
       ) : (
         <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-3'>
           {list.map((b) => {
-            const coverJob = coverJobs[b.id]
+            const coverJob = coverJobs[bookKey(b.id)]
             const coverSrc = coverJob?.previewUrl || b.coverUrl
             const coverBusy =
               coverJob?.status === 'queued' || coverJob?.status === 'running'
@@ -473,7 +474,7 @@ export function WordBooksPage() {
                       </Link>
                     </Button>
                     <AudioJobButtons
-                      job={jobs[b.id]}
+                      job={jobs[bookKey(b.id)]}
                       onBatch={() => void toggleBatchAudio(b)}
                       onPurge={() => void startPurgeAudio(b)}
                     />
@@ -709,7 +710,7 @@ export function WordBooksPage() {
         onOpenChange={(v) => {
           if (!v) setCoverBook(null)
         }}
-        job={coverBook ? coverJobs[coverBook.id] : undefined}
+        job={coverBook ? coverJobs[bookKey(coverBook.id)] : undefined}
         onStart={async (book, opts) => {
           const r = await startCoverJob(book, opts)
           return r === 'started'

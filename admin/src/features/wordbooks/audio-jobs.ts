@@ -1,5 +1,12 @@
 export type AudioJobKind = 'batch' | 'purge'
 
+/** Wordbook id may be snowflake string from JSON. */
+export type BookId = string | number
+
+export function bookKey(id: BookId): string {
+  return String(id)
+}
+
 export type AudioJob = {
   kind: AudioJobKind
   status: string
@@ -54,12 +61,12 @@ export function sameAudioJob(a?: AudioJob, b?: AudioJob): boolean {
 }
 
 /** Current-page books that can still start a batch-audio job. */
-export function eligibleBooksForPageBatch<T extends { id: number }>(
+export function eligibleBooksForPageBatch<T extends { id: BookId }>(
   books: T[],
-  jobs: Record<number, AudioJob | undefined>
+  jobs: Record<string, AudioJob | undefined>
 ): T[] {
   return books.filter((book) => {
-    const job = jobs[book.id]
+    const job = jobs[bookKey(book.id)]
     if (job?.kind === 'batch' && isBatchAudioActive(job.status)) return false
     if (job?.kind === 'purge' && isPurgeAudioActive(job.status)) return false
     return true

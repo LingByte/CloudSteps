@@ -3,16 +3,18 @@ import { toast } from 'sonner'
 import { get, post } from '@/lib/api'
 import {
   type AudioJob,
+  type BookId,
+  bookKey,
   eligibleBooksForPageBatch,
   isBatchAudioActive,
   isPurgeAudioActive,
   sameAudioJob,
 } from './audio-jobs'
 
-type BookRef = { id: number; name: string }
+type BookRef = { id: BookId; name: string }
 
 type BatchJobSnap = {
-  bookId?: number
+  bookId?: BookId
   status?: string
   processed?: number
   total?: number
@@ -21,32 +23,34 @@ type BatchJobSnap = {
   queuePosition?: number
 }
 
-function bookName(books: BookRef[], id: number): string {
-  return books.find((b) => b.id === id)?.name || `词库 #${id}`
+function bookName(books: BookRef[], id: BookId): string {
+  const key = bookKey(id)
+  return books.find((b) => bookKey(b.id) === key)?.name || `词库 #${key}`
 }
 
 export function useWordBookAudioJobs(books: BookRef[]) {
-  const [jobs, setJobs] = useState<Record<number, AudioJob>>({})
+  const [jobs, setJobs] = useState<Record<string, AudioJob>>({})
   const [pageBatching, setPageBatching] = useState(false)
   const booksRef = useRef(books)
   booksRef.current = books
 
-  const setBookJob = (bookId: number, job: AudioJob | null) => {
+  const setBookJob = (bookId: BookId, job: AudioJob | null) => {
+    const key = bookKey(bookId)
     setJobs((prev) => {
       if (!job) {
-        if (!(bookId in prev)) return prev
+        if (!(key in prev)) return prev
         const next = { ...prev }
-        delete next[bookId]
+        delete next[key]
         return next
       }
-      if (sameAudioJob(prev[bookId], job)) return prev
-      return { ...prev, [bookId]: job }
+      if (sameAudioJob(prev[key], job)) return prev
+      return { ...prev, [key]: job }
     })
   }
 
   useEffect(() => {
     let stopped = false
-    let knownActive = new Set<number>()
+    let knownActive = new Set<string>()
     let timer: ReturnType<typeof setTimeout> | undefined
     const POLL_FAST_MS = 2000
     const POLL_SLOW_MS = 8000
@@ -68,18 +72,20 @@ export function useWordBookAudioJobs(books: BookRef[]) {
         )
         if (stopped) return
         const remote = res.data?.jobs || []
-        const nextActive = new Set<number>()
-        const finished: number[] = []
+        const nextActive = new Set<string>()
+        const finished: string[] = []
 
         setJobs((prev) => {
           let changed = false
-          const next: Record<number, AudioJob> = { ...prev }
+          const next: Record<string, AudioJob> = { ...prev }
 
-          for (const [idStr, job] of Object.entries(next)) {
-            const id = Number(idStr)
+          for (const [id, job] of Object.entries(next)) {
             if (job.kind !== 'batch') continue
             const still = remote.some(
-              (j) => Number(j.bookId) === id && isBatchAudioActive(j.status)
+              (j) =>
+                j.bookId != null &&
+                bookKey(j.bookId) === id &&
+                isBatchAudioActive(j.status)
             )
             if (!still) {
               if (knownActive.has(id)) {
@@ -91,11 +97,9 @@ export function useWordBookAudioJobs(books: BookRef[]) {
           }
 
           for (const j of remote) {
-            const bookId = Number(j.bookId)
-            if (!Number.isFinite(bookId) || !isBatchAudioActive(j.status)) {
-              continue
-            }
-            nextActive.add(bookId)
+            if (j.bookId == null || !isBatchAudioActive(j.status)) continue
+            const id = bookKey(j.bookId)
+            nextActive.add(id)
             const job: AudioJob = {
               kind: 'batch',
               status: j.status || 'running',
@@ -104,8 +108,8 @@ export function useWordBookAudioJobs(books: BookRef[]) {
               success: j.success,
               queuePosition: j.queuePosition,
             }
-            if (!sameAudioJob(next[bookId], job)) {
-              next[bookId] = job
+            if (!sameAudioJob(next[id], job)) {
+              next[id] = job
               changed = true
             }
           }
@@ -170,7 +174,7 @@ export function useWordBookAudioJobs(books: BookRef[]) {
 
   useEffect(() => {
     if (!purgeJobKey) return
-    const purgeIds = purgeJobKey.split(',').map(Number)
+    const purgeIds = purgeJobKey.split(',').filter(Boolean)
     let stopped = false
 
     const tick = async () => {
@@ -229,7 +233,7 @@ export function useWordBookAudioJobs(books: BookRef[]) {
   }, [purgeJobKey])
 
   const startBatchAudio = async (book: BookRef, quiet = false) => {
-    const job = jobs[book.id]
+    const job = jobs[bookKey(book.id)]
     if (job?.kind === 'purge' && isPurgeAudioActive(job.status)) {
       return 'busy'
     }
@@ -263,7 +267,7 @@ export function useWordBookAudioJobs(books: BookRef[]) {
   }
 
   const toggleBatchAudio = async (book: BookRef) => {
-    const job = jobs[book.id]
+    const job = jobs[bookKey(book.id)]
     if (job?.kind === 'purge' && isPurgeAudioActive(job.status)) return
     if (job?.kind === 'batch' && isBatchAudioActive(job.status)) {
       try {
@@ -321,7 +325,7 @@ export function useWordBookAudioJobs(books: BookRef[]) {
   }
 
   const startPurgeAudio = async (book: BookRef) => {
-    const job = jobs[book.id]
+    const job = jobs[bookKey(book.id)]
     if (job?.kind === 'purge' && isPurgeAudioActive(job.status)) return
     try {
       const res = await post<{
