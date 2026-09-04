@@ -12,6 +12,7 @@ import {
 import { formatApiMessage } from "../utils/apiMessage";
 import { showToast } from "../utils/toast";
 import reportBg from "../assets/images/session-report-bg.jpg";
+import { buildSessionReportCopyText } from "../utils/sessionReportCopy";
 
 function formatReportDate(iso?: string) {
   if (!iso) return "";
@@ -36,43 +37,6 @@ function buildCoachFallback(
     return t("session_report.fallback.mid", { name, accuracy: acc, forgot: report.forgotCount });
   }
   return t("session_report.fallback.low", { name, accuracy: acc, forgot: report.forgotCount });
-}
-
-function buildCopyText(
-  report: StudySessionReport,
-  note: string,
-  t: (key: string, opts?: Record<string, unknown>) => string
-) {
-  const screenTotal = report.screenedKnownCount + report.screenedUnknownCount;
-  const lines = [
-    t("session_report.copy_title"),
-    report.studentName || report.wordBookName
-      ? t("session_report.meta_line", {
-          name: report.studentName || t("session_report.student_fallback"),
-          book: report.wordBookName || t("session_report.wordbook_fallback"),
-        })
-      : "",
-    "",
-    t("session_report.copy_screen", {
-      total: screenTotal,
-      known: report.screenedKnownCount,
-      unknown: report.screenedUnknownCount,
-    }),
-    t("session_report.copy_check", {
-      studied: report.wordCount,
-      remembered: report.correctCount,
-      forgot: report.forgotCount,
-      accuracy: Math.round(report.accuracyPercent),
-      minutes: report.durationMinutes,
-    }),
-  ];
-  if (report.forgotWords && report.forgotWords.length > 0) {
-    lines.push("", t("session_report.dim.reinforce"), report.forgotWords.join("、"));
-  }
-  if (note.trim()) {
-    lines.push("", t("session_report.dim.note"), note.trim());
-  }
-  return lines.filter(Boolean).join("\n").replace(/\n{3,}/g, "\n\n");
 }
 
 function Metric({
@@ -248,7 +212,7 @@ export default function SessionReport() {
 
   const copyAll = async () => {
     if (!report) return;
-    const text = buildCopyText(report, noteTarget || noteShown, t);
+    const text = buildSessionReportCopyText(report, noteTarget || noteShown, t);
     try {
       await navigator.clipboard.writeText(text);
       showToast.success(t("session_report.copied"));

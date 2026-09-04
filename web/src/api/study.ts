@@ -223,7 +223,12 @@ export interface StudySessionReport {
   forgotCount: number
   accuracyPercent: number
   remainPending: number
+  wordBookWordCount?: number
+  learnedCount?: number
+  lessonCount?: number
+  remainingMinutes?: number
   forgotWords?: string[]
+  studiedWords?: string[]
   reportSummary?: string
   aiAvailable: boolean
 }
