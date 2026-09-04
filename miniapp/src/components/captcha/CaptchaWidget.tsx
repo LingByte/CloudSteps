@@ -179,9 +179,9 @@ export default function CaptchaWidget({ onChange }: CaptchaWidgetProps) {
           <Input
             className="captcha__input captcha__input--math"
             style={IS_RN ? { ...rnStyles.input, flex: 1 } : undefined}
-            type="number"
+            type="text"
             value={value ?? ''}
-            onInput={(e) => reportValue(Number(e.detail.value))}
+            onInput={(e) => reportValue(String(e.detail.value ?? '').trim())}
             placeholder="答案"
             placeholderTextColor={IS_RN ? color.mutedSoft : undefined}
             placeholderClass="captcha__placeholder"

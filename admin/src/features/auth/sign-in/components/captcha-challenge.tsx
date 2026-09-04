@@ -62,7 +62,7 @@ export function CaptchaChallenge({
     onChange({
       captchaId: captcha.id,
       captchaType: captcha.type,
-      captchaValue: captcha.type === 'math' ? Number(raw) : raw,
+      captchaValue: raw.trim(),
     })
   }
 
@@ -93,7 +93,9 @@ export function CaptchaChallenge({
           {captcha.data?.question}
         </span>
         <Input
-          type='number'
+          type='text'
+          inputMode='numeric'
+          autoComplete='off'
           className='min-w-0 flex-1'
           value={answer}
           onChange={(e) => report(e.target.value)}

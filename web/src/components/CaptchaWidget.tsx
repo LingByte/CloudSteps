@@ -103,9 +103,11 @@ export default function CaptchaWidget({ onChange, className }: CaptchaWidgetProp
           {q}
         </span>
         <input
-          type="number"
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
           value={value ?? ""}
-          onChange={(e) => reportValue(Number(e.target.value))}
+          onChange={(e) => reportValue(e.target.value.trim())}
           placeholder={t("ui.answer")}
           className={inputClass}
         />
