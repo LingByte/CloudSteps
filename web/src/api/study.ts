@@ -148,9 +148,11 @@ export interface StudySessionListItem {
   completedAt?: string | null
   wordCount: number
   correctCount: number
-  wordBookId?: number
+  screenedKnownCount?: number
+  screenedUnknownCount?: number
+  wordBookId?: string | number
   wordBookName?: string
-  userId?: number
+  userId?: string | number
   /** groupBy=bookDay 时返回 */
   day?: string
   latestAt?: string
@@ -175,7 +177,7 @@ export const listStudySessions = async (params?: {
   date?: string
   dateFrom?: string
   dateTo?: string
-  wordBookId?: number
+  wordBookId?: string | number
   status?: string
   groupBy?: "bookDay"
 }): Promise<ApiResponse<StudySessionsListResponse>> => {
@@ -340,7 +342,7 @@ export const exportStudySessionWords = async (params?: {
   date?: string
   dateFrom?: string
   dateTo?: string
-  wordBookId?: number
+  wordBookId?: string | number
   status?: string
 }): Promise<ApiResponse<{ words: StudyExportWord[]; total: number }>> => {
   return get<{ words: StudyExportWord[]; total: number }>('/study/sessions/export-words', { params })

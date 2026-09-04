@@ -630,13 +630,15 @@ func (h *Handlers) handleStudySessionsList(c *gin.Context) {
 	// 按「词库 + 上课日」聚合，避免同课多次开练刷屏
 	if strings.TrimSpace(c.Query("groupBy")) == "bookDay" {
 		type groupRow struct {
-			WordBookID   uint      `gorm:"column:word_book_id"`
-			Day          string    `gorm:"column:day"`
-			SessionCount int64     `gorm:"column:session_count"`
-			WordCount    int64     `gorm:"column:word_count"`
-			CorrectCount int64     `gorm:"column:correct_count"`
-			LatestAt     time.Time `gorm:"column:latest_at"`
-			SessionIDs   string    `gorm:"column:session_ids"`
+			WordBookID           uint      `gorm:"column:word_book_id"`
+			Day                  string    `gorm:"column:day"`
+			SessionCount         int64     `gorm:"column:session_count"`
+			WordCount            int64     `gorm:"column:word_count"`
+			CorrectCount         int64     `gorm:"column:correct_count"`
+			ScreenedKnownCount   int64     `gorm:"column:screened_known_count"`
+			ScreenedUnknownCount int64     `gorm:"column:screened_unknown_count"`
+			LatestAt             time.Time `gorm:"column:latest_at"`
+			SessionIDs           string    `gorm:"column:session_ids"`
 		}
 
 		countQ := q.Session(&gorm.Session{})
@@ -651,6 +653,8 @@ func (h *Handlers) handleStudySessionsList(c *gin.Context) {
 			COUNT(*) AS session_count,
 			COALESCE(SUM(word_count), 0) AS word_count,
 			COALESCE(SUM(correct_count), 0) AS correct_count,
+			COALESCE(SUM(screened_known_count), 0) AS screened_known_count,
+			COALESCE(SUM(screened_unknown_count), 0) AS screened_unknown_count,
 			MAX(started_at) AS latest_at,
 			GROUP_CONCAT(id ORDER BY started_at DESC, id DESC) AS session_ids
 		`).Group("word_book_id, DATE(started_at)").
@@ -679,14 +683,15 @@ func (h *Handlers) handleStudySessionsList(c *gin.Context) {
 
 		list := make([]gin.H, 0, len(rows))
 		for _, r := range rows {
-			ids := make([]uint, 0)
+			ids := make([]string, 0)
 			for _, p := range strings.Split(r.SessionIDs, ",") {
 				p = strings.TrimSpace(p)
 				if p == "" {
 					continue
 				}
 				if id64, err := strconv.ParseUint(p, 10, 64); err == nil && id64 > 0 {
-					ids = append(ids, uint(id64))
+					// 字符串返回，避免前端 Number 丢雪花精度
+					ids = append(ids, strconv.FormatUint(id64, 10))
 				}
 			}
 			day := strings.TrimSpace(r.Day)
@@ -694,16 +699,18 @@ func (h *Handlers) handleStudySessionsList(c *gin.Context) {
 				day = day[:10]
 			}
 			list = append(list, gin.H{
-				"wordBookId":   r.WordBookID,
-				"wordBookName": wbNames[r.WordBookID],
-				"day":          day,
-				"sessionCount": r.SessionCount,
-				"wordCount":    r.WordCount,
-				"correctCount": r.CorrectCount,
-				"latestAt":     r.LatestAt,
-				"sessionIds":   ids,
-				"sessionType":  sessionType,
-				"status":       "grouped",
+				"wordBookId":           strconv.FormatUint(uint64(r.WordBookID), 10),
+				"wordBookName":         wbNames[r.WordBookID],
+				"day":                  day,
+				"sessionCount":         r.SessionCount,
+				"wordCount":            r.WordCount,
+				"correctCount":         r.CorrectCount,
+				"screenedKnownCount":   r.ScreenedKnownCount,
+				"screenedUnknownCount": r.ScreenedUnknownCount,
+				"latestAt":             r.LatestAt,
+				"sessionIds":           ids,
+				"sessionType":          sessionType,
+				"status":               "grouped",
 			})
 		}
 
@@ -745,16 +752,18 @@ func (h *Handlers) handleStudySessionsList(c *gin.Context) {
 	list := make([]gin.H, 0, len(sessions))
 	for _, s := range sessions {
 		list = append(list, gin.H{
-			"id":           s.ID,
-			"sessionType":  s.SessionType,
-			"status":       s.Status,
-			"startedAt":    s.StartedAt,
-			"completedAt":  s.CompletedAt,
-			"wordCount":    s.WordCount,
-			"correctCount": s.CorrectCount,
-			"wordBookId":   s.WordBookID,
-			"wordBookName": wbNames[s.WordBookID],
-			"userId":       s.UserID,
+			"id":                   strconv.FormatUint(uint64(s.ID), 10),
+			"sessionType":          s.SessionType,
+			"status":               s.Status,
+			"startedAt":            s.StartedAt,
+			"completedAt":          s.CompletedAt,
+			"wordCount":            s.WordCount,
+			"correctCount":         s.CorrectCount,
+			"screenedKnownCount":   s.ScreenedKnownCount,
+			"screenedUnknownCount": s.ScreenedUnknownCount,
+			"wordBookId":           strconv.FormatUint(uint64(s.WordBookID), 10),
+			"wordBookName":         wbNames[s.WordBookID],
+			"userId":               strconv.FormatUint(uint64(s.UserID), 10),
 		})
 	}
 
