@@ -13,8 +13,8 @@ import (
 
 // WordLite 单词轻量结构（学习/列表场景只需少量字段，避免 SELECT * 40+ 列）
 type WordLite struct {
-	ID               uint   `json:"id"`
-	WordBookID       uint   `json:"wordBookId"`
+	ID               uint   `json:"id,string"`
+	WordBookID       uint   `json:"wordBookId,string"`
 	Word             string `json:"word"`
 	Phonetic         string `json:"phonetic"`
 	PhoneticUK       string `json:"phoneticUk"`
@@ -117,7 +117,7 @@ func ToPublicWordBooks(books []WordBook) []PublicWordBook {
 // Word 单词
 type Word struct {
 	common.BaseModel
-	WordBookID       uint   `json:"wordBookId" gorm:"index;index:idx_wordbook_sort;not null;comment:所属词库ID"`
+	WordBookID       uint   `json:"wordBookId,string" gorm:"index;index:idx_wordbook_sort;not null;comment:所属词库ID"`
 	Word             string `json:"word" gorm:"size:128;not null;index;comment:英文单词"`
 	Phonetic         string `json:"phonetic" gorm:"size:128;comment:音标"`
 	Translation      string `json:"translation" gorm:"type:text;comment:中文释义 JSON数组"`
@@ -393,7 +393,9 @@ func DeleteWordBook(db *gorm.DB, id uint, operator string) error {
 	if id == 0 {
 		return gorm.ErrRecordNotFound
 	}
-	if err := db.First(&WordBook{}, id).Error; err != nil {
+	// Include soft-deleted rows so admin can purge books that still appear after partial deletes.
+	var book WordBook
+	if err := db.Unscoped().First(&book, id).Error; err != nil {
 		return err
 	}
 

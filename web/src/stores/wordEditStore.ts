@@ -1,8 +1,8 @@
 import { create } from "zustand";
 
 type WordEditState = {
-  editingId: number | null;
-  openEditor: (wordId: number) => void;
+  editingId: string | number | null;
+  openEditor: (wordId: string | number) => void;
   closeEditor: () => void;
 };
 

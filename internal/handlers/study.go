@@ -24,25 +24,35 @@ func (h *Handlers) handleStudyLighthouse(c *gin.Context) {
 		response.FailI18n(c, "auth.authorization_required", nil)
 		return
 	}
+	learner, err := reviewResolveTargetUser(db, user, c.Query("studentId"))
+	if err != nil {
+		response.AbortWithStatusJSON(c, http.StatusForbidden, err)
+		return
+	}
 
 	wordBookID := parseQueryUintID(c.Query("wordBookId"))
-	cacheKey := lighthouseCacheKey(user.ID, int(wordBookID))
+	cacheKey := lighthouseCacheKey(learner.ID, int(wordBookID))
 	if cached, ok := getCachedLighthouse(cacheKey); ok {
 		response.SuccessI18n(c, "common.success", cached)
 		return
 	}
 
-	payload := computeStudyLighthouse(db, user.ID, int(wordBookID))
+	payload := computeStudyLighthouse(db, learner.ID, int(wordBookID))
 	setCachedLighthouse(cacheKey, payload)
 	response.SuccessI18n(c, "common.success", payload)
 }
 
-// handleStudyLighthouseWords GET /study/lighthouse/words?wordBookId=N&step=01|pending|mastered
+// handleStudyLighthouseWords GET /study/lighthouse/words?wordBookId=N&step=01|pending|mastered&studentId=
 func (h *Handlers) handleStudyLighthouseWords(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
 	user := auth.CurrentUser(c)
 	if user == nil {
 		response.FailI18n(c, "auth.authorization_required", nil)
+		return
+	}
+	learner, err := reviewResolveTargetUser(db, user, c.Query("studentId"))
+	if err != nil {
+		response.AbortWithStatusJSON(c, http.StatusForbidden, err)
 		return
 	}
 
@@ -68,7 +78,7 @@ func (h *Handlers) handleStudyLighthouseWords(c *gin.Context) {
 	if step == "pending" && wordBookID > 0 {
 		joinClause := "FROM words w LEFT JOIN user_word_states uws ON uws.word_id = w.id AND uws.user_id = ? AND uws.deleted_at IS NULL"
 		whereClause := "w.word_book_id = ? AND w.deleted_at IS NULL AND (uws.id IS NULL OR uws.learn_status = 'pending')"
-		queryArgs := []any{user.ID, uint(wordBookID)}
+		queryArgs := []any{learner.ID, uint(wordBookID)}
 
 		var total int64
 		_ = db.Raw("SELECT COUNT(*) "+joinClause+" WHERE "+whereClause, queryArgs...).Scan(&total).Error
@@ -89,7 +99,7 @@ func (h *Handlers) handleStudyLighthouseWords(c *gin.Context) {
 			response.FailI18n(c, "common.query_failed", err)
 			return
 		}
-		models.OverlayWordLites(db, user.ID, words)
+		models.OverlayWordLites(db, learner.ID, words)
 
 		response.SuccessI18n(c, "common.success", gin.H{"words": words, "total": total})
 		return
@@ -100,10 +110,10 @@ func (h *Handlers) handleStudyLighthouseWords(c *gin.Context) {
 	switch {
 	case step == "today":
 		stateWhere = "uws.user_id = ? AND uws.first_learned_at IS NOT NULL AND uws.first_learned_at >= ? AND uws.first_learned_at < ?"
-		stateArgs = []any{user.ID, startOfToday, endOfToday}
+		stateArgs = []any{learner.ID, startOfToday, endOfToday}
 	case step == "mastered":
 		stateWhere = "uws.user_id = ? AND uws.learn_status = ?"
-		stateArgs = []any{user.ID, "mastered"}
+		stateArgs = []any{learner.ID, "mastered"}
 	default:
 		stage, err := strconv.Atoi(step)
 		if err != nil || stage < 1 || stage > 7 {
@@ -111,7 +121,7 @@ func (h *Handlers) handleStudyLighthouseWords(c *gin.Context) {
 			return
 		}
 		stateWhere = "uws.user_id = ? AND uws.learn_status IN ? AND uws.review_stage = ?"
-		stateArgs = []any{user.ID, []string{"learning", "learned", "mastered"}, stage - 1}
+		stateArgs = []any{learner.ID, []string{"learning", "learned", "mastered"}, stage - 1}
 	}
 	if wordBookID > 0 {
 		stateWhere += " AND uws.word_book_id = ?"
@@ -143,7 +153,7 @@ func (h *Handlers) handleStudyLighthouseWords(c *gin.Context) {
 		response.FailI18n(c, "common.query_failed", err)
 		return
 	}
-	models.OverlayWordLites(db, user.ID, words)
+	models.OverlayWordLites(db, learner.ID, words)
 
 	response.SuccessI18n(c, "common.success", gin.H{
 		"words": words,
@@ -177,6 +187,11 @@ func (h *Handlers) handleStudyWords(c *gin.Context) {
 		response.FailI18n(c, "wordbook.id_required", nil)
 		return
 	}
+	learner, err := reviewResolveTargetUser(db, user, c.Query("studentId"))
+	if err != nil {
+		response.AbortWithStatusJSON(c, http.StatusForbidden, err)
+		return
+	}
 
 	// 确保分页参数合理
 	if page < 1 {
@@ -189,12 +204,12 @@ func (h *Handlers) handleStudyWords(c *gin.Context) {
 		seed = time.Now().UnixNano()
 	}
 
-	words, total, err := models.ListStudyWordsLite(db, wordBookID, user.ID, page, pageSize, shuffle, seed)
+	words, total, err := models.ListStudyWordsLite(db, wordBookID, learner.ID, page, pageSize, shuffle, seed)
 	if err != nil {
 		response.FailI18n(c, "common.query_failed", err)
 		return
 	}
-	models.OverlayWordLites(db, user.ID, words)
+	models.OverlayWordLites(db, learner.ID, words)
 
 	response.SuccessI18n(c, "common.success", gin.H{
 		"total":    total,
@@ -217,18 +232,24 @@ func (h *Handlers) handleStudySessionStart(c *gin.Context) {
 	}
 
 	var body struct {
-		WordBookID uint   `json:"wordBookId" binding:"required"`
-		UnknownIDs []uint `json:"unknownIds"`
-		KnownIDs   []uint `json:"knownIds"`
-		WordIDs    []uint `json:"wordIds"`
-		StudentID  string `json:"studentId"`
+		WordBookID utils.JSONUint   `json:"wordBookId"`
+		UnknownIDs []utils.JSONUint `json:"unknownIds"`
+		KnownIDs   []utils.JSONUint `json:"knownIds"`
+		WordIDs    []utils.JSONUint `json:"wordIds"`
+		StudentID  string           `json:"studentId"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
-		response.FailI18n(c, "common.invalid_params", nil)
+		response.FailI18n(c, "common.invalid_params", err)
+		return
+	}
+	wordBookID := body.WordBookID.Uint()
+	if wordBookID == 0 {
+		response.FailI18n(c, "wordbook.id_required", nil)
 		return
 	}
 
 	sessionStudentID := uint(0)
+	learner := user
 	if strings.TrimSpace(body.StudentID) != "" {
 		targetUser, err := reviewResolveTargetUser(db, user, body.StudentID)
 		if err != nil {
@@ -237,13 +258,15 @@ func (h *Handlers) handleStudySessionStart(c *gin.Context) {
 		}
 		if targetUser.ID != user.ID {
 			sessionStudentID = targetUser.ID
+			learner = targetUser
 		}
 	}
 
-	unknownIDs := body.UnknownIDs
-	if len(unknownIDs) == 0 && len(body.WordIDs) > 0 {
-		unknownIDs = body.WordIDs
+	unknownIDs := utils.JSONUintValues(body.UnknownIDs)
+	if len(unknownIDs) == 0 {
+		unknownIDs = utils.JSONUintValues(body.WordIDs)
 	}
+	knownIDs := utils.JSONUintValues(body.KnownIDs)
 
 	batchSize, _ := strconv.Atoi(c.DefaultQuery("batchSize", "20"))
 	if batchSize <= 0 {
@@ -253,10 +276,10 @@ func (h *Handlers) handleStudySessionStart(c *gin.Context) {
 		batchSize = 50
 	}
 
-	// Ensure user selected wordbook
+	// 词库选择记在「学习者」账号（代练时为学员）
 	now := time.Now().UTC()
-	uwb := models.UserWordBook{UserID: user.ID, WordBookID: body.WordBookID}
-	if err := db.Where(models.UserWordBook{UserID: user.ID, WordBookID: body.WordBookID}).
+	uwb := models.UserWordBook{UserID: learner.ID, WordBookID: wordBookID}
+	if err := db.Where(models.UserWordBook{UserID: learner.ID, WordBookID: wordBookID}).
 		Attrs(models.UserWordBook{Status: "active", StartedAt: &now}).
 		FirstOrCreate(&uwb).Error; err != nil {
 		response.FailI18n(c, "wordbook.not_selected", err)
@@ -264,13 +287,13 @@ func (h *Handlers) handleStudySessionStart(c *gin.Context) {
 	}
 
 	// known -> learned (no queue)
-	if len(body.KnownIDs) > 0 {
-		states := make([]models.UserWordState, 0, len(body.KnownIDs))
-		for _, wid := range body.KnownIDs {
+	if len(knownIDs) > 0 {
+		states := make([]models.UserWordState, 0, len(knownIDs))
+		for _, wid := range knownIDs {
 			states = append(states, models.UserWordState{
-				UserID:         user.ID,
+				UserID:         learner.ID,
 				WordID:         wid,
-				WordBookID:     body.WordBookID,
+				WordBookID:     wordBookID,
 				ScreenResult:   "known",
 				ScreenAt:       &now,
 				LearnStatus:    "learned",
@@ -288,9 +311,9 @@ func (h *Handlers) handleStudySessionStart(c *gin.Context) {
 		states := make([]models.UserWordState, 0, len(unknownIDs))
 		for _, wid := range unknownIDs {
 			states = append(states, models.UserWordState{
-				UserID:       user.ID,
+				UserID:       learner.ID,
 				WordID:       wid,
-				WordBookID:   body.WordBookID,
+				WordBookID:   wordBookID,
 				ScreenResult: "unknown",
 				ScreenAt:     &now,
 				LearnStatus:  "pending",
@@ -306,7 +329,7 @@ func (h *Handlers) handleStudySessionStart(c *gin.Context) {
 	selectedIDs := unknownIDs
 	if len(selectedIDs) == 0 {
 		_ = db.Model(&models.UserWordState{}).
-			Where("user_id = ? AND word_book_id = ? AND learn_status = ?", user.ID, body.WordBookID, "learning").
+			Where("user_id = ? AND word_book_id = ? AND learn_status = ?", learner.ID, wordBookID, "learning").
 			Update("learn_status", "pending").Error
 
 		var picked []models.UserWordState
@@ -314,7 +337,7 @@ func (h *Handlers) handleStudySessionStart(c *gin.Context) {
 			q := tx.Model(&models.UserWordState{}).
 				Joins("JOIN words w ON w.id = user_word_states.word_id").
 				Where("user_word_states.user_id = ? AND user_word_states.word_book_id = ? AND user_word_states.screen_result = ? AND user_word_states.learn_status = ?",
-					user.ID, body.WordBookID, "unknown", "pending").
+					learner.ID, wordBookID, "unknown", "pending").
 				Order("w.sort_order ASC, w.id ASC").
 				Limit(batchSize)
 			if err := q.Clauses(clause.Locking{Strength: "UPDATE"}).Find(&picked).Error; err != nil {
@@ -328,7 +351,7 @@ func (h *Handlers) handleStudySessionStart(c *gin.Context) {
 				ids = append(ids, s.WordID)
 			}
 			return tx.Model(&models.UserWordState{}).
-				Where("user_id = ? AND word_id IN ?", user.ID, ids).
+				Where("user_id = ? AND word_id IN ?", learner.ID, ids).
 				Update("learn_status", "learning").Error
 		}); err != nil {
 			response.FailI18n(c, "reading.fetch_questions_failed", err)
@@ -344,16 +367,16 @@ func (h *Handlers) handleStudySessionStart(c *gin.Context) {
 		return
 	}
 
-	// Create session
+	// Create session：课次归属老师账号，进度落在学习者（学员）账号
 	session := models.StudySession{
 		UserID:               user.ID,
 		StudentID:            sessionStudentID,
-		WordBookID:           body.WordBookID,
+		WordBookID:           wordBookID,
 		SessionType:          "learn",
 		Status:               "in_progress",
 		StartedAt:            now,
 		WordCount:            len(selectedIDs),
-		ScreenedKnownCount:   len(body.KnownIDs),
+		ScreenedKnownCount:   len(knownIDs),
 		ScreenedUnknownCount: len(unknownIDs),
 	}
 	if err := db.Create(&session).Error; err != nil {
@@ -371,13 +394,13 @@ func (h *Handlers) handleStudySessionStart(c *gin.Context) {
 	// If client explicitly provided ids, mark them learning now
 	if len(unknownIDs) > 0 {
 		_ = db.Model(&models.UserWordState{}).
-			Where("user_id = ? AND word_id IN ?", user.ID, selectedIDs).
+			Where("user_id = ? AND word_id IN ?", learner.ID, selectedIDs).
 			Update("learn_status", "learning").Error
 	}
 
 	var words []models.WordLite
 	_ = db.Where("id IN ?", selectedIDs).Find(&words).Error
-	models.OverlayWordLites(db, user.ID, words)
+	models.OverlayWordLites(db, learner.ID, words)
 
 	response.SuccessI18n(c, "common.success", gin.H{
 		"sessionId": session.ID,
@@ -418,6 +441,17 @@ func (h *Handlers) handleStudySessionComplete(c *gin.Context) {
 		return
 	}
 
+	// 代练课次：进度写在学员账号；本人练习：写在登录账号
+	learnerID := user.ID
+	learnerUser := user
+	if session.StudentID > 0 {
+		learnerID = session.StudentID
+		var stu models.User
+		if err := db.First(&stu, session.StudentID).Error; err == nil {
+			learnerUser = &stu
+		}
+	}
+
 	now := time.Now().UTC()
 	rememberedIDs := make([]uint, 0)
 	forgotIDs := make([]uint, 0)
@@ -444,12 +478,12 @@ func (h *Handlers) handleStudySessionComplete(c *gin.Context) {
 
 	// remembered -> learned + enqueue stage=0 due=开课日（第1天）本地 0 点
 	if len(rememberedIDs) > 0 {
-		loc := models.UserReviewLocation(user)
+		loc := models.UserReviewLocation(learnerUser)
 		firstDue := models.FirstReviewDueAt(loc)
 		queueItems := make([]models.ReviewQueue, 0, len(rememberedIDs))
 		for _, wid := range rememberedIDs {
 			queueItems = append(queueItems, models.ReviewQueue{
-				UserID:          user.ID,
+				UserID:          learnerID,
 				WordID:          wid,
 				WordBookID:      session.WordBookID,
 				SourceSessionID: session.ID,
@@ -468,7 +502,7 @@ func (h *Handlers) handleStudySessionComplete(c *gin.Context) {
 
 		due := firstDue
 		if err := db.Model(&models.UserWordState{}).
-			Where("user_id = ? AND word_id IN ?", user.ID, rememberedIDs).
+			Where("user_id = ? AND word_id IN ?", learnerID, rememberedIDs).
 			Updates(map[string]any{"learn_status": "learned", "first_learned_at": &now, "review_stage": 0, "next_review_at": &due}).Error; err != nil {
 			response.FailI18n(c, "study.update_state_failed", err)
 			return
@@ -478,17 +512,17 @@ func (h *Handlers) handleStudySessionComplete(c *gin.Context) {
 	// forgot -> pending
 	if len(forgotIDs) > 0 {
 		_ = db.Model(&models.UserWordState{}).
-			Where("user_id = ? AND word_id IN ?", user.ID, forgotIDs).
+			Where("user_id = ? AND word_id IN ?", learnerID, forgotIDs).
 			Update("learn_status", "pending").Error
 	}
 
 	correctCount := len(rememberedIDs)
 	_ = db.Model(&session).Updates(map[string]any{"status": "completed", "completed_at": &now, "correct_count": correctCount}).Error
-	invalidateLighthouseCacheForUser(user.ID)
+	invalidateLighthouseCacheForUser(learnerID)
 
 	var remainCount int64
 	_ = db.Model(&models.UserWordState{}).
-		Where("user_id = ? AND word_book_id = ? AND screen_result = ? AND learn_status = ?", user.ID, session.WordBookID, "unknown", "pending").
+		Where("user_id = ? AND word_book_id = ? AND screen_result = ? AND learn_status = ?", learnerID, session.WordBookID, "unknown", "pending").
 		Count(&remainCount).Error
 
 	response.SuccessI18n(c, "common.success", gin.H{
@@ -907,13 +941,18 @@ func (h *Handlers) handleStudySessionsExportWords(c *gin.Context) {
 // lighthouseMasteredAfterStage 九宫格 02–08 对应 review_stage 0–6，通过后进入 09 已掌握。
 const lighthouseMasteredAfterStage = 6
 
-// handleLighthouseReviewWords GET /study/lighthouse/review-words?wordBookId=N
+// handleLighthouseReviewWords GET /study/lighthouse/review-words?wordBookId=N&studentId=
 // 返回词库内所有已学、尚未掌握的单词（九宫格「开始复习」用）。
 func (h *Handlers) handleLighthouseReviewWords(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
 	user := auth.CurrentUser(c)
 	if user == nil {
 		response.FailI18n(c, "auth.authorization_required", nil)
+		return
+	}
+	learner, err := reviewResolveTargetUser(db, user, c.Query("studentId"))
+	if err != nil {
+		response.AbortWithStatusJSON(c, http.StatusForbidden, err)
 		return
 	}
 
@@ -934,7 +973,7 @@ func (h *Handlers) handleLighthouseReviewWords(c *gin.Context) {
 	offset := (page - 1) * pageSize
 
 	stateWhere := `uws.user_id = ? AND uws.word_book_id = ? AND uws.learn_status IN ?`
-	stateArgs := []any{user.ID, uint(wordBookID), []string{"learning", "learned"}}
+	stateArgs := []any{learner.ID, uint(wordBookID), []string{"learning", "learned"}}
 
 	var total int64
 	countSQL := "SELECT COUNT(*) FROM user_word_states uws WHERE uws.deleted_at IS NULL AND " + stateWhere
@@ -961,7 +1000,7 @@ func (h *Handlers) handleLighthouseReviewWords(c *gin.Context) {
 		response.FailI18n(c, "common.query_failed", err)
 		return
 	}
-	models.OverlayWordLites(db, user.ID, words)
+	models.OverlayWordLites(db, learner.ID, words)
 
 	response.SuccessI18n(c, "common.success", gin.H{
 		"words": words,
@@ -970,7 +1009,7 @@ func (h *Handlers) handleLighthouseReviewWords(c *gin.Context) {
 }
 
 // handleLighthouseReviewSubmit POST /study/lighthouse/review-submit
-// body: { wordBookId, results: [{ wordId, remembered }] }
+// body: { wordBookId, studentId?, results: [{ wordId, remembered }] }
 // remembered=true → review_stage +1（满格后 mastered）；false → 不推进。
 func (h *Handlers) handleLighthouseReviewSubmit(c *gin.Context) {
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
@@ -982,13 +1021,19 @@ func (h *Handlers) handleLighthouseReviewSubmit(c *gin.Context) {
 
 	var body struct {
 		WordBookID utils.JSONUint `json:"wordBookId" binding:"required"`
+		StudentID  string         `json:"studentId"`
 		Results    []struct {
-			WordID     uint `json:"wordId"`
-			Remembered bool `json:"remembered"`
+			WordID     utils.JSONUint `json:"wordId"`
+			Remembered bool           `json:"remembered"`
 		} `json:"results" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil || len(body.Results) == 0 {
 		response.FailI18n(c, "common.invalid_params", nil)
+		return
+	}
+	learner, err := reviewResolveTargetUser(db, user, body.StudentID)
+	if err != nil {
+		response.AbortWithStatusJSON(c, http.StatusForbidden, err)
 		return
 	}
 	wbID := body.WordBookID.Uint()
@@ -1001,11 +1046,12 @@ func (h *Handlers) handleLighthouseReviewSubmit(c *gin.Context) {
 	wordIDs := make([]uint, 0, len(body.Results))
 	resMap := make(map[uint]bool, len(body.Results))
 	for _, r := range body.Results {
-		if r.WordID == 0 {
+		wid := r.WordID.Uint()
+		if wid == 0 {
 			continue
 		}
-		wordIDs = append(wordIDs, r.WordID)
-		resMap[r.WordID] = r.Remembered
+		wordIDs = append(wordIDs, wid)
+		resMap[wid] = r.Remembered
 	}
 	if len(wordIDs) == 0 {
 		response.FailI18n(c, "common.invalid_params", nil)
@@ -1013,10 +1059,10 @@ func (h *Handlers) handleLighthouseReviewSubmit(c *gin.Context) {
 	}
 
 	var advanced, unchanged int
-	err := db.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		var states []models.UserWordState
 		if err := tx.Where("user_id = ? AND word_book_id = ? AND word_id IN ? AND learn_status IN ?",
-			user.ID, wbID, wordIDs, []string{"learning", "learned"}).
+			learner.ID, wbID, wordIDs, []string{"learning", "learned"}).
 			Find(&states).Error; err != nil {
 			return err
 		}
@@ -1064,7 +1110,7 @@ func (h *Handlers) handleLighthouseReviewSubmit(c *gin.Context) {
 		return
 	}
 
-	invalidateLighthouseCacheForUser(user.ID)
+	invalidateLighthouseCacheForUser(learner.ID)
 
 	response.SuccessI18n(c, "common.success", gin.H{
 		"advanced":  advanced,

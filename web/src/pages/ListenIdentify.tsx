@@ -1,4 +1,5 @@
 import { CloudButton } from "../components/cloudsteps";
+import { normalizeSnowflakeId } from "../utils/json-snowflake";
 import { AnnotationLayer } from "../components/AnnotationLayer";
 import { PRACTICE_TRANS_CLASS, PRACTICE_WORD_CLASS, PRACTICE_CARD_WORD_CLASS } from "../components/PracticeFontSettings";
 import { PracticeFlowToolbar } from "../components/PracticeFlowToolbar";
@@ -46,8 +47,8 @@ export default function ListenIdentify() {
   const [detailMode, setDetailMode] = useState(false);
 
   const mode = useMemo(() => sessionStorage.getItem("lb_mode") || "study", []);
-  const wordBookId = useMemo(() => Number(sessionStorage.getItem("lb_wordbook_id") || 0), []);
-  const wordNoteKey = (wordId: number) => `study-note:word:${wordBookId}:${wordId}`;
+  const wordBookId = useMemo(() => normalizeSnowflakeId(sessionStorage.getItem("lb_wordbook_id")), []);
+  const wordNoteKey = (wordId: string | number) => `study-note:word:${wordBookId}:${wordId}`;
 
   const batchIdx = useMemo(() => {
     const key = mode === "review" ? "lb_review_batch_idx" : "lb_study_batch_idx";

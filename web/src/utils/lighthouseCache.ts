@@ -15,12 +15,15 @@ const emptyLighthouse = (): StudyLighthouseResponse => ({
   todayNewLearned: 0,
 });
 
-function cacheKey(wordBookId: string | number): string {
-  return normalizeSnowflakeId(wordBookId);
+/** 缓存键按词库 + 学员隔离，避免教练端切换学员串数据 */
+function cacheKey(wordBookId: string | number, studentId?: string | number | null): string {
+  const wb = normalizeSnowflakeId(wordBookId);
+  if (!wb) return "";
+  const sid = normalizeSnowflakeId(studentId);
+  return sid ? `${wb}:s:${sid}` : wb;
 }
 
-function loadSession(wordBookId: string | number): StudyLighthouseResponse | null {
-  const key = cacheKey(wordBookId);
+function loadSession(key: string): StudyLighthouseResponse | null {
   if (!key) return null;
   try {
     const raw = sessionStorage.getItem(`${CACHE_PREFIX}${key}`);
@@ -37,8 +40,7 @@ function loadSession(wordBookId: string | number): StudyLighthouseResponse | nul
   }
 }
 
-function saveCache(wordBookId: string | number, data: StudyLighthouseResponse) {
-  const key = cacheKey(wordBookId);
+function saveCache(key: string, data: StudyLighthouseResponse) {
   if (!key) return;
   const entry = { data, savedAt: Date.now() };
   memoryCache.set(key, entry);
@@ -49,8 +51,7 @@ function saveCache(wordBookId: string | number, data: StudyLighthouseResponse) {
   }
 }
 
-function readCached(wordBookId: string | number): StudyLighthouseResponse | null {
-  const key = cacheKey(wordBookId);
+function readCached(key: string): StudyLighthouseResponse | null {
   if (!key) return null;
   const mem = memoryCache.get(key);
   if (mem && Date.now() - mem.savedAt < CACHE_TTL_MS) return mem.data;
@@ -62,17 +63,25 @@ function readCached(wordBookId: string | number): StudyLighthouseResponse | null
   return null;
 }
 
+export type FetchLighthouseOptions = {
+  force?: boolean;
+  studentId?: string | number | null;
+};
+
 /** 后台刷新，不阻塞 UI */
-export function revalidateLighthouse(wordBookId: string | number) {
-  if (!cacheKey(wordBookId)) return;
-  void fetchLighthouse(wordBookId, { force: true }).catch(() => {});
+export function revalidateLighthouse(
+  wordBookId: string | number,
+  studentId?: string | number | null,
+) {
+  if (!cacheKey(wordBookId, studentId)) return;
+  void fetchLighthouse(wordBookId, { force: true, studentId }).catch(() => {});
 }
 
 export async function fetchLighthouse(
   wordBookId: string | number,
-  options?: { force?: boolean },
+  options?: FetchLighthouseOptions,
 ): Promise<StudyLighthouseResponse> {
-  const key = cacheKey(wordBookId);
+  const key = cacheKey(wordBookId, options?.studentId);
   if (!key) return emptyLighthouse();
 
   if (!options?.force) {
@@ -84,7 +93,9 @@ export async function fetchLighthouse(
   if (pending) return pending;
 
   const promise = (async () => {
-    const res = await getStudyLighthouse(key);
+    const res = await getStudyLighthouse(wordBookId, {
+      studentId: options?.studentId || undefined,
+    });
     if (res.code !== 200) throw new Error(res.msg || i18n.t("lighthouse.load_failed"));
     const data: StudyLighthouseResponse = {
       days: Array.isArray(res.data?.days) ? res.data.days : [],
@@ -102,21 +113,30 @@ export async function fetchLighthouse(
   return promise;
 }
 
-export function prefetchLighthouses(wordBookIds: Array<string | number>) {
+export function prefetchLighthouses(
+  wordBookIds: Array<string | number>,
+  studentId?: string | number | null,
+) {
   for (const id of wordBookIds) {
-    const key = cacheKey(id);
+    const key = cacheKey(id, studentId);
     if (!key || readCached(key)) continue;
-    void fetchLighthouse(key).catch(() => {});
+    void fetchLighthouse(id, { studentId }).catch(() => {});
   }
 }
 
-export function getCachedLighthouse(wordBookId: string | number): StudyLighthouseResponse | null {
-  return readCached(wordBookId);
+export function getCachedLighthouse(
+  wordBookId: string | number,
+  studentId?: string | number | null,
+): StudyLighthouseResponse | null {
+  return readCached(cacheKey(wordBookId, studentId));
 }
 
-export function invalidateLighthouseCache(wordBookId?: string | number) {
+export function invalidateLighthouseCache(
+  wordBookId?: string | number,
+  studentId?: string | number | null,
+) {
   if (wordBookId != null && wordBookId !== "") {
-    const key = cacheKey(wordBookId);
+    const key = cacheKey(wordBookId, studentId);
     if (!key) return;
     memoryCache.delete(key);
     sessionStorage.removeItem(`${CACHE_PREFIX}${key}`);

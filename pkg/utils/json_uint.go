@@ -40,3 +40,14 @@ func (u *JSONUint) UnmarshalJSON(data []byte) error {
 func (u JSONUint) Uint() uint {
 	return uint(u)
 }
+
+// JSONUintValues converts a JSONUint slice to []uint.
+func JSONUintValues(ids []JSONUint) []uint {
+	out := make([]uint, 0, len(ids))
+	for _, id := range ids {
+		if v := id.Uint(); v != 0 {
+			out = append(out, v)
+		}
+	}
+	return out
+}

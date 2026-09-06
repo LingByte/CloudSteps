@@ -29,7 +29,7 @@ function stripTags(s: string): string {
 }
 
 type Props = {
-  wordId: number | null;
+  wordId: string | number | null;
   wordText?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;

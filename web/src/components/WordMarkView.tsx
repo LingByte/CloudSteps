@@ -7,7 +7,7 @@ import { WordDetailPanel } from "./WordDetailPanel";
 import { StudyNoteLauncher } from "./StudyNotePanel";
 
 export type MarkableWord = {
-  id: number;
+  id: string | number;
   word: string;
   phonetic?: string;
   translation?: string;
@@ -76,8 +76,8 @@ export function markWordCardStyle(
 /** 仅当前交互中的词高亮（heard / 释义 / 正在播放），不累积多张 */
 export function isWordCardTapped(
   word: Pick<MarkableWord, "heard" | "showTranslation">,
-  playingId?: number | null,
-  wordId?: number
+  playingId?: string | number | null,
+  wordId?: string | number
 ): boolean {
   return !!(word.heard || word.showTranslation || (playingId != null && playingId === wordId));
 }
@@ -117,12 +117,12 @@ type CardProps = {
   words: MarkableWord[];
   index: number;
   onIndexChange: (index: number) => void;
-  playingId: number | null;
+  playingId: string | number | null;
   onPlay: (word: MarkableWord) => void;
   onWordClick: (word: MarkableWord) => void;
-  onStatus: (id: number, status: "correct" | "wrong") => void;
+  onStatus: (id: string | number, status: "correct" | "wrong") => void;
   /** 外部控制：展开该词的拓展面板（页内，非模态） */
-  detailWordId?: number | null;
+  detailWordId?: string | number | null;
   onDetailClose?: () => void;
   simpleMode?: boolean;
   /**

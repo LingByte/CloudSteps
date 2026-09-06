@@ -79,19 +79,23 @@ export default function WordTraining() {
   );
   const [memoryData, setMemoryData] = useState<LighthouseDay[]>(() => {
     const id = normalizeSnowflakeId(initialPick?.id);
-    return id ? getCachedLighthouse(id)?.days || [] : [];
+    const sid = isCoach ? normalizeSnowflakeId(getTrainingStudent()?.id) : "";
+    return id ? getCachedLighthouse(id, sid || undefined)?.days || [] : [];
   });
   const [pendingCount, setPendingCount] = useState<number>(() => {
     const id = normalizeSnowflakeId(initialPick?.id);
-    return id ? Number(getCachedLighthouse(id)?.pendingCount || 0) : 0;
+    const sid = isCoach ? normalizeSnowflakeId(getTrainingStudent()?.id) : "";
+    return id ? Number(getCachedLighthouse(id, sid || undefined)?.pendingCount || 0) : 0;
   });
   const [masteredCount, setMasteredCount] = useState<number>(() => {
     const id = normalizeSnowflakeId(initialPick?.id);
-    return id ? Number(getCachedLighthouse(id)?.masteredCount || 0) : 0;
+    const sid = isCoach ? normalizeSnowflakeId(getTrainingStudent()?.id) : "";
+    return id ? Number(getCachedLighthouse(id, sid || undefined)?.masteredCount || 0) : 0;
   });
   const [todayNewLearned, setTodayNewLearned] = useState<number>(() => {
     const id = normalizeSnowflakeId(initialPick?.id);
-    return id ? Number(getCachedLighthouse(id)?.todayNewLearned || 0) : 0;
+    const sid = isCoach ? normalizeSnowflakeId(getTrainingStudent()?.id) : "";
+    return id ? Number(getCachedLighthouse(id, sid || undefined)?.todayNewLearned || 0) : 0;
   });
 
   const todayLabel = useMemo(() => fmtYMD(new Date()), []);
@@ -115,7 +119,8 @@ export default function WordTraining() {
   const pickWordBook = (wb: { id: string | number; name: string }, opts?: { fromUser?: boolean }) => {
     const id = normalizeSnowflakeId(wb.id);
     if (!id) return;
-    const cached = getCachedLighthouse(id);
+    const sid = isCoach ? studentId : undefined;
+    const cached = getCachedLighthouse(id, sid);
     if (cached) applyLighthouse(cached);
     setSelectedWordBookId(id);
     sessionStorage.setItem("lb_wordbook_id", id);
@@ -262,9 +267,11 @@ export default function WordTraining() {
   useEffect(() => {
     let mounted = true;
     if (isCoach && coachGate !== "ready") return;
+    if (isCoach && !studentId) return;
     if (!selectedWordBookId) return;
 
-    const cached = getCachedLighthouse(selectedWordBookId);
+    const sid = isCoach ? studentId : undefined;
+    const cached = getCachedLighthouse(selectedWordBookId, sid);
     if (cached) {
       applyLighthouse(cached);
     } else {
@@ -276,7 +283,7 @@ export default function WordTraining() {
 
     (async () => {
       try {
-        const data = await fetchLighthouse(selectedWordBookId, { force: true });
+        const data = await fetchLighthouse(selectedWordBookId, { force: true, studentId: sid });
         if (!mounted) return;
         applyLighthouse(data);
       } catch {
@@ -292,7 +299,7 @@ export default function WordTraining() {
     return () => {
       mounted = false;
     };
-  }, [selectedWordBookId, isCoach, coachGate]);
+  }, [selectedWordBookId, isCoach, coachGate, studentId]);
 
   const wordBookOptions = useMemo(() => {
     if (isCoach) {
@@ -315,6 +322,8 @@ export default function WordTraining() {
   };
 
   const trainingStudentName = getTrainingStudent()?.name || "";
+  const lighthouseStudentQuery =
+    isCoach && studentId ? `&studentId=${encodeURIComponent(studentId)}` : "";
 
   const lighthouseBoxes = memoryData.map(({ count }) => ({ count }));
 
@@ -476,21 +485,21 @@ export default function WordTraining() {
 
         <div className="grid grid-cols-3 gap-2 shrink-0">
           <div
-            onClick={() => navigate("/lighthouse-words?step=today")}
+            onClick={() => navigate(`/lighthouse-words?step=today${lighthouseStudentQuery}`)}
             className="bg-white rounded-xl p-2.5 text-center shadow-sm cursor-pointer hover:bg-gray-50 active:scale-95 transition-all"
           >
             <div className="text-lg font-bold text-[#4ECDC4] mb-0.5">{todayNewLearned}</div>
             <div className="text-[11px] text-[#718096]">{t("word_training.today_new")}</div>
           </div>
           <div
-            onClick={() => navigate("/lighthouse-words?step=01")}
+            onClick={() => navigate(`/lighthouse-words?step=01${lighthouseStudentQuery}`)}
             className="bg-white rounded-xl p-2.5 text-center shadow-sm cursor-pointer hover:bg-gray-50 active:scale-95 transition-all"
           >
             <div className="text-lg font-bold text-[#FF9800] mb-0.5">{memoryData[0]?.count ?? 0}</div>
             <div className="text-[11px] text-[#718096]">{t("word_training.today_review_target")}</div>
           </div>
           <div
-            onClick={() => navigate("/lighthouse-words?step=mastered")}
+            onClick={() => navigate(`/lighthouse-words?step=mastered${lighthouseStudentQuery}`)}
             className="bg-white rounded-xl p-2.5 text-center shadow-sm cursor-pointer hover:bg-gray-50 active:scale-95 transition-all"
           >
             <div className="text-lg font-bold text-[#66BB6A] mb-0.5">{masteredCount}</div>
@@ -521,7 +530,7 @@ export default function WordTraining() {
                   BOX_7: "mastered", UNLEARNED: "pending",
                 };
                 const step = stepMap[type] || tips;
-                navigate(`/lighthouse-words?step=${step}`);
+                navigate(`/lighthouse-words?step=${step}${lighthouseStudentQuery}`);
               }}
             />
           </div>
@@ -538,9 +547,17 @@ export default function WordTraining() {
               sessionStorage.setItem("lb_mode", "review");
               sessionStorage.setItem("lb_review_wordbook_id", selectedWordBookId);
               sessionStorage.setItem("lb_review_return", "/word-training");
-              sessionStorage.removeItem("lb_review_student_id");
+              if (isCoach && studentId) {
+                sessionStorage.setItem("lb_review_student_id", studentId);
+              } else {
+                sessionStorage.removeItem("lb_review_student_id");
+              }
+              const studentQ =
+                isCoach && studentId
+                  ? `&studentId=${encodeURIComponent(studentId)}`
+                  : "";
               navigate(
-                `/review-word-list?wordBookId=${encodeURIComponent(selectedWordBookId)}&lighthouse=1`
+                `/review-word-list?wordBookId=${encodeURIComponent(selectedWordBookId)}&lighthouse=1${studentQ}`
               );
             }}
           >

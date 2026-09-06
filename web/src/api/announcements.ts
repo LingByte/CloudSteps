@@ -1,7 +1,7 @@
 import { get, post, ApiResponse } from '../utils/request'
 
 export type Announcement = {
-  id: number
+  id: string | number
   title: string
   content: string
   status?: string
@@ -36,6 +36,8 @@ export const listAnnouncements = async (params?: {
   })
 }
 
-export const markAnnouncementRead = async (id: number): Promise<ApiResponse<null>> => {
+export const markAnnouncementRead = async (
+  id: string | number
+): Promise<ApiResponse<null>> => {
   return post<null>(`/announcements/${id}/read`)
 }

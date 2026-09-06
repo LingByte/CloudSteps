@@ -5,7 +5,7 @@ import { useWordEditStore } from "../stores/wordEditStore";
 import { formatTranslation, displayTranslationFull, pickPhoneticDisplay } from "../utils/wordFormat";
 import type { UserWordView } from "../api/wordbooks";
 
-export function WordEditTrigger({ wordId }: { wordId: number }) {
+export function WordEditTrigger({ wordId }: { wordId: string | number }) {
   const { t } = useTranslation();
   const openEditor = useWordEditStore((s) => s.openEditor);
   return (
@@ -41,7 +41,7 @@ export function WordEditHost({ onSaved }: { onSaved?: (view: UserWordView) => vo
 
 export function applyUserWordView<
   T extends {
-    id: number;
+    id: string | number;
     word: string;
     phonetic?: string;
     translation?: string;
@@ -49,7 +49,7 @@ export function applyUserWordView<
   },
 >(items: T[], view: UserWordView): T[] {
   return items.map((item) => {
-    if (item.id !== view.wordId) return item;
+    if (String(item.id) !== String(view.wordId)) return item;
     const e = view.effective;
     return {
       ...item,

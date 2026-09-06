@@ -27,15 +27,31 @@ function readLessonDefaults() {
   const endRaw = Number(sessionStorage.getItem("lb_lesson_practice_end") || now);
   const startRaw = Number(sessionStorage.getItem("lb_lesson_practice_start") || 0);
   const endTs = Number.isFinite(endRaw) && endRaw > 0 ? endRaw : now;
+  const minGapMs = 15 * 60_000;
   const startTs =
     Number.isFinite(startRaw) && startRaw > 0 && startRaw < endTs
       ? startRaw
-      : endTs - 45 * 60_000;
+      : endTs - minGapMs;
+  // 默认至少间隔 15 分钟（开始/结束落到同一分钟时也会拉开）
+  const safeEndTs = endTs - startTs < minGapMs ? startTs + minGapMs : endTs;
   return {
-    date: toDateInputValue(new Date(endTs)),
+    date: toDateInputValue(new Date(safeEndTs)),
     startTime: formatHmFromTs(startTs),
-    endTime: formatHmFromTs(endTs),
+    endTime: formatHmFromTs(safeEndTs),
   };
+}
+
+function ensureMinGapHm(startHm: string, endHm: string, gapMinutes = 15): string {
+  const [sh, sm] = startHm.split(":").map((x) => Number(x));
+  const [eh, em] = endHm.split(":").map((x) => Number(x));
+  if (![sh, sm, eh, em].every((n) => Number.isFinite(n))) {
+    return endHm;
+  }
+  const startMin = sh * 60 + sm;
+  const endMin = eh * 60 + em;
+  if (endMin - startMin >= gapMinutes) return endHm;
+  const next = (startMin + gapMinutes) % (24 * 60);
+  return `${String(Math.floor(next / 60)).padStart(2, "0")}:${String(next % 60).padStart(2, "0")}`;
 }
 
 export default function CreateAntiForgetting() {
@@ -83,12 +99,15 @@ export default function CreateAntiForgetting() {
         if (latest?.completedAt) {
           const end = new Date(latest.completedAt);
           if (!Number.isNaN(end.getTime())) {
-            setEndTime(formatHmFromTs(end.getTime()));
+            const startHm = latest.startedAt
+              ? formatHmFromTs(new Date(latest.startedAt).getTime())
+              : defaults.startTime;
+            setEndTime(ensureMinGapHm(startHm, formatHmFromTs(end.getTime()), 15));
           }
         } else if (latest?.startedAt) {
           const start = new Date(latest.startedAt);
           if (!Number.isNaN(start.getTime())) {
-            setEndTime(formatHmFromTs(start.getTime() + 45 * 60_000));
+            setEndTime(formatHmFromTs(start.getTime() + 15 * 60_000));
           }
         }
       } catch {
@@ -189,7 +208,7 @@ export default function CreateAntiForgetting() {
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block space-y-1">
-              <span className="text-xs text-muted-foreground">{t("create_anti_forgetting.start")}</span>
+              <span className="text-xs text-muted-foreground">{t("create_anti_forgetting.start_time")}</span>
               <input
                 type="time"
                 value={startTime}
@@ -198,7 +217,7 @@ export default function CreateAntiForgetting() {
               />
             </label>
             <label className="block space-y-1">
-              <span className="text-xs text-muted-foreground">{t("create_anti_forgetting.end")}</span>
+              <span className="text-xs text-muted-foreground">{t("create_anti_forgetting.end_time")}</span>
               <input
                 type="time"
                 value={endTime}

@@ -42,7 +42,7 @@ func (h *Handlers) registerAnnouncementRoutes(r *humax.Group) {
 }
 
 type announcementDTO struct {
-	ID          uint       `json:"id"`
+	ID          uint       `json:"id,string"`
 	Title       string     `json:"title"`
 	Content     string     `json:"content"`
 	Status      string     `json:"status,omitempty"`
@@ -178,13 +178,12 @@ func (h *Handlers) handleMarkAnnouncementRead(c *gin.Context) {
 		response.FailI18n(c, "common.login_required", nil)
 		return
 	}
-	id, _ := strconv.Atoi(c.Param("id"))
-	if id <= 0 {
-		response.FailI18n(c, "common.invalid_params", nil)
+	id, ok := parseRouteUintID(c, "id")
+	if !ok {
 		return
 	}
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
-	row, err := models.GetAnnouncementByID(db, uint(id))
+	row, err := models.GetAnnouncementByID(db, id)
 	if err != nil || row.Status != models.AnnouncementStatusPublished {
 		response.FailI18n(c, "announcement.not_found", err)
 		return

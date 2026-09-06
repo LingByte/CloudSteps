@@ -15,16 +15,22 @@ type Props = {
   onClose: () => void;
   /** 继续训练文案，默认「继续训练」 */
   continueLabel?: string;
+  /**
+   * 是否展示「结束定时」。
+   * 仅从顶栏计时器暂停入口打开时为 true；顶栏返回 / 浏览器后退只留「返回主页 / 继续」。
+   */
+  showEndTimer?: boolean;
 };
 
 /**
- * 练习流通用暂停菜单：返回主页 / 继续训练 / 结束定时
+ * 练习流通用暂停菜单：返回主页 / 继续训练；可选结束定时。
  * 「结束定时」只停前端计时器；真正离开练习（返回主页）才结算额度。
  */
 export function PracticePauseMenu({
   open,
   onClose,
   continueLabel,
+  showEndTimer = false,
 }: Props) {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -86,17 +92,19 @@ export function PracticePauseMenu({
         >
           {resolvedContinueLabel}
         </CloudButton>
-        <CloudButton
-          variant="ghost"
-          className="w-full justify-start rounded-none px-6 py-3 h-auto text-[#E53E3E]"
-          onClick={() => {
-            useClassTimerStore.getState().stop();
-            onClose();
-            showToast.info(t("coaching.timer_stopped"));
-          }}
-        >
-          {t("coaching.practice_end")}
-        </CloudButton>
+        {showEndTimer ? (
+          <CloudButton
+            variant="ghost"
+            className="w-full justify-start rounded-none px-6 py-3 h-auto text-[#E53E3E]"
+            onClick={() => {
+              useClassTimerStore.getState().stop();
+              onClose();
+              showToast.info(t("coaching.timer_stopped"));
+            }}
+          >
+            {t("coaching.practice_end")}
+          </CloudButton>
+        ) : null}
       </div>
     </div>
   );

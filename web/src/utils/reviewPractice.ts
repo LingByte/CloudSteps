@@ -3,7 +3,7 @@
 import i18n from "../i18n";
 
 export type ReviewPracticeWord = {
-  id: number;
+  id: string | number;
   word: string;
   phonetic?: string;
   phoneticUk?: string;
@@ -18,8 +18,8 @@ export type ReviewPracticeWord = {
  * @param returnPath 复习结束后回跳路径（如 /anti-forgetting、/word-training）
  */
 export function beginReviewPractice(opts: {
-  sessionId: number;
-  wordBookId: number;
+  sessionId: string | number;
+  wordBookId: string | number;
   words: ReviewPracticeWord[];
   returnPath: string;
 }) {

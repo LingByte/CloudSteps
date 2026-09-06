@@ -3,7 +3,7 @@ import { getApiBaseURL } from '../config/apiConfig'
 import { getStoredLocale } from '../i18n'
 
 export interface StudyWordItem {
-  id: number
+  id: string | number
   word: string
   translation?: string
   phonetic?: string
@@ -38,9 +38,9 @@ export interface StudyLighthouseResponse {
 }
 
 export interface StartStudySessionRequest {
-  wordBookId: number
-  knownIds: number[]
-  unknownIds: number[]
+  wordBookId: string | number
+  knownIds: Array<string | number>
+  unknownIds: Array<string | number>
   /** 老师代练时传当前学员 ID */
   studentId?: string
 }
@@ -52,36 +52,48 @@ export interface StartStudySessionResponse {
 }
 
 export interface CompleteSessionResult {
-  wordId: number
+  wordId: string | number
   remembered: boolean
 }
 
 export const getStudyWords = async (
-  wordBookId: number,
+  wordBookId: string | number,
   page: number = 1,
   pageSize: number = 20,
-  opts?: { shuffle?: boolean; seed?: number }
+  opts?: { shuffle?: boolean; seed?: number; studentId?: string | number }
 ): Promise<ApiResponse<StudyWordsResponse>> => {
   return get<StudyWordsResponse>('/study/words', {
     params: {
-      wordBookId,
+      wordBookId: String(wordBookId),
       page,
       pageSize,
       ...(opts?.shuffle ? { shuffle: 1, seed: opts.seed ?? 0 } : {}),
+      ...(opts?.studentId ? { studentId: String(opts.studentId) } : {}),
     },
   })
 }
 
 export const getStudyLighthouse = async (
-  wordBookId: string | number
+  wordBookId: string | number,
+  opts?: { studentId?: string | number }
 ): Promise<ApiResponse<StudyLighthouseResponse>> => {
-  return get<StudyLighthouseResponse>('/study/lighthouse', { params: { wordBookId } })
+  return get<StudyLighthouseResponse>('/study/lighthouse', {
+    params: {
+      wordBookId: String(wordBookId),
+      ...(opts?.studentId ? { studentId: String(opts.studentId) } : {}),
+    },
+  })
 }
 
 export const startStudySession = async (
   data: StartStudySessionRequest
 ): Promise<ApiResponse<StartStudySessionResponse>> => {
-  return post<StartStudySessionResponse>('/study/session/start', data)
+  return post<StartStudySessionResponse>('/study/session/start', {
+    ...data,
+    wordBookId: String(data.wordBookId),
+    knownIds: data.knownIds.map(String),
+    unknownIds: data.unknownIds.map(String),
+  })
 }
 
 export interface LighthouseWordsResponse {
@@ -90,25 +102,32 @@ export interface LighthouseWordsResponse {
 }
 
 export const getLighthouseWords = async (
-  wordBookId: number,
+  wordBookId: string | number,
   step: string,
   page: number = 1,
-  pageSize: number = 50
+  pageSize: number = 50,
+  opts?: { studentId?: string | number }
 ): Promise<ApiResponse<LighthouseWordsResponse>> => {
   return get<LighthouseWordsResponse>('/study/lighthouse/words', {
-    params: { wordBookId, step, page, pageSize }
+    params: {
+      wordBookId: String(wordBookId),
+      step,
+      page,
+      pageSize,
+      ...(opts?.studentId ? { studentId: String(opts.studentId) } : {}),
+    }
   })
 }
 
 export type LighthouseReviewSubmitResult = {
-  wordId: number
+  wordId: string | number
   remembered: boolean
 }
 
 /** 九宫格「开始复习」：拉取所有已学未掌握词 */
 export const getLighthouseReviewWords = async (
   wordBookId: string | number,
-  opts?: { page?: number; pageSize?: number }
+  opts?: { page?: number; pageSize?: number; studentId?: string | number }
 ): Promise<ApiResponse<LighthouseWordsResponse>> => {
   const id = String(wordBookId).trim()
   return get<LighthouseWordsResponse>('/study/lighthouse/review-words', {
@@ -116,6 +135,7 @@ export const getLighthouseReviewWords = async (
       wordBookId: id,
       page: opts?.page ?? 1,
       pageSize: opts?.pageSize ?? 200,
+      ...(opts?.studentId ? { studentId: String(opts.studentId) } : {}),
     },
   })
 }
@@ -123,12 +143,14 @@ export const getLighthouseReviewWords = async (
 /** 九宫格复习提交：对了推进一格，错了不推进 */
 export const submitLighthouseReview = async (
   wordBookId: string | number,
-  results: LighthouseReviewSubmitResult[]
+  results: LighthouseReviewSubmitResult[],
+  opts?: { studentId?: string | number }
 ): Promise<ApiResponse<{ advanced: number; unchanged: number }>> => {
   const id = String(wordBookId).trim()
   return post<{ advanced: number; unchanged: number }>('/study/lighthouse/review-submit', {
     wordBookId: id,
     results,
+    ...(opts?.studentId ? { studentId: String(opts.studentId) } : {}),
   })
 }
 

@@ -23,7 +23,7 @@ export interface StartReviewSessionResponse {
 }
 
 export interface CompleteReviewResult {
-  wordId: number
+  wordId: string | number
   remembered: boolean
 }
 

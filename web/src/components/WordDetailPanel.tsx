@@ -67,7 +67,7 @@ type ParsedDetail = {
 type ExtTab = { key: ExtKey; label: string };
 
 type Props = {
-  wordId: number;
+  wordId: string | number;
   wordText?: string;
   /** 当后端返回的释义为空时，作为默认“释义”标签内容展示 */
   fallbackTranslation?: string;

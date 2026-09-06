@@ -180,42 +180,50 @@ export async function beginPracticeBilling(
 }
 
 /** 结束练习课次并扣额度；复用原排课的不在此下课 */
+let finishInFlight: Promise<void> | null = null;
+
 export async function finishPracticeBilling(
   link?: PracticeBillingLink | null
 ) {
-  const active = link ?? usePracticeBillingStore.getState().link;
-  if (!active?.appointmentId) {
-    usePracticeBillingStore.getState().clear();
-    return;
-  }
-  if (!active.owned) {
-    usePracticeBillingStore.getState().clear();
-    return;
-  }
-  try {
-    const res = await endCoachingAppointment(active.appointmentId);
-    if (res.code !== 200) {
-      showToast.error(formatApiMessage(res.msg, "practice_billing.settle_failed"));
-      // 课次找不到多半是本地 ID 精度损坏，清掉以免反复失败
-      if (String(res.msg || "").includes("不存在") || res.code === 2000) {
-        usePracticeBillingStore.getState().clear();
-      }
+  if (finishInFlight) return finishInFlight;
+  finishInFlight = (async () => {
+    const active = link ?? usePracticeBillingStore.getState().link;
+    if (!active?.appointmentId) {
+      usePracticeBillingStore.getState().clear();
       return;
     }
-    showToast.success(
-      i18n.t("practice_billing.settled", { name: active.studentName })
-    );
-    usePracticeBillingStore.getState().clear();
-  } catch (e: unknown) {
-    const msg =
-      e && typeof e === "object" && "msg" in e
-        ? formatApiMessage(
-            String((e as { msg: string }).msg),
-            "practice_billing.settle_failed"
-          )
-        : i18n.t("practice_billing.settle_failed");
-    showToast.error(msg);
-  }
+    if (!active.owned) {
+      usePracticeBillingStore.getState().clear();
+      return;
+    }
+    try {
+      const res = await endCoachingAppointment(active.appointmentId);
+      if (res.code !== 200) {
+        showToast.error(formatApiMessage(res.msg, "practice_billing.settle_failed"));
+        // 课次找不到多半是本地 ID 精度损坏，清掉以免反复失败
+        if (String(res.msg || "").includes("不存在") || res.code === 2000) {
+          usePracticeBillingStore.getState().clear();
+        }
+        return;
+      }
+      showToast.success(
+        i18n.t("practice_billing.settled", { name: active.studentName })
+      );
+      usePracticeBillingStore.getState().clear();
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === "object" && "msg" in e
+          ? formatApiMessage(
+              String((e as { msg: string }).msg),
+              "practice_billing.settle_failed"
+            )
+          : i18n.t("practice_billing.settle_failed");
+      showToast.error(msg);
+    }
+  })().finally(() => {
+    finishInFlight = null;
+  });
+  return finishInFlight;
 }
 
 export function getPracticeBilling(): PracticeBillingLink | null {

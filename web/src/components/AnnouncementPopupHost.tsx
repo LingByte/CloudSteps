@@ -23,7 +23,8 @@ import {
 
 /**
  * 登录后拉取未读公告；若新手引导正在进行/待展示，则延后弹出，引导结束后再展示。
- * 每次仅展示最新一条；点「我知道了」标记已读；可跳转公告列表查看其余公告。
+ * 每次仅展示最新一条；点「我知道了」会把当前弹窗队列里的未读（含更早的）一并标已读，
+ * 避免下次进入又弹出旧公告。完整内容仍可在公告列表查看。
  */
 export function AnnouncementPopupHost() {
   const { t } = useTranslation();
@@ -36,7 +37,12 @@ export function AnnouncementPopupHost() {
 
   const [item, setItem] = useState<Announcement | null>(null);
   const [moreCount, setMoreCount] = useState(0);
-  const pendingRef = useRef<{ item: Announcement; moreCount: number } | null>(null);
+  const [pendingIds, setPendingIds] = useState<Array<string | number>>([]);
+  const pendingRef = useRef<{
+    item: Announcement;
+    moreCount: number;
+    ids: Array<string | number>;
+  } | null>(null);
   const loadedRef = useRef(false);
 
   const deferred = shouldDeferSystemPopups(role, userId);
@@ -45,11 +51,13 @@ export function AnnouncementPopupHost() {
     if (shouldDeferSystemPopups(role, userId)) {
       setItem(null);
       setMoreCount(0);
+      setPendingIds([]);
       return;
     }
     if (pendingRef.current) {
       setItem(pendingRef.current.item);
       setMoreCount(pendingRef.current.moreCount);
+      setPendingIds(pendingRef.current.ids);
       pendingRef.current = null;
     }
   }, [role, userId]);
@@ -58,15 +66,20 @@ export function AnnouncementPopupHost() {
     (list: Announcement[]) => {
       const latest = list[0] ?? null;
       const extra = Math.max(0, list.length - 1);
+      const ids = list.map((a) => a.id).filter(Boolean);
       if (shouldDeferSystemPopups(role, userId)) {
-        pendingRef.current = latest ? { item: latest, moreCount: extra } : null;
+        pendingRef.current = latest
+          ? { item: latest, moreCount: extra, ids }
+          : null;
         setItem(null);
         setMoreCount(0);
+        setPendingIds([]);
         return;
       }
       pendingRef.current = null;
       setItem(latest);
       setMoreCount(extra);
+      setPendingIds(ids);
     },
     [role, userId],
   );
@@ -75,6 +88,7 @@ export function AnnouncementPopupHost() {
     if (!hasHydrated || !isAuthenticated) {
       setItem(null);
       setMoreCount(0);
+      setPendingIds([]);
       pendingRef.current = null;
       loadedRef.current = false;
       return;
@@ -91,12 +105,14 @@ export function AnnouncementPopupHost() {
         pendingRef.current = null;
         setItem(null);
         setMoreCount(0);
+        setPendingIds([]);
         return;
       }
       applyList(list);
     } catch {
       setItem(null);
       setMoreCount(0);
+      setPendingIds([]);
       pendingRef.current = null;
     }
   }, [hasHydrated, isAuthenticated, applyList]);
@@ -110,6 +126,7 @@ export function AnnouncementPopupHost() {
       if (shouldDeferSystemPopups(role, userId)) {
         setItem(null);
         setMoreCount(0);
+        setPendingIds([]);
         return;
       }
       if (pendingRef.current) {
@@ -129,17 +146,23 @@ export function AnnouncementPopupHost() {
   const close = () => {
     setItem(null);
     setMoreCount(0);
+    setPendingIds([]);
     pendingRef.current = null;
   };
 
   const dismiss = () => {
-    const id = item?.id;
+    const ids =
+      pendingIds.length > 0
+        ? pendingIds
+        : item?.id
+          ? [item.id]
+          : [];
     close();
-    if (id) {
-      void markAnnouncementRead(id).catch(() => {
-        // 忽略失败；下次仍可能再弹
-      });
-    }
+    if (ids.length === 0) return;
+    // 队列里更早的未读一并标已读，避免下次登录连环弹旧公告
+    void Promise.all(
+      ids.map((id) => markAnnouncementRead(id).catch(() => undefined))
+    );
   };
 
   const viewAll = () => {

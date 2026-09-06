@@ -19,7 +19,7 @@ import {
 import { displayTranslationFull } from "../utils/wordFormat";
 
 type Props = {
-  wordId: number | null;
+  wordId: string | number | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved?: (view: UserWordView) => void;

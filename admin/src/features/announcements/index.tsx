@@ -235,7 +235,7 @@ export function AnnouncementsPage() {
   return (
     <AdminPage
       title='系统公告'
-      description='后台发布公告；用户登录后未读会弹窗一次，点「我知道了」后不再主动弹出。'
+      description='后台发布公告；用户登录后未读会弹窗一次，点「我知道了」会清空当前未读弹窗队列，不再连环弹出旧公告。'
       extra={
         <div className='flex gap-2'>
           <Button variant='outline' size='sm' onClick={() => void load(page)}>

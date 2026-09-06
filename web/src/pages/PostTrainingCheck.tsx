@@ -1,4 +1,4 @@
-import { Volume2, Check, X, BookOpen, Shuffle, PanelTop, Type, ArrowRight } from "lucide-react";
+import { Volume2, Check, X, BookOpen, Shuffle, PanelTop, Type, ArrowRight, CheckCircle2, ClipboardList, Sparkles, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -49,7 +49,7 @@ import { formatApiMessage } from "../utils/apiMessage";
 import { showToast } from "../utils/toast";
 
 type CheckWord = {
-  id: number;
+  id: string | number;
   word: string;
   phonetic?: string;
   translation?: string;
@@ -95,15 +95,15 @@ export default function PostTrainingCheck() {
   const [viewMode, setViewMode] = useState<WordViewMode>("list");
   const [cardIndex, setCardIndex] = useState(0);
   const [detailMode, setDetailMode] = useState(false);
-  const [detailWord, setDetailWord] = useState<{ id: number; word: string } | null>(null);
+  const [detailWord, setDetailWord] = useState<{ id: string | number; word: string } | null>(null);
   const [spellMode, setSpellMode] = useState(false);
-  const [spellRevealed, setSpellRevealed] = useState<Set<number>>(new Set());
+  const [spellRevealed, setSpellRevealed] = useState<Set<string | number>>(new Set());
   const [spellTarget, setSpellTarget] = useState<CheckWord | null>(null);
   const [spellInput, setSpellInput] = useState("");
   const [spellResult, setSpellResult] = useState<"correct" | "wrong" | null>(null);
 
   const mode = useMemo(() => sessionStorage.getItem("lb_mode") || "study", []);
-  const wordBookId = useMemo(() => Number(sessionStorage.getItem("lb_wordbook_id") || 0), []);
+  const wordBookId = useMemo(() => normalizeSnowflakeId(sessionStorage.getItem("lb_wordbook_id")), []);
   const note = useSplitScreenNote("lb_posttraining_note_width");
 
   const batchIdx = useMemo(() => {
@@ -125,7 +125,10 @@ export default function PostTrainingCheck() {
   }, [mode]);
 
   const [submitting, setSubmitting] = useState(false);
-  const [playingId, setPlayingId] = useState<number | null>(null);
+  const [playingId, setPlayingId] = useState<string | number | null>(null);
+  const [finishChoiceOpen, setFinishChoiceOpen] = useState(false);
+  const [finishedSessionId, setFinishedSessionId] = useState("");
+  const [finishingTraining, setFinishingTraining] = useState(false);
   const abortRef = useRef<(() => void) | null>(null);
 
   const batchInfo = useMemo(() => {
@@ -169,7 +172,7 @@ export default function PostTrainingCheck() {
     setSpellResult(null);
   };
 
-  const toggleSpellRevealed = (id: number, e: React.MouseEvent) => {
+  const toggleSpellRevealed = (id: string | number, e: React.MouseEvent) => {
     e.stopPropagation();
     setSpellRevealed((prev) => {
       const next = new Set(prev);
@@ -244,7 +247,7 @@ export default function PostTrainingCheck() {
     }
   }, [effectiveBatchIdx, batchInfo.totalBatches, mode, checkPhase, isRecheckMode]);
 
-  const handleStatusClick = (id: number, newStatus: "correct" | "wrong") => {
+  const handleStatusClick = (id: string | number, newStatus: "correct" | "wrong") => {
     setWords((prev) =>
       prev.map((word) => {
         if (word.id !== id) return word;
@@ -298,11 +301,11 @@ export default function PostTrainingCheck() {
     });
   };
 
-  const appendMilestoneResults = (results: { wordId: number; remembered: boolean }[]) => {
+  const appendMilestoneResults = (results: { wordId: string | number; remembered: boolean }[]) => {
     try {
       const raw = sessionStorage.getItem("lb_study_batch_results") || "[]";
       const prev = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [];
-      const byId = new Map<number, { wordId: number; remembered: boolean }>();
+      const byId = new Map<string | number, { wordId: string | number; remembered: boolean }>();
       for (const r of prev) byId.set(r.wordId, r);
       for (const r of results) byId.set(r.wordId, r);
       sessionStorage.setItem("lb_study_batch_results", JSON.stringify([...byId.values()]));
@@ -327,23 +330,51 @@ export default function PostTrainingCheck() {
     navigate("/word-practice", { replace: true });
   };
 
-  const finishTrainingAndCreateReview = () => {
-    const reportSessionId = sessionId;
+  const clearStudySessionLocalState = () => {
     sessionStorage.removeItem("lb_study_batch_idx");
     sessionStorage.removeItem("lb_study_batch_results");
     sessionStorage.removeItem("lb_study_total_batches");
     sessionStorage.removeItem(CHECK_PHASE_KEY);
+    sessionStorage.removeItem("lb_study_session_id");
+    sessionStorage.removeItem("lb_study_words");
     clearStudyRecheck();
-    // 整段识记练完 → 课堂报告 → 抗遗忘；并结算本段练习额度
+  };
+
+  /** 训后检测全部完成：先弹窗，再决定继续筛词或结束出报告 */
+  const openFinishChoice = (reportSessionId?: string) => {
+    setFinishedSessionId(reportSessionId || sessionId || "");
+    setFinishChoiceOpen(true);
+  };
+
+  const continueToPreTraining = () => {
+    if (finishingTraining) return;
+    setFinishChoiceOpen(false);
+    clearStudySessionLocalState();
+    // 额度继续计时，回到训前筛词开始下一批
+    navigate("/pre-training-check", { replace: true });
+  };
+
+  const finishTrainingAndCreateReview = () => {
+    if (finishingTraining) return;
+    const reportSessionId = finishedSessionId || sessionId;
+    setFinishingTraining(true);
+    // 整段识记练完 → 结算额度 → 课堂报告；保持弹窗 loading，避免连点
     stampLessonPracticeWindow();
     allowPracticeLeaveOnce();
-    void finishPracticeBilling().finally(() => {
-      if (reportSessionId) {
-        navigate(`/session-report/${reportSessionId}`, { replace: true });
-        return;
-      }
-      navigate("/create-anti-forgetting", { replace: true });
-    });
+    void finishPracticeBilling()
+      .catch(() => {
+        // toast 已在 finishPracticeBilling 内处理
+      })
+      .finally(() => {
+        clearStudySessionLocalState();
+        setFinishChoiceOpen(false);
+        setFinishingTraining(false);
+        if (reportSessionId) {
+          navigate(`/session-report/${reportSessionId}`, { replace: true });
+          return;
+        }
+        navigate("/create-anti-forgetting", { replace: true });
+      });
   };
 
   const wrongWords = useMemo(() => words.filter((w) => w.status === "wrong"), [words]);
@@ -410,7 +441,7 @@ export default function PostTrainingCheck() {
       return;
     }
     if (shouldFinal && from === "final") {
-      finishTrainingAndCreateReview();
+      openFinishChoice(sessionId);
       return;
     }
     goToFinalCheck();
@@ -495,7 +526,7 @@ export default function PostTrainingCheck() {
         } else {
           throw new Error(t("practice.session_not_ready"));
         }
-        finishTrainingAndCreateReview();
+        openFinishChoice(sessionId);
       } catch (e: unknown) {
         const msg =
           e instanceof Error
@@ -575,8 +606,8 @@ export default function PostTrainingCheck() {
                 style={markWordCardStyle(word.status, isWordCardTapped(word, playingId, word.id))}
                 onClick={() => handleWordClick(word)}
               >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="flex flex-row items-center justify-between gap-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
                   <div className="min-w-0">
                     {spellMode ? (
                       <span
@@ -614,7 +645,7 @@ export default function PostTrainingCheck() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 sm:gap-3 -mr-1 sm:mr-0">
+                <div className="flex shrink-0 items-center gap-1 sm:gap-2 -mr-1 sm:mr-0">
                   <CloudButton
                     type="button"
                     variant="ghost"
@@ -876,6 +907,88 @@ export default function PostTrainingCheck() {
                 </CloudButton>
               </>
             )}
+          </div>
+        </div>
+      )}
+      {finishChoiceOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F172A]/45 p-4 backdrop-blur-[2px]">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="finish-choice-title"
+            className="relative mx-auto w-full max-w-[22rem] overflow-hidden rounded-3xl bg-white shadow-[0_24px_64px_rgba(15,23,42,0.22)]"
+          >
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-[#4ECDC4]/25 via-[#4ECDC4]/8 to-transparent" />
+            <div className="relative px-5 pb-5 pt-7">
+              <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-[#4ECDC4] text-white shadow-[0_10px_24px_rgba(78,205,196,0.45)]">
+                <CheckCircle2 size={28} strokeWidth={2.25} />
+              </div>
+              <h3
+                id="finish-choice-title"
+                className="mt-4 text-center text-[1.125rem] font-semibold tracking-tight text-[#1A1A1A]"
+              >
+                {t("practice.finish_choice_title")}
+              </h3>
+              <p className="mt-1.5 text-center text-[13px] leading-relaxed text-[#718096]">
+                {t("practice.finish_choice_desc")}
+              </p>
+
+              <div className="mt-5 flex flex-col gap-6">
+                <button
+                  type="button"
+                  disabled={finishingTraining}
+                  onClick={continueToPreTraining}
+                  className="group flex w-full items-center gap-3 rounded-2xl border border-[#E8EEF2] bg-[#F8FBFC] px-3.5 py-3.5 text-left transition hover:border-[#4ECDC4]/50 hover:bg-[#4ECDC4]/[0.08] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50"
+                >
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#4ECDC4] shadow-sm ring-1 ring-[#E8EEF2] transition group-hover:ring-[#4ECDC4]/40">
+                    <Sparkles size={18} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-semibold text-[#1A1A1A]">
+                      {t("practice.continue_practice")}
+                    </span>
+                    <span className="mt-0.5 block text-[12px] leading-snug text-[#718096]">
+                      {t("practice.finish_choice_continue_hint")}
+                    </span>
+                  </span>
+                  <ArrowRight
+                    size={16}
+                    className="shrink-0 text-[#A0AEC0] transition group-hover:translate-x-0.5 group-hover:text-[#4ECDC4]"
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  disabled={finishingTraining}
+                  onClick={finishTrainingAndCreateReview}
+                  className="group flex w-full items-center gap-3 rounded-2xl border border-transparent bg-[#4ECDC4] px-3.5 py-3.5 text-left text-white shadow-[0_10px_24px_rgba(78,205,196,0.35)] transition hover:bg-[#3dbdb5] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-80"
+                >
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white">
+                    {finishingTraining ? (
+                      <Loader2 size={18} className="animate-spin" />
+                    ) : (
+                      <ClipboardList size={18} />
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-semibold">
+                      {finishingTraining
+                        ? t("practice.ending_training")
+                        : t("practice.end_training")}
+                    </span>
+                    <span className="mt-0.5 block text-[12px] leading-snug text-white/85">
+                      {t("practice.finish_choice_end_hint")}
+                    </span>
+                  </span>
+                  {!finishingTraining ? (
+                    <ArrowRight
+                      size={16}
+                      className="shrink-0 text-white/80 transition group-hover:translate-x-0.5"
+                    />
+                  ) : null}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

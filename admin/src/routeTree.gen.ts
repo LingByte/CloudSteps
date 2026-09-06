@@ -60,6 +60,7 @@ import { Route as ClerkAuthenticatedUserManagementRouteImport } from './routes/c
 import { Route as ClerkauthSignUpRouteImport } from './routes/clerk/(auth)/sign-up'
 import { Route as ClerkauthSignInRouteImport } from './routes/clerk/(auth)/sign-in'
 import { Route as AuthenticatedWordbooksBookIdRouteImport } from './routes/_authenticated/wordbooks/$bookId'
+import { Route as AuthenticatedUserFeedbackTicketIdRouteImport } from './routes/_authenticated/user-feedback/$ticketId'
 import { Route as AuthenticatedSettingsRechargeRouteImport } from './routes/_authenticated/settings/recharge'
 import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated/settings/notifications'
 import { Route as AuthenticatedSettingsInviteCodeRouteImport } from './routes/_authenticated/settings/invite-code'
@@ -356,6 +357,12 @@ const AuthenticatedWordbooksBookIdRoute =
     path: '/wordbooks/$bookId',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedUserFeedbackTicketIdRoute =
+  AuthenticatedUserFeedbackTicketIdRouteImport.update({
+    id: '/user-feedback/$ticketId',
+    path: '/user-feedback/$ticketId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSettingsRechargeRoute =
   AuthenticatedSettingsRechargeRouteImport.update({
     id: '/recharge',
@@ -476,6 +483,7 @@ export interface FileRoutesByFullPath {
   '/settings/invite-code': typeof AuthenticatedSettingsInviteCodeRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/settings/recharge': typeof AuthenticatedSettingsRechargeRoute
+  '/user-feedback/$ticketId': typeof AuthenticatedUserFeedbackTicketIdRoute
   '/wordbooks/$bookId': typeof AuthenticatedWordbooksBookIdRoute
   '/clerk/sign-in': typeof ClerkauthSignInRoute
   '/clerk/sign-up': typeof ClerkauthSignUpRoute
@@ -540,6 +548,7 @@ export interface FileRoutesByTo {
   '/settings/invite-code': typeof AuthenticatedSettingsInviteCodeRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/settings/recharge': typeof AuthenticatedSettingsRechargeRoute
+  '/user-feedback/$ticketId': typeof AuthenticatedUserFeedbackTicketIdRoute
   '/wordbooks/$bookId': typeof AuthenticatedWordbooksBookIdRoute
   '/clerk/sign-in': typeof ClerkauthSignInRoute
   '/clerk/sign-up': typeof ClerkauthSignUpRoute
@@ -609,6 +618,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/invite-code': typeof AuthenticatedSettingsInviteCodeRoute
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsRoute
   '/_authenticated/settings/recharge': typeof AuthenticatedSettingsRechargeRoute
+  '/_authenticated/user-feedback/$ticketId': typeof AuthenticatedUserFeedbackTicketIdRoute
   '/_authenticated/wordbooks/$bookId': typeof AuthenticatedWordbooksBookIdRoute
   '/clerk/(auth)/sign-in': typeof ClerkauthSignInRoute
   '/clerk/(auth)/sign-up': typeof ClerkauthSignUpRoute
@@ -676,6 +686,7 @@ export interface FileRouteTypes {
     | '/settings/invite-code'
     | '/settings/notifications'
     | '/settings/recharge'
+    | '/user-feedback/$ticketId'
     | '/wordbooks/$bookId'
     | '/clerk/sign-in'
     | '/clerk/sign-up'
@@ -740,6 +751,7 @@ export interface FileRouteTypes {
     | '/settings/invite-code'
     | '/settings/notifications'
     | '/settings/recharge'
+    | '/user-feedback/$ticketId'
     | '/wordbooks/$bookId'
     | '/clerk/sign-in'
     | '/clerk/sign-up'
@@ -808,6 +820,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/invite-code'
     | '/_authenticated/settings/notifications'
     | '/_authenticated/settings/recharge'
+    | '/_authenticated/user-feedback/$ticketId'
     | '/_authenticated/wordbooks/$bookId'
     | '/clerk/(auth)/sign-in'
     | '/clerk/(auth)/sign-up'
@@ -1221,6 +1234,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWordbooksBookIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/user-feedback/$ticketId': {
+      id: '/_authenticated/user-feedback/$ticketId'
+      path: '/user-feedback/$ticketId'
+      fullPath: '/user-feedback/$ticketId'
+      preLoaderRoute: typeof AuthenticatedUserFeedbackTicketIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings/recharge': {
       id: '/_authenticated/settings/recharge'
       path: '/recharge'
@@ -1372,6 +1392,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedNotificationChannelsNewRoute: typeof AuthenticatedNotificationChannelsNewRoute
   AuthenticatedNotificationTemplatesIdRoute: typeof AuthenticatedNotificationTemplatesIdRoute
   AuthenticatedNotificationTemplatesNewRoute: typeof AuthenticatedNotificationTemplatesNewRoute
+  AuthenticatedUserFeedbackTicketIdRoute: typeof AuthenticatedUserFeedbackTicketIdRoute
   AuthenticatedWordbooksBookIdRoute: typeof AuthenticatedWordbooksBookIdRoute
   AuthenticatedAnnouncementsIndexRoute: typeof AuthenticatedAnnouncementsIndexRoute
   AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
@@ -1417,6 +1438,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedNotificationTemplatesIdRoute,
   AuthenticatedNotificationTemplatesNewRoute:
     AuthenticatedNotificationTemplatesNewRoute,
+  AuthenticatedUserFeedbackTicketIdRoute:
+    AuthenticatedUserFeedbackTicketIdRoute,
   AuthenticatedWordbooksBookIdRoute: AuthenticatedWordbooksBookIdRoute,
   AuthenticatedAnnouncementsIndexRoute: AuthenticatedAnnouncementsIndexRoute,
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,

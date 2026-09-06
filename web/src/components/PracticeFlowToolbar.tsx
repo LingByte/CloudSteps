@@ -31,6 +31,8 @@ export function PracticeFlowToolbar({
 }: Props) {
   const [timerOpen, setTimerOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
+  /** timer = 点倒计时；leave = 顶栏返回 / 浏览器后退 */
+  const [pauseSource, setPauseSource] = useState<"timer" | "leave">("leave");
   const pauseTimer = useClassTimerStore((s) => s.pause);
   const lockPauseOpen = usePracticeFlowLockStore((s) => s.pauseMenuOpen);
   const setLockPauseOpen = usePracticeFlowLockStore((s) => s.setPauseMenuOpen);
@@ -40,6 +42,7 @@ export function PracticeFlowToolbar({
   useEffect(() => {
     if (lockPauseOpen) {
       pauseTimer();
+      setPauseSource("leave");
       setPauseOpen(true);
       setLockPauseOpen(false);
     }
@@ -55,6 +58,7 @@ export function PracticeFlowToolbar({
             const { endsAt, pausedRemainingMs } = useClassTimerStore.getState();
             if (endsAt != null || pausedRemainingMs != null) {
               pauseTimer();
+              setPauseSource("timer");
               setPauseOpen(true);
               return;
             }
@@ -75,6 +79,7 @@ export function PracticeFlowToolbar({
           useClassTimerStore.getState().resume();
         }}
         continueLabel={pauseContinueLabel}
+        showEndTimer={pauseSource === "timer"}
       />
       <WordEditHost onSaved={onWordPatched} />
     </>

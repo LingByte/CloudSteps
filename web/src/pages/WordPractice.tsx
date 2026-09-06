@@ -1,4 +1,5 @@
 import { Shuffle, ArrowRight, BookOpen, ChevronLeft, ChevronRight, PanelTop } from "lucide-react";
+import { normalizeSnowflakeId } from "../utils/json-snowflake";
 import { useNavigate } from "react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnnotationLayer } from "../components/AnnotationLayer";
@@ -46,7 +47,7 @@ export default function WordPractice() {
   const lastTappedIndexRef = useRef<number | null>(null);
   const [playingId, setPlayingId] = useState<number | null>(null);
   const [detailMode, setDetailMode] = useState(false);
-  const [detailWord, setDetailWord] = useState<{ id: number; word: string } | null>(null);
+  const [detailWord, setDetailWord] = useState<{ id: string | number; word: string } | null>(null);
   const [viewMode, setViewMode] = useState<WordViewMode>("list");
   const [cardIndex, setCardIndex] = useState(0);
   const [fullMeaning, setFullMeaning] = useState(false);
@@ -65,8 +66,8 @@ export default function WordPractice() {
   } = useSplitScreenNote("lb_practice_note_width");
 
   const mode = useMemo(() => sessionStorage.getItem("lb_mode") || "study", []);
-  const wordBookId = useMemo(() => Number(sessionStorage.getItem("lb_wordbook_id") || 0), []);
-  const wordNoteKey = (wordId: number) => `study-note:word:${wordBookId}:${wordId}`;
+  const wordBookId = useMemo(() => normalizeSnowflakeId(sessionStorage.getItem("lb_wordbook_id")), []);
+  const wordNoteKey = (wordId: string | number) => `study-note:word:${wordBookId}:${wordId}`;
 
   const [activeNoteKey, setActiveNoteKey] = useState(`study-note:global:${wordBookId}`);
   const [activeNoteTitle, setActiveNoteTitle] = useState(t("practice.free_note"));
@@ -433,17 +434,17 @@ export default function WordPractice() {
                   <SequenceNextMark
                     show={!manualReadMode && nextGuideIndex >= 0 && index === nextGuideIndex}
                   />
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-row items-center justify-between gap-2">
                     <div
                       onClick={() => handleWordTap(word)}
-                      className="flex-1 cursor-pointer min-w-0"
+                      className="min-w-0 flex-1 cursor-pointer"
                     >
                       <div className="min-w-0">
                         <div className={`${PRACTICE_WORD_CLASS} mb-1`}>{word.word}</div>
                         {renderReveal(word)}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 sm:gap-3 -mr-1 sm:mr-0">
+                    <div className="flex shrink-0 items-center gap-1 sm:gap-2 -mr-1 sm:mr-0">
                       <div onClick={(e) => e.stopPropagation()}>
                         <StudyNoteLauncher
                           storageKey={wordNoteKey(word.id)}

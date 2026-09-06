@@ -1,4 +1,5 @@
 import { Volume2, Loader2 } from "lucide-react";
+import { normalizeSnowflakeId } from "../utils/json-snowflake";
 import { useNavigate, useSearchParams } from "react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -11,6 +12,8 @@ import { AudioMuteToggleButton } from "../components/AudioMuteToggleButton";
 import { FlowPageShell } from "../components/PageTransition";
 import { playFirstWordAudio } from "../utils/audioPlayer";
 import { nextWordTapState } from "../utils/wordReveal";
+import { getTrainingStudent } from "../utils/trainingStudent";
+import { useAuthStore } from "../stores/authStore";
 
 const STEP_KEY_MAP: Record<string, string> = {
   today: "lighthouse_words.step.today",
@@ -40,20 +43,29 @@ export default function LighthouseWords() {
   const label = t(STEP_KEY_MAP[step] || step);
 
   const wordBookId = useMemo(
-    () => Number(sessionStorage.getItem("lb_wordbook_id") || 0),
+    () => normalizeSnowflakeId(sessionStorage.getItem("lb_wordbook_id")),
     []
   );
+  const role = (useAuthStore((s) => s.user) as { role?: string } | null)?.role || "user";
+  const studentId = useMemo(() => {
+    if (role === "student") return "";
+    const fromUrl = normalizeSnowflakeId(searchParams.get("studentId"));
+    if (fromUrl) return fromUrl;
+    const fromReview = normalizeSnowflakeId(sessionStorage.getItem("lb_review_student_id"));
+    if (fromReview) return fromReview;
+    return normalizeSnowflakeId(getTrainingStudent()?.id);
+  }, [role, searchParams]);
 
   const [words, setWords] = useState<StudyWordItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showTranslationMap, setShowTranslationMap] = useState<
-    Map<number, boolean>
+    Map<string | number, boolean>
   >(new Map());
-  const [heardIds, setHeardIds] = useState<Set<number>>(new Set());
+  const [heardIds, setHeardIds] = useState<Set<string | number>>(new Set());
   const [annotationOpen, setAnnotationOpen] = useState(false);
-  const [playingId, setPlayingId] = useState<number | null>(null);
+  const [playingId, setPlayingId] = useState<string | number | null>(null);
   const abortRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -63,7 +75,9 @@ export default function LighthouseWords() {
       setLoading(true);
       setError(null);
       try {
-        const res = await getLighthouseWords(wordBookId, step);
+        const res = await getLighthouseWords(wordBookId, step, 1, 50, {
+          ...(studentId ? { studentId } : {}),
+        });
         if (!mounted) return;
         const list = Array.isArray(res.data?.words)
           ? (res.data.words as StudyWordItem[])
@@ -80,7 +94,7 @@ export default function LighthouseWords() {
     return () => {
       mounted = false;
     };
-  }, [wordBookId, step, t]);
+  }, [wordBookId, step, studentId, t]);
 
   const handleWordClick = (word: StudyWordItem) => {
     const next = nextWordTapState({
@@ -140,7 +154,7 @@ export default function LighthouseWords() {
       />
 
       <AnnotationLayer
-        storageKey={`lighthouse:${wordBookId}:${step}`}
+        storageKey={`lighthouse:${wordBookId}:${step}:${studentId || "self"}`}
         open={annotationOpen}
         onOpenChange={setAnnotationOpen}
       />

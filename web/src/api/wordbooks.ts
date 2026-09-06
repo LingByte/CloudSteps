@@ -126,7 +126,7 @@ export interface WordDetail {
   overridden?: boolean
 }
 
-export const getWordDetail = async (id: number): Promise<ApiResponse<WordDetail>> => {
+export const getWordDetail = async (id: string | number): Promise<ApiResponse<WordDetail>> => {
   return get<WordDetail>(`/words/${id}`)
 }
 
@@ -144,8 +144,8 @@ export interface UserWordFields {
 }
 
 export interface UserWordView {
-  wordId: number
-  wordBookId: number
+  wordId: string | number
+  wordBookId: string | number
   canonical: UserWordFields
   overlay: UserWordFields | null
   effective: UserWordFields
@@ -153,18 +153,22 @@ export interface UserWordView {
   hasOverlay: boolean
 }
 
-export const getUserWord = async (wordId: number): Promise<ApiResponse<UserWordView>> => {
+export const getUserWord = async (
+  wordId: string | number
+): Promise<ApiResponse<UserWordView>> => {
   return get<UserWordView>(`/words/${wordId}/user-word`)
 }
 
 export const saveUserWord = async (
-  wordId: number,
+  wordId: string | number,
   body: UserWordFields
 ): Promise<ApiResponse<UserWordView>> => {
   return put<UserWordView>(`/words/${wordId}/user-word`, body)
 }
 
-export const deleteUserWord = async (wordId: number): Promise<ApiResponse<UserWordView>> => {
+export const deleteUserWord = async (
+  wordId: string | number
+): Promise<ApiResponse<UserWordView>> => {
   return del<UserWordView>(`/words/${wordId}/user-word`)
 }
 

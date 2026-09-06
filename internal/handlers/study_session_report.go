@@ -177,8 +177,8 @@ func buildStudySessionReport(db *gorm.DB, session *models.StudySession) studySes
 		}
 	}
 
-	studiedWords := loadSessionWordLabels(db, session, sessionWordFilterAll, 40)
-	forgotWords := loadSessionWordLabels(db, session, sessionWordFilterForgot, 20)
+	studiedWords := loadSessionWordLabels(db, session, sessionWordFilterAll, 0)
+	forgotWords := loadSessionWordLabels(db, session, sessionWordFilterForgot, 0)
 
 	return studySessionReportDTO{
 		SessionID:            fmt.Sprintf("%d", session.ID),
@@ -247,7 +247,10 @@ func loadSessionWordLabels(db *gorm.DB, session *models.StudySession, filter ses
 		byID[w.ID] = w
 	}
 	if limit <= 0 {
-		limit = 40
+		limit = len(sessionWords)
+		if limit == 0 {
+			limit = 1
+		}
 	}
 	out := make([]string, 0, len(sessionWords))
 	for _, sw := range sessionWords {

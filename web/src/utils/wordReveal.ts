@@ -20,8 +20,8 @@ export function nextWordTapState(opts: {
 export function syncDetailWordWithTap(
   detailMode: boolean,
   next: { showTranslation: boolean },
-  word: { id: number; word: string }
-): { id: number; word: string } | null {
+  word: { id: string | number; word: string }
+): { id: string | number; word: string } | null {
   if (!detailMode) return null;
   if (next.showTranslation) return { id: word.id, word: word.word };
   return null;

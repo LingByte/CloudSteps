@@ -88,15 +88,17 @@ function WordList({
     <div>
       <p className="mb-1.5 text-[11px] font-medium text-[#6B7280]">{title}</p>
       <ul className="divide-y divide-[#F0F0F0] rounded-lg border border-[#ECECEC] bg-[#FAFAFA]">
-        {rows.map((row) => (
+        {rows.map((row, i) => (
           <li
-            key={`${tone}-${row.word}-${row.gloss}`}
+            key={`${tone}-${i}-${row.word}-${row.gloss}`}
             className="flex min-w-0 items-center gap-2 px-2.5 py-2"
           >
             <span className={`size-1.5 shrink-0 rounded-full ${dot}`} aria-hidden />
             <span className="shrink-0 text-[13px] font-semibold text-[#111827]">{row.word}</span>
             {row.gloss ? (
-              <span className="min-w-0 flex-1 truncate text-[12px] text-[#6B7280]">{row.gloss}</span>
+              <span className="min-w-0 flex-1 text-[12px] leading-snug text-[#6B7280]">
+                {row.gloss}
+              </span>
             ) : null}
           </li>
         ))}
@@ -237,7 +239,7 @@ export default function SessionReport() {
   useEffect(() => {
     if (!noteBoxRef.current) return;
     if (!typing && !streaming) return;
-    noteBoxRef.current.scrollTop = noteBoxRef.current.scrollHeight;
+    noteBoxRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [noteShown, typing, streaming]);
 
   const reportDate = useMemo(
@@ -250,8 +252,9 @@ export default function SessionReport() {
   );
 
   const noteBusy = streaming || typing;
-  const forgotWords = report?.forgotWords?.slice(0, 5) ?? [];
-  const studiedWords = report?.studiedWords?.slice(0, 8) ?? [];
+  // 完整展示本课全部词条（保存长图也要用全量）
+  const forgotWords = report?.forgotWords ?? [];
+  const studiedWords = report?.studiedWords ?? [];
   const studentName = report?.studentName || t("session_report.student_fallback");
   const coachName = report?.coachName || t("session_report.coach_fallback");
   const bookName = report?.wordBookName || t("session_report.wordbook_fallback");
@@ -271,11 +274,37 @@ export default function SessionReport() {
     if (!posterRef.current || !report) return;
     setSavingImage(true);
     try {
-      await new Promise((r) => requestAnimationFrame(() => r(null)));
-      const dataUrl = await toPng(posterRef.current, {
+      // 先展开词条区（去掉 max-height），再按完整高度导出长图
+      await new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+      await new Promise((r) => setTimeout(r, 80));
+      const node = posterRef.current;
+      if (!node) return;
+      const width = Math.ceil(node.scrollWidth);
+      const height = Math.ceil(node.scrollHeight);
+      const dataUrl = await toPng(node, {
         cacheBust: true,
         pixelRatio: 2,
         backgroundColor: "#F5F5F5",
+        width,
+        height,
+        // 跨域 Google Fonts 无法读 cssRules，跳过字体内联避免 SecurityError
+        skipFonts: true,
+        fontEmbedCSS: "",
+        style: {
+          height: `${height}px`,
+          overflow: "visible",
+          fontFamily:
+            'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif',
+        },
+        filter: (el) => {
+          if (el.tagName === "LINK") {
+            const href = el.getAttribute("href") || "";
+            if (href.includes("fonts.googleapis.com") || href.includes("fonts.gstatic.com")) {
+              return false;
+            }
+          }
+          return true;
+        },
       });
       const link = document.createElement("a");
       const name = ["课堂报告", report.studentName || "", reportDate || ""]
@@ -294,42 +323,46 @@ export default function SessionReport() {
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-[#F5F5F5]">
-      <button
-        type="button"
-        onClick={() => void saveImage()}
-        disabled={!report || savingImage || loading}
-        className="absolute right-3 top-2.5 z-30 inline-flex h-8 items-center gap-1 rounded-full bg-white px-2.5 text-[11px] font-medium text-[#5C574F] shadow-sm transition hover:bg-white disabled:opacity-50"
-        aria-label={t("session_report.save_image")}
-      >
-        {savingImage ? (
-          <Loader2 size={13} className="animate-spin" />
-        ) : (
-          <Download size={13} />
-        )}
-        {t("session_report.save_image")}
-      </button>
+      <header className="relative z-20 mx-auto flex h-10 w-full max-w-lg shrink-0 items-center justify-center px-3">
+        <h1
+          id="session-report-title"
+          className="px-16 text-center text-[13px] font-medium tracking-wide text-[#6B7280]"
+        >
+          {t("session_report.feedback_title")}
+        </h1>
+        <button
+          type="button"
+          onClick={() => void saveImage()}
+          disabled={!report || savingImage || loading}
+          className="absolute right-3 top-1/2 z-10 inline-flex h-8 -translate-y-1/2 items-center gap-1 rounded-full bg-white px-2.5 text-[11px] font-medium text-[#5C574F] shadow-sm transition hover:bg-white disabled:opacity-50"
+          aria-label={t("session_report.save_image")}
+        >
+          {savingImage ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : (
+            <Download size={13} />
+          )}
+          {t("session_report.save_image")}
+        </button>
+      </header>
 
-      <div className="mx-auto flex min-h-0 w-full max-w-lg flex-1 flex-col px-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))] pt-2">
-        <div ref={posterRef} className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#F5F5F5]">
-          <h1
-            id="session-report-title"
-            className="shrink-0 pr-14 text-center text-[13px] font-medium tracking-wide text-[#6B7280]"
-          >
-            {t("session_report.feedback_title")}
-          </h1>
-
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(4.75rem+env(safe-area-inset-bottom))]">
+        <div
+          ref={posterRef}
+          className="mx-auto w-full max-w-lg bg-[#F5F5F5] pb-3"
+        >
           {loading ? (
-            <div className="flex flex-1 items-center justify-center gap-2 text-sm text-[#8A857C]">
+            <div className="flex items-center justify-center gap-2 py-16 text-sm text-[#8A857C]">
               <Loader2 className="animate-spin text-[var(--primary)]" size={18} />
               {t("session_report.loading")}
             </div>
           ) : !report ? (
-            <p className="flex flex-1 items-center justify-center text-sm text-[#8A857C]">
+            <p className="py-16 text-center text-sm text-[#8A857C]">
               {t("session_report.load_failed")}
             </p>
           ) : (
-            <div className="mt-2 flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-              <section className="shrink-0">
+            <div className="flex flex-col gap-2.5">
+              <section>
                 <SectionLabel>{t("session_report.section.basic")}</SectionLabel>
                 <Card>
                   <div className="flex items-center gap-2.5">
@@ -367,10 +400,10 @@ export default function SessionReport() {
                 </Card>
               </section>
 
-              <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <section>
                 <SectionLabel>{t("session_report.section.note")}</SectionLabel>
-                <Card className="flex min-h-0 flex-1 flex-col overflow-hidden !bg-white">
-                  <div className="flex shrink-0 items-center justify-between gap-2">
+                <Card className="!bg-white !py-3">
+                  <div className="flex items-center justify-between gap-2">
                     <p className="text-[13px] font-semibold text-[#1A1A1A]">
                       {t("session_report.note_heading")}
                     </p>
@@ -382,8 +415,8 @@ export default function SessionReport() {
                     ) : null}
                   </div>
 
-                  <div className="mt-2 shrink-0 rounded-lg bg-[#F8F8F8] px-2.5 py-2 text-[11px] leading-relaxed text-[#4B5563]">
-                    <p className="line-clamp-2">
+                  <div className="mt-2 rounded-lg bg-[#F8F8F8] px-2.5 py-2.5 text-[12px] leading-relaxed text-[#4B5563]">
+                    <p className="whitespace-pre-wrap">
                       {t("session_report.note_stats", {
                         screened: report.screenedKnownCount + report.screenedUnknownCount,
                         known: report.screenedKnownCount,
@@ -394,9 +427,9 @@ export default function SessionReport() {
                         accuracy: Math.round(report.accuracyPercent),
                       })}
                     </p>
-                    <div ref={noteBoxRef} className="mt-1.5">
+                    <div ref={noteBoxRef} className="mt-2">
                       {noteShown.trim() ? (
-                        <p className="line-clamp-2 whitespace-pre-wrap text-[#374151]">
+                        <p className="whitespace-pre-wrap text-[#374151]">
                           {t("session_report.note_eval_prefix")}
                           {noteShown}
                           {noteBusy ? (
@@ -409,7 +442,13 @@ export default function SessionReport() {
                     </div>
                   </div>
 
-                  <div className="mt-2 min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain">
+                  <div
+                    className={
+                      savingImage
+                        ? "mt-3 space-y-3"
+                        : "mt-3 max-h-[32vh] space-y-3 overflow-y-auto overscroll-contain"
+                    }
+                  >
                     <WordList
                       title={t("session_report.studied_list_title")}
                       items={studiedWords}
@@ -423,14 +462,14 @@ export default function SessionReport() {
                   </div>
 
                   {aiError && aiError !== "llm_not_configured" ? (
-                    <p className="mt-1 shrink-0 text-[10px] text-[var(--warning)]">
+                    <p className="mt-2 text-[10px] text-[var(--warning)]">
                       {t("session_report.ai_failed_hint")}
                     </p>
                   ) : null}
                 </Card>
               </section>
 
-              <section className="shrink-0">
+              <section>
                 <div className="inline-flex max-w-full items-center rounded-full bg-[#E8F8EF] px-3 py-1 text-[11px] font-medium text-[#1F8A4C]">
                   <span className="truncate">【{bookName}】</span>
                 </div>
@@ -441,7 +480,7 @@ export default function SessionReport() {
       </div>
 
       <div
-        className="shrink-0 px-3 pt-1"
+        className="absolute inset-x-0 bottom-0 z-20 px-3 pt-1"
         style={{ paddingBottom: "max(0.65rem, env(safe-area-inset-bottom))" }}
       >
         <div className="mx-auto flex max-w-lg items-center gap-2 rounded-xl bg-white p-1.5 shadow-[0_8px_24px_rgba(42,38,32,0.1)]">

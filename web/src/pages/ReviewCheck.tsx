@@ -1,4 +1,5 @@
 import { Volume2, Check, X, Shuffle, BookOpen, PanelTop, ArrowRight } from "lucide-react";
+import { normalizeSnowflakeId } from "../utils/json-snowflake";
 import { useNavigate } from "react-router";
 import { useEffect, useMemo, useState } from "react";
 import { AnnotationLayer } from "../components/AnnotationLayer";
@@ -31,7 +32,7 @@ import { useTranslation } from "react-i18next";
 import { formatApiMessage } from "../utils/apiMessage";
 
 type ReviewWord = {
-  id: number;
+  id: string | number;
   word: string;
   phonetic?: string;
   phoneticUk?: string;
@@ -62,14 +63,14 @@ export default function ReviewCheck() {
     requestPracticePauseMenu();
   };
 
-  const wordBookId = useMemo(() => Number(sessionStorage.getItem("lb_wordbook_id") || 0), []);
+  const wordBookId = useMemo(() => normalizeSnowflakeId(sessionStorage.getItem("lb_wordbook_id")), []);
   const note = useNote();
   const [sessionId, setSessionId] = useState<number>(0);
   const [annotationOpen, setAnnotationOpen] = useState(false);
   const [viewMode, setViewMode] = useState<WordViewMode>("list");
   const [cardIndex, setCardIndex] = useState(0);
   const [detailMode, setDetailMode] = useState(false);
-  const [detailWord, setDetailWord] = useState<{ id: number; word: string } | null>(null);
+  const [detailWord, setDetailWord] = useState<{ id: string | number; word: string } | null>(null);
 
   useEffect(() => {
     sessionStorage.setItem("lb_mode", "review");
@@ -123,7 +124,7 @@ export default function ReviewCheck() {
     };
   }, [wordBookId]);
 
-  const handleStatusClick = (id: number, newStatus: "correct" | "wrong") => {
+  const handleStatusClick = (id: string | number, newStatus: "correct" | "wrong") => {
     setWords((prev) =>
       prev.map((word) => {
         if (word.id !== id) return word;
@@ -318,13 +319,13 @@ export default function ReviewCheck() {
                     style={markWordCardStyle(word.status, isWordCardTapped(word))}
                     onClick={() => handleWordClick(word)}
                   >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="flex flex-row items-center justify-between gap-2">
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
                         <div className="min-w-0">
                           <span className={`${PRACTICE_WORD_CLASS} hover:text-[#4ECDC4] transition-colors`}>{word.word}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 sm:gap-3 -mr-1 sm:mr-0">
+                      <div className="flex shrink-0 items-center gap-1 sm:gap-2 -mr-1 sm:mr-0">
                         <div onClick={(e) => e.stopPropagation()}>
                           <StudyNoteLauncher
                             storageKey={`study-note:word:${wordBookId}:${word.id}`}

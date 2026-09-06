@@ -1,4 +1,5 @@
 import { Volume2, Check, X, Shuffle, Loader2, ArrowDownAZ, BookOpen, PanelTop } from "lucide-react";
+import { normalizeSnowflakeId } from "../utils/json-snowflake";
 import { useNavigate } from "react-router";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 
@@ -33,7 +34,7 @@ import { ensurePracticeBillingActive } from "../utils/practiceBilling";
 import { useAuthStore } from "../stores/authStore";
 
 type WordItem = {
-  id: number;
+  id: string | number;
   word: string;
   phonetic?: string;
   translation?: string;
@@ -66,7 +67,7 @@ export default function PreTrainingCheck() {
   const shuffleSeedRef = useRef(0);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const sentinelNodeRef = useRef<HTMLDivElement | null>(null);
-  const [playingId, setPlayingId] = useState<number | null>(null);
+  const [playingId, setPlayingId] = useState<string | number | null>(null);
   const abortRef = useRef<(() => void) | null>(null);
   const [annotationOpen, setAnnotationOpen] = useState(false);
   const [viewMode, setViewMode] = useState<WordViewMode>("list");
@@ -74,7 +75,7 @@ export default function PreTrainingCheck() {
   const [detailMode, setDetailMode] = useState(false);
   /** 拓展简易模式：默认开，只展示部分标签 */
   const [simpleDetail, setSimpleDetail] = useState(true);
-  const [detailWord, setDetailWord] = useState<{ id: number; word: string } | null>(null);
+  const [detailWord, setDetailWord] = useState<{ id: string | number; word: string } | null>(null);
 
   const handlePlayAudio = useCallback((word: WordItem) => {
     if (!word.audioUrl) return;
@@ -88,7 +89,7 @@ export default function PreTrainingCheck() {
     navigate("/word-training");
   };
 
-  const wordBookId = useMemo(() => Number(sessionStorage.getItem("lb_wordbook_id") || 0), []);
+  const wordBookId = useMemo(() => normalizeSnowflakeId(sessionStorage.getItem("lb_wordbook_id")), []);
   const note = useNote();
 
   const loadWords = useCallback(
@@ -106,6 +107,7 @@ export default function PreTrainingCheck() {
         const res = await getStudyWords(wordBookId, page, PAGE_SIZE, {
           shuffle: shuffleModeRef.current,
           seed: shuffleSeedRef.current,
+          ...(getTrainingStudent()?.id ? { studentId: getTrainingStudent()!.id } : {}),
         });
         const list = res.data?.words;
         const totalCount = res.data?.total || 0;
@@ -114,7 +116,7 @@ export default function PreTrainingCheck() {
         }
         const arr = Array.isArray(list)
           ? (list as Array<{
-              id: number;
+              id: string | number;
               word: string;
               translation?: string;
               audioUrl?: string;
@@ -226,7 +228,7 @@ export default function PreTrainingCheck() {
     };
   }, [initialLoading, viewMode, words.length, hasMore, loading, attachObserver]);
 
-  const handleStatusClick = useCallback((id: number, newStatus: "correct" | "wrong") => {
+  const handleStatusClick = useCallback((id: string | number, newStatus: "correct" | "wrong") => {
     const currentWord = words[cardIndex];
     const isSelectingCurrentCard = viewMode === "card" && currentWord?.id === id;
 
@@ -356,6 +358,11 @@ export default function PreTrainingCheck() {
         unknownIds,
         ...(trainingStudent?.id ? { studentId: trainingStudent.id } : {}),
       });
+      if (res.code !== 200) {
+        setError(formatApiMessage(res.msg, "practice.start_failed"));
+        setStarting(false);
+        return;
+      }
       const sessionId = res.data?.sessionId;
       const sessionWords = res.data?.words;
       if (res.data?.finished || !Array.isArray(sessionWords) || sessionWords.length === 0) {
@@ -386,7 +393,14 @@ export default function PreTrainingCheck() {
       sessionStorage.removeItem("lb_review_words");
       sessionStorage.removeItem("lb_review_batch_idx");
       navigate("/word-practice");
-    } catch {
+    } catch (e: unknown) {
+      const msg =
+        e instanceof Error
+          ? e.message
+          : e && typeof e === "object" && "msg" in e
+            ? formatApiMessage(String((e as { msg: string }).msg), "practice.start_failed")
+            : t("practice.start_failed");
+      setError(msg);
       setStarting(false);
     }
   };
@@ -400,8 +414,8 @@ export default function PreTrainingCheck() {
       style={markWordCardStyle(word.status, isWordCardTapped(word, playingId, word.id))}
       onClick={() => handleWordClick(word)}
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
+      <div className="flex flex-row items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <div className="min-w-0">
             <span className={`${PRACTICE_WORD_CLASS} transition-colors hover:text-[#4ECDC4]`}>
               {word.word}
@@ -418,7 +432,7 @@ export default function PreTrainingCheck() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3 -mr-1 sm:mr-0">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2 -mr-1 sm:mr-0">
           <div onClick={(e) => e.stopPropagation()}>
             <StudyNoteLauncher
               storageKey={`study-note:word:${wordBookId}:${word.id}`}
