@@ -1524,6 +1524,8 @@
   "practice.simple_tip_on": "Simple mode: tap for full expand",
   "practice.simple_tip_off": "Full mode: tap for simple",
   "practice.select_five": "Select 5",
+  "practice.mark_correct_5": "5 correct",
+  "practice.mark_wrong_5": "5 incorrect",
   "practice.start_learning": "Start learning",
   "practice.start_learning_count": "Learn {{count}} words",
   "practice.screened_count": "{{count}} screened",

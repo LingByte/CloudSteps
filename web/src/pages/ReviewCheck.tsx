@@ -402,7 +402,7 @@ export default function ReviewCheck() {
                   type="button"
                   variant={note.open ? "brand" : "outline"}
                   size="pill"
-                  onClick={() => note.setOpen((value) => !value)}
+                  onClick={() => (note.open ? note.setOpen(false) : note.openDefaultNote())}
                   aria-label={t("practice.open_free_note")}
                   title={t("practice.open_free_note")}
                   className="max-sm:px-2 max-sm:text-xs"

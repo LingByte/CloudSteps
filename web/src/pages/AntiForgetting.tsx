@@ -21,6 +21,7 @@ type ReviewTask = {
   timeSort: number;
   trainingAt: string;
   practiceStartedAt?: string;
+  practiceEndedAt?: string | null;
 };
 
 type TimeSlotGroup = {
@@ -36,7 +37,7 @@ function studentDisplayName(row: ReviewBookStatRow): string {
   return id ? i18n.t("student_detail.student_fallback", { id }) : i18n.t("anti_forgetting.current_user");
 }
 
-function clockParts(iso: string | null | undefined, tz: string) {
+function clockParts(iso: string | null | undefined, endIso: string | null | undefined, tz: string) {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
@@ -58,10 +59,18 @@ function clockParts(iso: string | null | undefined, tz: string) {
   const day = parts.find((p) => p.type === "day")?.value ?? "";
   const slot = timeFmt.format(d);
   const [hh, mm] = slot.split(":").map((x) => Number(x));
+  // 结束时间：有 endedAt 则用，否则同开始时间（显示 17:05~17:05）
+  let endSlot = slot;
+  if (endIso) {
+    const endD = new Date(endIso);
+    if (!Number.isNaN(endD.getTime())) {
+      endSlot = timeFmt.format(endD);
+    }
+  }
   return {
     slot,
     sort: (Number.isFinite(hh) ? hh : 0) * 60 + (Number.isFinite(mm) ? mm : 0),
-    trainingAt: `${y}-${mo}-${day} ${slot}`,
+    trainingAt: `${y}-${mo}-${day} ${slot}~${endSlot}`,
   };
 }
 
@@ -118,7 +127,7 @@ export default function AntiForgetting() {
       const studentId = normalizeSnowflakeId(b.studentId) || "self";
       const wordBookId = normalizeSnowflakeId(b.wordBookId);
       const sessionId = normalizeSnowflakeId(b.sessionId);
-      const clock = clockParts(b.practiceStartedAt, timeZone);
+      const clock = clockParts(b.practiceStartedAt, b.practiceEndedAt, timeZone);
       return {
         id: `${studentId}-${wordBookId}-${sessionId || "0"}`,
         studentId,
@@ -132,6 +141,7 @@ export default function AntiForgetting() {
         timeSort: clock?.sort ?? 9999,
         trainingAt: clock?.trainingAt || "—",
         practiceStartedAt: b.practiceStartedAt,
+        practiceEndedAt: b.practiceEndedAt,
       };
     });
   }, [bookStats, timeZone]);

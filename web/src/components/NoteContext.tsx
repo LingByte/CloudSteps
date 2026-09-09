@@ -7,6 +7,7 @@ type NoteContextValue = ReturnType<typeof useSplitScreenNote> & {
   storageKey: string;
   setStorageKey: (key: string) => void;
   openNote: (key: string, title?: string) => void;
+  openDefaultNote: () => void;
   noteTitle: string;
   setNoteTitle: (title: string) => void;
   defaultTitle: string;
@@ -27,6 +28,12 @@ export function NoteProvider({ children }: { children: ReactNode }) {
     note.setOpen(true);
   };
 
+  const openDefaultNote = () => {
+    setStorageKey("");
+    setNoteTitle(defaultTitle);
+    note.setOpen(true);
+  };
+
   return (
     <NoteContext.Provider
       value={{
@@ -34,6 +41,7 @@ export function NoteProvider({ children }: { children: ReactNode }) {
         storageKey,
         setStorageKey,
         openNote,
+        openDefaultNote,
         noteTitle,
         setNoteTitle,
         defaultTitle,

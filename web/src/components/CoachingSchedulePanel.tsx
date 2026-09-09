@@ -214,6 +214,7 @@ function layoutDayEvents(
   zIndex: number;
 }> {
   const span = Math.max(1, axisEnd - axisStart);
+  const STACK_OFFSET_PX = 8;
   const raw = items.map((schedule) => {
     const range = scheduleVisualRange(schedule);
     let s = parseHmToMinutes(range.start);
@@ -258,30 +259,30 @@ function layoutDayEvents(
     const normalHeightPx = Math.max(EVENT_MIN_H, ((ev.end - ev.start) / span) * axisHeightPx);
     const group = groupById.get(ev.schedule.id) || { key: String(ev.schedule.id), index: 0, count: 1 };
     const expanded = group.count > 1 && group.key === expandedGroupKey;
-    const collapsedHeightPx = Math.max(EVENT_MIN_H, Math.min(normalHeightPx, 72));
+    const collapsedHeightPx = Math.max(EVENT_MIN_H, Math.min(normalHeightPx, 48));
     const heightPx = group.count === 1
       ? normalHeightPx
       : expanded
-        ? Math.max(52, Math.min(normalHeightPx, 88))
+        ? Math.max(56, Math.min(normalHeightPx, 64))
         : collapsedHeightPx;
     const offsetPx = group.count === 1
       ? 0
       : expanded
-        ? group.index * Math.min(48, Math.max(32, heightPx * 0.55))
-        : group.index * 8;
+        ? group.index * 44
+        : group.index * STACK_OFFSET_PX;
     const collapsedTopPx = ((groupStartByKey.get(group.key) ?? ev.start) - axisStart) / span * axisHeightPx;
 
     return {
       schedule: ev.schedule,
-      topPx: (!expanded && group.count > 1 ? collapsedTopPx : topPx) + offsetPx,
+      topPx: (group.count > 1 ? collapsedTopPx : topPx) + offsetPx,
       heightPx,
-      showDetail: group.count === 1 ? normalHeightPx >= 40 : expanded || group.index === 0,
+      showDetail: group.count === 1 ? normalHeightPx >= 40 : expanded || group.index === group.count - 1,
       col: 0,
       colCount: 1,
       overlapGroupKey: group.key,
       overlapIndex: group.index,
       overlapCount: group.count,
-      zIndex: raisedId === ev.schedule.id ? 30 : 10 + (group.count - group.index),
+      zIndex: raisedId === ev.schedule.id ? 30 : 10 + group.index,
     };
   });
 }
@@ -331,11 +332,12 @@ function TimetableBlock({
   return (
     <button
       type="button"
+      data-timetable-block
       onClick={(e) => {
         e.stopPropagation();
         onClick();
       }}
-      className={`absolute overflow-hidden rounded-2xl border ${soft.border} bg-background ${soft.bg} text-left px-1 py-1 shadow-sm active:scale-[0.98] touch-manipulation`}
+      className={`absolute overflow-hidden rounded-[24px] border ${soft.border} bg-background text-left px-2.5 py-2 shadow-[0_2px_6px_rgba(0,0,0,0.16)] active:scale-[0.98] touch-manipulation`}
       style={{
         top: topPx,
         height: heightPx,
@@ -345,25 +347,24 @@ function TimetableBlock({
         maxWidth: "min(100%, 280px)",
       }}
     >
-      <div className="min-w-0 h-full flex flex-col justify-center">
-        <div className={`text-[10px] font-semibold tabular-nums leading-tight ${soft.text}`}>
-          {start}{showDetail ? `–${end}` : ""}
-        </div>
+      <div className="flex h-full min-w-0 flex-col items-center justify-center text-center">
         {showDetail ? (
           <>
-            {studentName ? (
-              <div className="text-[11px] font-medium leading-snug line-clamp-1 mt-0.5 text-foreground">
-                {studentName}
-              </div>
-            ) : null}
-            <div className={`text-[11px] font-medium leading-snug line-clamp-2 mt-0.5 ${past ? "text-muted-foreground" : "text-foreground"}`}>
-              {title}
+            <div className="line-clamp-1 text-sm font-medium leading-tight text-foreground">
+              {studentName && title && studentName !== title ? `${studentName}（${title}）` : studentName || title}
+            </div>
+            <div className={`mt-0.5 text-sm font-medium leading-tight tabular-nums ${past ? "text-muted-foreground" : soft.text}`}>
+              {start}–{end}
             </div>
           </>
-        ) : null}
+        ) : (
+          <div className={`text-sm font-medium leading-tight tabular-nums ${past ? "text-muted-foreground" : soft.text}`}>
+            {start}
+          </div>
+        )}
       </div>
       {overlapCount > 1 && !overlapExpanded && overlapIndex === 0 ? (
-        <span className="absolute right-1 top-1 rounded-full bg-foreground/10 px-1 text-[9px] font-semibold text-foreground/70">
+        <span className="absolute right-2 top-1 rounded-full bg-foreground/10 px-1.5 text-[10px] font-semibold text-foreground/70">
           +{overlapCount - 1}
         </span>
       ) : null}
@@ -426,6 +427,18 @@ export function CoachingSchedulePanel({ nowTs, mode = "coach" }: Props) {
 
   const timetableHostRef = useRef<HTMLDivElement>(null);
   const [axisHeightPx, setAxisHeightPx] = useState(280);
+
+  useEffect(() => {
+    if (!expandedOverlapGroup) return;
+    const collapseOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest("[data-timetable-block]")) return;
+      setExpandedOverlapGroup(null);
+      setRaisedOverlapId(null);
+    };
+    document.addEventListener("pointerdown", collapseOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", collapseOnOutsidePointer);
+  }, [expandedOverlapGroup]);
 
   const weekMon = useMemo(() => weekMonday(weekAnchor), [weekAnchor]);
   const weekDays = useMemo(
@@ -993,6 +1006,12 @@ export function CoachingSchedulePanel({ nowTs, mode = "coach" }: Props) {
                         dIdx < 6 ? "border-r border-border/30" : ""
                       }`}
                       style={{ height: axisHeightPx }}
+                      onClick={() => {
+                        if (expandedOverlapGroup) {
+                          setExpandedOverlapGroup(null);
+                          setRaisedOverlapId(null);
+                        }
+                      }}
                     >
                       {isPastDay ? (
                         <div
@@ -1022,6 +1041,11 @@ export function CoachingSchedulePanel({ nowTs, mode = "coach" }: Props) {
                           className="absolute inset-0 z-0 touch-manipulation"
                           onClick={() => {
                             dismissCellTip();
+                            if (expandedOverlapGroup) {
+                              setExpandedOverlapGroup(null);
+                              setRaisedOverlapId(null);
+                              return;
+                            }
                             openScheduleForDay(d);
                           }}
                         />

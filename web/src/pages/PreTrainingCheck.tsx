@@ -303,23 +303,13 @@ export default function PreTrainingCheck() {
     void loadWords(1, true);
   }, [loadWords]);
 
-  const handleSelectAll = useCallback(() => {
-    setWords((prev) => {
-      const allSelected = prev.every((word) => word.status !== null);
-      if (allSelected) {
-        return prev.map((word) => ({ ...word, status: null as WordItem["status"] }));
-      }
-      return prev.map((word) => ({ ...word, status: "wrong" as WordItem["status"] }));
-    });
-  }, []);
-
-  const handleSelect5 = useCallback(() => {
+  const handleSelect5 = useCallback((status: "correct" | "wrong") => {
     setWords((prev) => {
       const unselected = prev.filter((word) => word.status === null);
       const toSelect = unselected.slice(0, 5);
       return prev.map((word) => {
         if (toSelect.find((w) => w.id === word.id)) {
-          return { ...word, status: "wrong" as WordItem["status"] };
+          return { ...word, status };
         }
         return word;
       });
@@ -606,7 +596,7 @@ export default function PreTrainingCheck() {
               type="button"
               variant={note.open ? "brand" : "outline"}
               size="pill"
-              onClick={() => note.setOpen((value) => !value)}
+              onClick={() => (note.open ? note.setOpen(false) : note.openDefaultNote())}
               aria-label={t("practice.open_free_note")}
               title={t("practice.open_free_note")}
               className="shrink-0 max-sm:px-2 max-sm:text-xs"
@@ -681,20 +671,22 @@ export default function PreTrainingCheck() {
               </CloudButton>
             )}
             <CloudButton
-              variant="outline"
+              variant="mint"
               size="pill"
-              onClick={handleSelectAll}
-              className="shrink-0 max-sm:px-2 max-sm:text-xs"
+              className="h-10 shrink-0 px-4 text-sm font-normal max-sm:px-3"
+              onClick={() => handleSelect5("correct")}
             >
-              {t("practice.select_all")}
+              <Check size={16} />
+              {t("practice.mark_correct_5")}
             </CloudButton>
             <CloudButton
-              variant="brandOutline"
+              variant="destructive"
               size="pill"
-              className="shrink-0 max-sm:px-2 max-sm:text-xs"
-              onClick={handleSelect5}
+              className="h-10 shrink-0 px-4 text-sm font-normal max-sm:px-3"
+              onClick={() => handleSelect5("wrong")}
             >
-              {t("practice.select_five")}
+              <X size={16} />
+              {t("practice.mark_wrong_5")}
             </CloudButton>
           </div>
           <CloudButton

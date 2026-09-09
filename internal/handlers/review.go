@@ -174,7 +174,6 @@ func reviewBooksByDateForUsers(db *gorm.DB, userIDs []uint, dayStart, dayEnd tim
 
 	type aggKey struct {
 		StudentID  uint
-		SessionID  uint
 		WordBookID uint
 	}
 	type aggVal struct {
@@ -209,7 +208,7 @@ func reviewBooksByDateForUsers(db *gorm.DB, userIDs []uint, dayStart, dayEnd tim
 			continue
 		}
 
-		key := aggKey{StudentID: r.StudentID, SessionID: r.SessionID, WordBookID: r.WordBookID}
+		key := aggKey{StudentID: r.StudentID, WordBookID: r.WordBookID}
 		cur, ok := aggs[key]
 		if !ok {
 			cur = &aggVal{
@@ -226,6 +225,17 @@ func reviewBooksByDateForUsers(db *gorm.DB, userIDs []uint, dayStart, dayEnd tim
 				words: map[uint]struct{}{},
 			}
 			aggs[key] = cur
+		}
+		// 合并同一学员同词库的多节课：取最早开始、最晚结束
+		if r.PracticeStartedAt != nil {
+			if cur.stat.PracticeStartedAt == nil || r.PracticeStartedAt.Before(*cur.stat.PracticeStartedAt) {
+				cur.stat.PracticeStartedAt = r.PracticeStartedAt
+			}
+		}
+		if r.PracticeEndedAt != nil {
+			if cur.stat.PracticeEndedAt == nil || r.PracticeEndedAt.After(*cur.stat.PracticeEndedAt) {
+				cur.stat.PracticeEndedAt = r.PracticeEndedAt
+			}
 		}
 		cur.words[r.WordID] = struct{}{}
 	}
@@ -258,7 +268,6 @@ func reviewBooksByDateForUsers(db *gorm.DB, userIDs []uint, dayStart, dayEnd tim
 	}
 	return stats, nil
 }
-
 
 // handleReviewToday GET /review/today?wordBookId=1&date=YYYY-MM-DD&timeZone=Asia/Shanghai&all=true
 // 取词口径与 /review/books-by-date 对齐：今日含逾期至本地明日 0 点前；其它日仅该日 due。

@@ -1234,6 +1234,8 @@
   "practice.simple_tip_on": "当前简易：点击查看全部拓展",
   "practice.simple_tip_off": "当前全部：点击切回简易",
   "practice.select_five": "选择5个",
+  "practice.mark_correct_5": "5个正确",
+  "practice.mark_wrong_5": "5个错误",
   "practice.start_learning": "开始识记",
   "practice.start_learning_count": "记 {{count}} 个",
   "practice.screened_count": "已筛 {{count}} 个",
