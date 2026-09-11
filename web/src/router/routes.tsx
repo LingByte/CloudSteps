@@ -55,6 +55,7 @@ import WordBookShelf from "../pages/WordBookShelf";
 import CreateCustomWordBook from "../pages/CreateCustomWordBook";
 import LighthouseWords from "../pages/LighthouseWords";
 import TrainingRecords from "../pages/TrainingRecords";
+import AdminSubscriptions from "../pages/AdminSubscriptions";
 
 export const router = createBrowserRouter(
   [
@@ -123,6 +124,14 @@ export const router = createBrowserRouter(
         element: (
           <RequireRole roles={["user", "teacher", "admin"]}>
             <CoachCompletedSessions />
+          </RequireRole>
+        ),
+      },
+      {
+        path: "admin/subscriptions",
+        element: (
+          <RequireRole roles={["admin"]}>
+            <AdminSubscriptions />
           </RequireRole>
         ),
       },

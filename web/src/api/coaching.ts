@@ -420,3 +420,55 @@ export const getTeacherCoachingCompleted = async (params?: {
     { params }
   )
 }
+
+// ── 订阅管理（Admin） ──
+
+export type SubscriptionType = 'monthly' | 'yearly' | 'lifetime'
+export type SubscriptionStatus = 'active' | 'expired' | 'cancelled'
+
+export type UserSubscription = {
+  id: number
+  userId: number
+  type: SubscriptionType
+  startedAt: string
+  expiredAt?: string | null
+  status: SubscriptionStatus
+  user?: {
+    id?: number
+    username?: string
+    displayName?: string
+    email?: string
+    role?: string
+  }
+}
+
+export type TeacherTeachingPoolWithSubscription = TeacherTeachingPoolSummary & {
+  subscription?: UserSubscription | null
+}
+
+export const listSubscriptions = async (params?: {
+  userId?: number
+  status?: SubscriptionStatus
+}): Promise<ApiResponse<UserSubscription[]>> => {
+  return get<UserSubscription[]>('/coaching/subscriptions', { params })
+}
+
+export const upsertSubscription = async (body: {
+  userId: number
+  type: SubscriptionType
+  startedAt?: string
+  duration?: number
+  status?: string
+}): Promise<ApiResponse<UserSubscription>> => {
+  return put<UserSubscription>('/coaching/subscriptions', body)
+}
+
+export const cancelSubscription = async (id: number): Promise<ApiResponse<{ id: number }>> => {
+  return del<{ id: number }>(`/coaching/subscriptions/${id}`)
+}
+
+export const getTeacherTeachingPoolWithSubscription = async (): Promise<
+  ApiResponse<TeacherTeachingPoolWithSubscription>
+> => {
+  return get<TeacherTeachingPoolWithSubscription>('/teacher/coaching/teacher-pool')
+}
