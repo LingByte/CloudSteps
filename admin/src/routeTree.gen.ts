@@ -52,6 +52,7 @@ import { Route as AuthenticatedInviteRecordsIndexRouteImport } from './routes/_a
 import { Route as AuthenticatedInboxNotificationsIndexRouteImport } from './routes/_authenticated/inbox-notifications/index'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
 import { Route as AuthenticatedCoachingIndexRouteImport } from './routes/_authenticated/coaching/index'
+import { Route as AuthenticatedClozePassagesIndexRouteImport } from './routes/_authenticated/cloze-passages/index'
 import { Route as AuthenticatedChatsIndexRouteImport } from './routes/_authenticated/chats/index'
 import { Route as AuthenticatedAppsIndexRouteImport } from './routes/_authenticated/apps/index'
 import { Route as AuthenticatedAnnouncementsIndexRouteImport } from './routes/_authenticated/announcements/index'
@@ -312,6 +313,12 @@ const AuthenticatedCoachingIndexRoute =
     path: '/coaching/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedClozePassagesIndexRoute =
+  AuthenticatedClozePassagesIndexRouteImport.update({
+    id: '/cloze-passages/',
+    path: '/cloze-passages/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedChatsIndexRoute = AuthenticatedChatsIndexRouteImport.update({
   id: '/chats/',
   path: '/chats/',
@@ -484,6 +491,7 @@ export interface FileRoutesByFullPath {
   '/announcements/': typeof AuthenticatedAnnouncementsIndexRoute
   '/apps/': typeof AuthenticatedAppsIndexRoute
   '/chats/': typeof AuthenticatedChatsIndexRoute
+  '/cloze-passages/': typeof AuthenticatedClozePassagesIndexRoute
   '/coaching/': typeof AuthenticatedCoachingIndexRoute
   '/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/inbox-notifications/': typeof AuthenticatedInboxNotificationsIndexRoute
@@ -548,6 +556,7 @@ export interface FileRoutesByTo {
   '/announcements': typeof AuthenticatedAnnouncementsIndexRoute
   '/apps': typeof AuthenticatedAppsIndexRoute
   '/chats': typeof AuthenticatedChatsIndexRoute
+  '/cloze-passages': typeof AuthenticatedClozePassagesIndexRoute
   '/coaching': typeof AuthenticatedCoachingIndexRoute
   '/help-center': typeof AuthenticatedHelpCenterIndexRoute
   '/inbox-notifications': typeof AuthenticatedInboxNotificationsIndexRoute
@@ -617,6 +626,7 @@ export interface FileRoutesById {
   '/_authenticated/announcements/': typeof AuthenticatedAnnouncementsIndexRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexRoute
+  '/_authenticated/cloze-passages/': typeof AuthenticatedClozePassagesIndexRoute
   '/_authenticated/coaching/': typeof AuthenticatedCoachingIndexRoute
   '/_authenticated/help-center/': typeof AuthenticatedHelpCenterIndexRoute
   '/_authenticated/inbox-notifications/': typeof AuthenticatedInboxNotificationsIndexRoute
@@ -684,6 +694,7 @@ export interface FileRouteTypes {
     | '/announcements/'
     | '/apps/'
     | '/chats/'
+    | '/cloze-passages/'
     | '/coaching/'
     | '/help-center/'
     | '/inbox-notifications/'
@@ -748,6 +759,7 @@ export interface FileRouteTypes {
     | '/announcements'
     | '/apps'
     | '/chats'
+    | '/cloze-passages'
     | '/coaching'
     | '/help-center'
     | '/inbox-notifications'
@@ -816,6 +828,7 @@ export interface FileRouteTypes {
     | '/_authenticated/announcements/'
     | '/_authenticated/apps/'
     | '/_authenticated/chats/'
+    | '/_authenticated/cloze-passages/'
     | '/_authenticated/coaching/'
     | '/_authenticated/help-center/'
     | '/_authenticated/inbox-notifications/'
@@ -1165,6 +1178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCoachingIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/cloze-passages/': {
+      id: '/_authenticated/cloze-passages/'
+      path: '/cloze-passages'
+      fullPath: '/cloze-passages/'
+      preLoaderRoute: typeof AuthenticatedClozePassagesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/chats/': {
       id: '/_authenticated/chats/'
       path: '/chats'
@@ -1377,6 +1397,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAnnouncementsIndexRoute: typeof AuthenticatedAnnouncementsIndexRoute
   AuthenticatedAppsIndexRoute: typeof AuthenticatedAppsIndexRoute
   AuthenticatedChatsIndexRoute: typeof AuthenticatedChatsIndexRoute
+  AuthenticatedClozePassagesIndexRoute: typeof AuthenticatedClozePassagesIndexRoute
   AuthenticatedCoachingIndexRoute: typeof AuthenticatedCoachingIndexRoute
   AuthenticatedHelpCenterIndexRoute: typeof AuthenticatedHelpCenterIndexRoute
   AuthenticatedInboxNotificationsIndexRoute: typeof AuthenticatedInboxNotificationsIndexRoute
@@ -1423,6 +1444,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAnnouncementsIndexRoute: AuthenticatedAnnouncementsIndexRoute,
   AuthenticatedAppsIndexRoute: AuthenticatedAppsIndexRoute,
   AuthenticatedChatsIndexRoute: AuthenticatedChatsIndexRoute,
+  AuthenticatedClozePassagesIndexRoute: AuthenticatedClozePassagesIndexRoute,
   AuthenticatedCoachingIndexRoute: AuthenticatedCoachingIndexRoute,
   AuthenticatedHelpCenterIndexRoute: AuthenticatedHelpCenterIndexRoute,
   AuthenticatedInboxNotificationsIndexRoute:

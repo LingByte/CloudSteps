@@ -20,6 +20,7 @@ import {
   Newspaper,
   BookOpen,
   BookMarked,
+  PenLine,
   Mic2,
   Ticket,
 } from 'lucide-react'
@@ -82,6 +83,16 @@ export const sidebarData: SidebarData = {
           icon: FileText,
         },
         {
+          title: '系统完形填空',
+          url: '/cloze-passages',
+          icon: PenLine,
+        },
+        {
+          title: '用户自定义完形',
+          url: '/user-cloze-passages',
+          icon: BookMarked,
+        },
+        {
           title: '场景对话',
           url: '/scenarios',
           icon: Mic2,
@@ -90,11 +101,6 @@ export const sidebarData: SidebarData = {
           title: '对话训练记录',
           url: '/scenario-sessions',
           icon: FileText,
-        },
-        {
-          title: '用户自定义完形',
-          url: '/user-cloze-passages',
-          icon: BookMarked,
         },
         {
           title: '一对一陪练',

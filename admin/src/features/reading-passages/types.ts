@@ -2,6 +2,7 @@ export type ReadingPassageRow = {
   id: number
   title: string
   level: string
+  tags?: string
   summary?: string
   content?: string
   status: string
