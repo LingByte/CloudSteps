@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { CloudButton, CloudImageWithFallback } from "../components/cloudsteps";
 import { CloudCard } from "../components/cloudsteps/arco";
-import { getTeacherTeachingPool } from "../api/coaching";
+import { getTeacherTeachingPoolWithSubscription, type UserSubscription } from "../api/coaching";
 import { getCheckInStatus, postCheckIn } from "../api/checkin";
 import { getFeedbackUnreadCount } from "../api/feedback";
 import { useAuthStore } from "../stores/authStore";
@@ -68,6 +68,7 @@ export default function CoachCenter() {
   const [poolMinutes, setPoolMinutes] = useState<number | null>(null);
   const [poolTotal, setPoolTotal] = useState<number | null>(null);
   const [poolLoading, setPoolLoading] = useState(false);
+  const [subscription, setSubscription] = useState<UserSubscription | null | undefined>(undefined);
   const [checkedInToday, setCheckedInToday] = useState<boolean | null>(null);
   const [checkInLoading, setCheckInLoading] = useState(false);
   const [checkInSubmitting, setCheckInSubmitting] = useState(false);
@@ -91,10 +92,11 @@ export default function CoachCenter() {
   const loadPool = useCallback(async () => {
     setPoolLoading(true);
     try {
-      const res = await getTeacherTeachingPool();
+      const res = await getTeacherTeachingPoolWithSubscription();
       if (res.code === 200 && res.data) {
         setPoolMinutes(res.data.remainingMinutes ?? 0);
         setPoolTotal(res.data.totalAllocatedMinutes ?? 0);
+        setSubscription(res.data.subscription ?? null);
       }
     } finally {
       setPoolLoading(false);
@@ -180,13 +182,14 @@ export default function CoachCenter() {
         : t("coach_center.not_checked_in_today");
 
   const featureList = useMemo(() => {
-    // 本期不上线充值入口；/recharge 页面与 Recharge.tsx 逻辑保留
-    const showRechargeEntry = false;
+    const showRechargeEntry = isCoach;
     const recharge = {
       id: 6,
       icon: Wallet,
-      label: "账户充值",
-      description: "充值余额，解锁学习服务",
+      label: subscription?.status === "active" ? "会员中心" : "开通会员",
+      description: subscription?.status === "active"
+        ? subscription.type === "lifetime" ? "买断会员 · 永久有效" : `会员有效中 · 到期 ${new Date(subscription.expiredAt || "").toLocaleDateString("zh-CN")}`
+        : "开通包月/包年/买断，畅享全部功能",
       tint: "mint" as const,
       path: "/recharge",
     };
@@ -229,7 +232,7 @@ export default function CoachCenter() {
       },
       ...base,
     ];
-  }, [isCoach, t, feedbackUnread]);
+  }, [isCoach, t, feedbackUnread, subscription]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 h-full gap-2 overflow-hidden">

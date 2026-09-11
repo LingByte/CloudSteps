@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, CircleHelp, Crown, Headphones, LockKeyhole, ShieldCheck, Sparkles, Tag } from "lucide-react";
-import { useNavigate } from "react-router";
+import { useEffect, useMemo, useState } from "react";
+import { Check, ChevronRight, Crown, LockKeyhole, CheckCircle2, Clock, Sparkles } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import { CloudButton } from "../components/cloudsteps";
 import { CloudCard } from "../components/cloudsteps/arco";
+import { PageBackHeader } from "../components/PageBackHeader";
 import { showToast } from "../utils/toast";
+import { getTeacherTeachingPoolWithSubscription, type UserSubscription } from "../api/coaching";
 
 type Plan = {
   id: string;
@@ -15,6 +17,8 @@ type Plan = {
   save?: string;
   features: string[];
 };
+
+const FIRST_MONTH_PRICE = 9.9;
 
 const plans: Plan[] = [
   { id: "monthly", tab: "月付", name: "月度会员", period: "1个月", price: 58, monthly: "¥58 / 月", features: ["全部功能无限制", "无限学习", "开通推广返佣", "优先客服支持"] },
@@ -38,25 +42,35 @@ const paymentMethods = [
   { id: "bank", label: "信用卡银行卡", icon: "icon-xinyongkayinhangka", color: "text-primary" },
 ];
 
-const money = (value: number) => `¥${value.toFixed(0)}`;
+const money = (value: number) => `¥${value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)}`;
 
 export default function Recharge() {
-  const navigate = useNavigate();
   const [selectedId, setSelectedId] = useState("yearly");
-  const [coupon, setCoupon] = useState("");
-  const [couponChecked, setCouponChecked] = useState(false);
   const [method, setMethod] = useState("微信支付");
+  const [currentSub, setCurrentSub] = useState<UserSubscription | null | undefined>(undefined);
+  const [showFirstMonthDeal, setShowFirstMonthDeal] = useState(false);
   const selected = useMemo(() => plans.find((plan) => plan.id === selectedId) ?? plans[2], [selectedId]);
-  const finalPrice = couponChecked ? selected.price * 0.9 : selected.price;
+  const isNewUser = !currentSub;
+  const isFirstMonth = selectedId === "monthly" && isNewUser && showFirstMonthDeal;
+  const finalPrice = isFirstMonth ? FIRST_MONTH_PRICE : selected.price;
 
-  const checkCoupon = (value = coupon) => {
-    if (value.length !== 6) {
-      showToast.error("请输入 6 位优惠码");
-      return;
-    }
-    setCouponChecked(true);
-    showToast.success("优惠码可用，已享 9 折");
-  };
+  useEffect(() => {
+    const timer = setTimeout(() => setShowFirstMonthDeal(true), 600);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await getTeacherTeachingPoolWithSubscription();
+        if (res.code === 200 && res.data) {
+          setCurrentSub(res.data.subscription ?? null);
+        }
+      } catch {
+        setCurrentSub(null);
+      }
+    })();
+  }, []);
 
   const submit = () => {
     if (!window.confirm(`确认开通${selected.name}？一次性购买，不会自动续费。`)) return;
@@ -65,23 +79,39 @@ export default function Recharge() {
 
   return (
     <div className="flex h-dvh flex-col bg-background text-foreground">
-      <header className="shrink-0 border-b border-border/70 bg-card/95 backdrop-blur">
-        <div className="mx-auto flex h-12 w-full max-w-6xl items-center px-3 sm:px-5">
-          <button type="button" onClick={() => navigate("/coach-center")} className="mr-1 flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary-soft hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50" aria-label="返回教练中心">
-            <ChevronLeft size={16} strokeWidth={1.8} />
-          </button>
-          <div className="flex items-baseline gap-2">
-            <h1 className="text-sm font-semibold tracking-tight">会员中心</h1>
-            <span className="hidden text-[11px] text-muted-foreground sm:inline">选择适合你的会员方案</span>
-          </div>
-          <button type="button" onClick={() => showToast.info("如需帮助，请联系在线客服")} className="ml-auto flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50" aria-label="查看会员帮助">
-            <CircleHelp size={18} />
-          </button>
-        </div>
-      </header>
+      <PageBackHeader title="会员中心" subtitle="选择适合你的会员方案" fallbackTo="/coach-center" maxWidthClass="max-w-6xl" />
 
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-7">
+          {/* 当前订阅状态 */}
+          {currentSub && currentSub.status === "active" ? (
+            <CloudCard className="mb-5 border-primary/30 bg-gradient-to-br from-primary/10 via-card to-card p-4 sm:p-5">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0">
+                  <Crown size={18} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-foreground">
+                      {currentSub.type === "monthly" ? "包月会员" : currentSub.type === "yearly" ? "包年会员" : "永久会员"}
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-[10px] font-medium text-primary">
+                      <CheckCircle2 size={11} /> 生效中
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {currentSub.type === "lifetime"
+                      ? "买断会员 · 永久有效"
+                      : `到期时间：${new Date(currentSub.expiredAt || "").toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" })}`}
+                  </p>
+                </div>
+                <div className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
+                  <Clock size={13} />
+                  {currentSub.type === "lifetime" ? "永久" : `开通于 ${new Date(currentSub.startedAt).toLocaleDateString("zh-CN")}`}
+                </div>
+              </div>
+            </CloudCard>
+          ) : null}
           <div className="mb-5 flex items-end justify-between gap-4">
             <div>
               <p className="mb-1 text-xs font-medium uppercase tracking-[0.16em] text-primary">CloudSteps Plus</p>
@@ -99,7 +129,7 @@ export default function Recharge() {
               </div>
               <div className="grid grid-cols-4 gap-1 rounded-xl bg-muted p-1" role="tablist" aria-label="会员套餐周期">
                 {plans.map((plan) => (
-                  <button key={plan.id} type="button" role="tab" aria-selected={selected.id === plan.id} onClick={() => { setSelectedId(plan.id); setCouponChecked(false); }} className={`relative rounded-lg px-1 py-2 text-xs transition-all sm:text-sm ${selected.id === plan.id ? "bg-card font-semibold text-foreground shadow-sm ring-1 ring-border/60" : "text-muted-foreground hover:text-foreground"}`}>
+                  <button key={plan.id} type="button" role="tab" aria-selected={selected.id === plan.id} onClick={() => { setSelectedId(plan.id); }} className={`relative rounded-lg px-1 py-2 text-xs transition-all sm:text-sm ${selected.id === plan.id ? "bg-card font-semibold text-foreground shadow-sm ring-1 ring-border/60" : "text-muted-foreground hover:text-foreground"}`}>
                     {plan.tab}
                     {plan.id === "yearly" ? <span className="absolute -right-1 -top-2 rounded-full bg-secondary-brand px-1.5 py-0.5 text-[10px] font-medium text-white">推荐</span> : null}
                   </button>
@@ -115,7 +145,33 @@ export default function Recharge() {
                   </div>
                   <div className="text-right">
                     {selected.save ? <span className="inline-block rounded-md bg-primary-soft px-2 py-1 text-xs font-semibold text-primary">{selected.save}</span> : null}
-                    <p className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{couponChecked ? <><span className="mr-2 text-base font-normal text-muted-foreground line-through">{money(selected.price)}</span>{money(finalPrice)}</> : money(selected.price)}</p>
+                    {isFirstMonth ? (
+                      <div className="mt-2 flex items-end justify-end gap-2">
+                        <AnimatePresence mode="popLayout">
+                          <motion.span
+                            key="original"
+                            initial={{ opacity: 0, x: 20, position: "absolute" }}
+                            animate={{ opacity: 1, x: 0, position: "relative" }}
+                            exit={{ opacity: 0, x: -10 }}
+                            transition={{ duration: 0.4, delay: 0.15 }}
+                            className="text-base font-normal text-muted-foreground line-through"
+                          >
+                            {money(selected.price)}
+                          </motion.span>
+                          <motion.span
+                            key="deal"
+                            initial={{ opacity: 0, scale: 0.5 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 18, delay: 0.3 }}
+                            className="text-3xl font-semibold tracking-tight text-primary sm:text-4xl"
+                          >
+                            {money(FIRST_MONTH_PRICE)}
+                          </motion.span>
+                        </AnimatePresence>
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{money(finalPrice)}</p>
+                    )}
                     <p className="text-xs text-muted-foreground">一次性支付</p>
                   </div>
                 </div>
@@ -125,26 +181,26 @@ export default function Recharge() {
                 </ul>
               </div>
 
-              <div className="mt-6 border-t border-border/70 pt-5">
-                <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold">会员服务保障</h3><span className="text-xs text-muted-foreground">开通即生效</span></div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="group h-full rounded-xl border border-border/70 bg-card/70 p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-card hover:shadow-sm"><ShieldCheck size={17} className="mt-0.5 shrink-0 text-primary transition-transform duration-200 group-hover:scale-110" /><div><p className="text-sm font-medium">安全支付</p><p className="mt-0.5 text-xs leading-5 text-muted-foreground">支付信息全程加密</p></div></div>
-                  <div className="group h-full rounded-xl border border-border/70 bg-card/70 p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-card hover:shadow-sm"><Sparkles size={17} className="mt-0.5 shrink-0 text-primary transition-transform duration-200 group-hover:scale-110" /><div><p className="text-sm font-medium">持续更新</p><p className="mt-0.5 text-xs leading-5 text-muted-foreground">新内容持续加入</p></div></div>
-                  <div className="group h-full rounded-xl border border-border/70 bg-card/70 p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-card hover:shadow-sm"><Headphones size={17} className="mt-0.5 shrink-0 text-primary transition-transform duration-200 group-hover:scale-110" /><div><p className="text-sm font-medium">专属支持</p><p className="mt-0.5 text-xs leading-5 text-muted-foreground">遇到问题随时咨询</p></div></div>
-                </div>
-              </div>
             </CloudCard>
 
             <aside className="lg:sticky lg:top-5">
               <CloudCard className="p-4 sm:p-5">
                 <div className="mb-4 flex items-center justify-between"><h3 className="text-base font-semibold">订单摘要</h3><span className="rounded-full bg-primary-soft px-2 py-1 text-xs text-primary">不自动续费</span></div>
                 <div className="flex items-center justify-between border-b border-border/70 pb-3 text-sm"><span className="text-muted-foreground">{selected.name}</span><span className="font-medium">{money(selected.price)}</span></div>
-                <div className="mt-4 rounded-lg border border-border bg-surface-soft p-3">
-                  <label htmlFor="coupon" className="flex items-center gap-2 text-sm font-medium"><Tag size={15} className="text-primary" />优惠码</label>
-                  <div className="mt-2 flex gap-2"><input id="coupon" value={coupon} maxLength={6} onChange={(event) => { const value = event.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase(); setCoupon(value); setCouponChecked(false); }} placeholder="输入 6 位优惠码" className="min-w-0 flex-1 rounded-md border border-input bg-card px-2.5 py-2 text-sm uppercase outline-none transition-shadow focus:border-primary focus:ring-2 focus:ring-primary-soft" /><button type="button" onClick={() => checkCoupon()} className="rounded-md px-2 text-sm font-medium text-muted-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50">验证</button></div>
-                  <p className="mt-2 text-xs leading-5 text-muted-foreground">首单可享 9 折，仅限未购买过会员的用户</p>
-                </div>
-                <div className="mt-4 flex items-end justify-between"><span className="text-sm text-muted-foreground">应付金额</span><span className="text-2xl font-semibold text-primary">{money(finalPrice)}</span></div>
+                {isFirstMonth ? (
+                  <div className="mt-3 flex items-center justify-between rounded-lg bg-primary/8 px-3 py-2">
+                    <span className="text-xs font-medium text-primary">新用户首月特惠</span>
+                    <span className="text-sm font-semibold text-primary">-{money(selected.price - FIRST_MONTH_PRICE)}</span>
+                  </div>
+                ) : null}
+                <div className="mt-4 flex items-end justify-between"><span className="text-sm text-muted-foreground">应付金额</span>
+                  <motion.span
+                    key={finalPrice}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="text-2xl font-semibold text-primary"
+                  >{money(finalPrice)}</motion.span></div>
                 <CloudButton onClick={submit} className="mt-4 h-11 w-full bg-primary text-sm font-semibold text-primary-foreground hover:bg-primary/90 active:scale-[0.99]">立即开通</CloudButton>
                 <p className="mt-2 text-center text-xs text-muted-foreground">支付即代表同意会员服务条款</p>
               </CloudCard>
