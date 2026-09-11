@@ -140,31 +140,38 @@ func coachingCompleteAppointment(db *gorm.DB, appointmentID uint, endedAt time.T
 			return err
 		}
 
-		var pool models.TeacherTeachingPool
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("teacher_id = ?", ap.TeacherID).
-			First(&pool).Error; err != nil {
-			return err
-		}
 		teacherCred := actual
-		if pool.RemainingMinutes < teacherCred {
-			teacherCred = pool.RemainingMinutes
-		}
-		if teacherCred > 0 {
-			poolRes := tx.Model(&models.TeacherTeachingPool{}).
-				Where("id = ? AND version = ?", pool.ID, pool.Version).
-				Updates(map[string]any{
-					"remaining_minutes": pool.RemainingMinutes - teacherCred,
-					"version":           pool.Version + 1,
-				})
-			if poolRes.Error != nil {
-				return poolRes.Error
+		// 老师有活跃订阅（包月/包年/买断）时不扣减授课池，但时间仍记录
+		teacherSubscribed := models.TeacherHasActiveSubscription(tx, ap.TeacherID)
+		if !teacherSubscribed {
+			var pool models.TeacherTeachingPool
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+				Where("teacher_id = ?", ap.TeacherID).
+				First(&pool).Error; err != nil {
+				return err
 			}
-			if poolRes.RowsAffected == 0 {
-				return errors.New("老师授课池更新冲突，请重试")
+			if pool.RemainingMinutes < teacherCred {
+				teacherCred = pool.RemainingMinutes
 			}
+			if teacherCred > 0 {
+				poolRes := tx.Model(&models.TeacherTeachingPool{}).
+					Where("id = ? AND version = ?", pool.ID, pool.Version).
+					Updates(map[string]any{
+						"remaining_minutes": pool.RemainingMinutes - teacherCred,
+						"version":           pool.Version + 1,
+					})
+				if poolRes.Error != nil {
+					return poolRes.Error
+				}
+				if poolRes.RowsAffected == 0 {
+					return errors.New("老师授课池更新冲突，请重试")
+				}
+			}
+		} else {
+			teacherCred = 0 // 订阅用户不扣减授课池
 		}
-		if err := tx.Model(&lockedPeriod).Update("used_minutes", lockedPeriod.UsedMinutes+teacherCred).Error; err != nil {
+		// 用量周期仍记录实际使用分钟（含订阅用户）
+		if err := tx.Model(&lockedPeriod).Update("used_minutes", lockedPeriod.UsedMinutes+actual).Error; err != nil {
 			return err
 		}
 		rec = models.CoachingSessionRecord{

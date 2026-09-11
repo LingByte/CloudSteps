@@ -80,6 +80,9 @@ const (
 	TABLE_INVITE_REWARD_SETTINGS    = "invite_reward_settings"
 	TABLE_INVITE_REWARD_GRANTS      = "invite_reward_grants"
 
+	// ── 用户订阅 ──
+	TABLE_USER_SUBSCRIPTIONS = "user_subscriptions"
+
 	// ── 系统指标 ──
 	SYS_METRIC_TABLE_NAME = "sys_metrics"
 )

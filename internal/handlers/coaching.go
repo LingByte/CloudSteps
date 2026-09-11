@@ -36,6 +36,9 @@ func (h *Handlers) registerCoachingRoutes(r *humax.Group) {
 		adminG.GET("/usage-periods", h.coachingAdminListUsagePeriods)
 		adminG.PUT("/usage-periods", h.coachingAdminPutUsagePeriod)
 		adminG.GET("/audit-logs", h.coachingAdminListAuditLogs)
+		adminG.GET("/subscriptions", h.coachingAdminListSubscriptions)
+		adminG.PUT("/subscriptions", h.coachingAdminUpsertSubscription)
+		adminG.DELETE("/subscriptions/:id", h.coachingAdminCancelSubscription)
 	}
 
 	t := r.Group("teacher/coaching")
@@ -821,9 +824,11 @@ func (h *Handlers) coachingTeacherGetMyPool(c *gin.Context) {
 		remaining = pool.RemainingMinutes
 		total = pool.TotalAllocatedMinutes
 	}
+	sub, _ := models.GetActiveSubscription(db, tid)
 	response.SuccessI18n(c, "common.ok", gin.H{
 		"remainingMinutes":      remaining,
 		"totalAllocatedMinutes": total,
+		"subscription":          sub,
 	})
 }
 
@@ -1574,11 +1579,15 @@ func (h *Handlers) coachingTeacherStart(c *gin.Context) {
 	}
 	if err := coachingTeacherPoolAllowsStart(db, ap.TeacherID); err != nil {
 		if errors.Is(err, errCoachingTeacherPoolEmpty) {
-			response.AbortWithStatusJSON(c, http.StatusBadRequest, err)
+			// 有活跃订阅的老师跳过授课池检查
+			if !models.TeacherHasActiveSubscription(db, ap.TeacherID) {
+				response.AbortWithStatusJSON(c, http.StatusBadRequest, err)
+				return
+			}
+		} else {
+			response.FailI18n(c, "coaching.query_teacher_metrics_failed", err.Error())
 			return
 		}
-		response.FailI18n(c, "coaching.query_teacher_metrics_failed", err.Error())
-		return
 	}
 	ap.Status = models.CoachingStatusInProgress
 	ap.ActualStartedAt = &now
@@ -1699,11 +1708,15 @@ func (h *Handlers) coachingTeacherStartPractice(c *gin.Context) {
 	now := time.Now().In(time.Local)
 	if err := coachingTeacherPoolAllowsStart(db, tid); err != nil {
 		if errors.Is(err, errCoachingTeacherPoolEmpty) {
-			response.AbortWithStatusJSON(c, http.StatusBadRequest, err)
+			// 有活跃订阅的老师跳过授课池检查
+			if !models.TeacherHasActiveSubscription(db, tid) {
+				response.AbortWithStatusJSON(c, http.StatusBadRequest, err)
+				return
+			}
+		} else {
+			response.FailI18n(c, "coaching.query_teacher_metrics_failed", err.Error())
 			return
 		}
-		response.FailI18n(c, "coaching.query_teacher_metrics_failed", err.Error())
-		return
 	}
 
 	// 已有进行中课次：同学员复用；其他学员则提示先下课
@@ -1788,4 +1801,143 @@ func (h *Handlers) coachingTeacherStartPractice(c *gin.Context) {
 		"owned":         true,
 		"reused":        false,
 	})
+}
+
+// ── 订阅管理（Admin） ──
+
+func (h *Handlers) coachingAdminListSubscriptions(c *gin.Context) {
+	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
+	tx := db.Model(&models.UserSubscription{}).Preload("User").Order("created_at DESC")
+	if uid := c.Query("userId"); uid != "" {
+		if v, _ := strconv.Atoi(uid); v > 0 {
+			tx = tx.Where("user_id = ?", v)
+		}
+	}
+	if status := c.Query("status"); status != "" {
+		tx = tx.Where("status = ?", status)
+	}
+	var list []models.UserSubscription
+	if err := tx.Find(&list).Error; err != nil {
+		response.FailI18n(c, "common.query_failed", err)
+		return
+	}
+	response.SuccessI18n(c, "common.ok", list)
+}
+
+type subscriptionUpsertBody struct {
+	UserID    uint   `json:"userId" binding:"required"`
+	Type      string `json:"type" binding:"required"`     // monthly | yearly | lifetime
+	StartedAt string `json:"startedAt"`                    // RFC3339，默认当前时间
+	Duration  int    `json:"duration"`                     // 月数（monthly=1, yearly=12, lifetime 忽略）；若 >0 则覆盖
+	Status    string `json:"status"`                       // 默认 active
+}
+
+func (h *Handlers) coachingAdminUpsertSubscription(c *gin.Context) {
+	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
+	var body subscriptionUpsertBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.FailI18n(c, "common.invalid_params", err)
+		return
+	}
+	validTypes := map[string]bool{
+		models.SubscriptionTypeMonthly: true,
+		models.SubscriptionTypeYearly:  true,
+		models.SubscriptionTypeLifetime: true,
+	}
+	if !validTypes[body.Type] {
+		response.FailI18n(c, "common.invalid_params", errors.New("invalid subscription type"))
+		return
+	}
+
+	var user models.User
+	if err := db.Where("id = ?", body.UserID).First(&user).Error; err != nil {
+		response.FailI18n(c, "auth.user_not_found", err)
+		return
+	}
+
+	startedAt := time.Now()
+	if body.StartedAt != "" {
+		if t, err := time.Parse(time.RFC3339, body.StartedAt); err == nil {
+			startedAt = t
+		}
+	}
+
+	var expiredAt *time.Time
+	switch body.Type {
+	case models.SubscriptionTypeMonthly:
+		months := 1
+		if body.Duration > 0 {
+			months = body.Duration
+		}
+		e := startedAt.AddDate(0, months, 0)
+		expiredAt = &e
+	case models.SubscriptionTypeYearly:
+		years := 1
+		if body.Duration > 0 {
+			years = body.Duration
+		}
+		e := startedAt.AddDate(years, 0, 0)
+		expiredAt = &e
+	case models.SubscriptionTypeLifetime:
+		// nil = 永不过期
+	}
+
+	status := body.Status
+	if status == "" {
+		status = models.SubscriptionStatusActive
+	}
+
+	// 查找已有活跃订阅，有则更新
+	var existing models.UserSubscription
+	hasExisting := db.Where("user_id = ? AND status = ?", body.UserID, models.SubscriptionStatusActive).
+		First(&existing).Error == nil
+
+	if hasExisting {
+		updates := map[string]any{
+			"type":       body.Type,
+			"started_at": startedAt,
+			"status":     status,
+		}
+		if expiredAt != nil {
+			updates["expired_at"] = *expiredAt
+		} else {
+			updates["expired_at"] = nil
+		}
+		if err := db.Model(&existing).Updates(updates).Error; err != nil {
+			response.FailI18n(c, "common.operation_failed", err)
+			return
+		}
+		db.First(&existing, existing.ID)
+		response.SuccessI18n(c, "common.ok", existing)
+		return
+	}
+
+	sub := models.UserSubscription{
+		UserID:    body.UserID,
+		Type:      body.Type,
+		StartedAt: startedAt,
+		ExpiredAt: expiredAt,
+		Status:    status,
+	}
+	if err := db.Create(&sub).Error; err != nil {
+		response.FailI18n(c, "common.operation_failed", err)
+		return
+	}
+	_ = db.Preload("User").First(&sub, sub.ID).Error
+	response.SuccessI18n(c, "common.ok", sub)
+}
+
+func (h *Handlers) coachingAdminCancelSubscription(c *gin.Context) {
+	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		response.FailI18n(c, "common.invalid_params", nil)
+		return
+	}
+	if err := db.Model(&models.UserSubscription{}).Where("id = ?", id).
+		Update("status", models.SubscriptionStatusCancelled).Error; err != nil {
+		response.FailI18n(c, "common.operation_failed", err)
+		return
+	}
+	response.SuccessI18n(c, "common.ok", gin.H{"id": id})
 }
