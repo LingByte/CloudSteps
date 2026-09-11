@@ -1,15 +1,23 @@
 /** Max runes per TTS request (matches backend ttsMaxRunes). */
 export const TTS_MAX_RUNES = 500;
 
-/** Split passage content into natural paragraphs (blank-line separated). */
+/** Split passage content into natural paragraphs.
+ * 优先按空行分段；若无空行则按单换行符分段（兼容 RACE 等数据源）。 */
 export function splitReadingParagraphs(content: string): string[] {
   const normalized = String(content ?? "")
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     .trim();
   if (!normalized) return [];
+  // 如果有空行分隔的段落，按空行分；否则按单换行符分
+  if (/\n\s*\n/.test(normalized)) {
+    return normalized
+      .split(/\n\s*\n/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+  }
   return normalized
-    .split(/\n\s*\n/)
+    .split(/\n/)
     .map((p) => p.trim())
     .filter(Boolean);
 }

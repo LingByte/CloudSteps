@@ -9,7 +9,7 @@ import {
   Tag,
   Typography,
 } from "@arco-design/web-react";
-import { IconLeft, IconPlus } from "@arco-design/web-react/icon";
+import { IconLeft, IconPlus, IconSearch } from "@arco-design/web-react/icon";
 import {
   ReadingAnswerSheet,
   type QuestionFeedback,
@@ -49,6 +49,7 @@ import {
   getReadingKnowledge,
   getReadingPassage,
   listReadingPassages,
+  listReadingTags,
   submitReadingPassage,
   type ReadingPassageDetail,
   type ReadingPassageListItem,
@@ -90,6 +91,7 @@ type SourceTab = "system" | "custom";
 type LevelFilter = "" | "初阶" | "中阶" | "高阶";
 
 const LEVELS: LevelFilter[] = ["", "初阶", "中阶", "高阶"];
+const LIST_PAGE_SIZE = 10;
 
 type PassageItem = ReadingPassageListItem & { isCustom?: boolean };
 
@@ -128,12 +130,23 @@ export default function ReadingComprehension() {
   const [phase, setPhase] = useState<Phase>("list");
   const [sourceTab, setSourceTab] = useState<SourceTab>("system");
   const [levelFilter, setLevelFilter] = useState<LevelFilter>("");
+  const [tagFilter, setTagFilter] = useState<string>("");
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [searchInput, setSearchInput] = useState("");
+  const [keyword, setKeyword] = useState("");
   const [loadingList, setLoadingList] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [loadingPassage, setLoadingPassage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const [passages, setPassages] = useState<PassageItem[]>([]);
+  const pageRef = useRef(1);
+  const hasMoreRef = useRef(true);
+  const loadingListRef = useRef(false);
+  const sentinelNodeRef = useRef<HTMLDivElement | null>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
   const [passage, setPassage] = useState<ReadingPassageDetail | null>(null);
   const [isCustomPassage, setIsCustomPassage] = useState(false);
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -224,40 +237,117 @@ export default function ReadingComprehension() {
     return READING_STAGE_ORDER.filter((_, i) => i < curIdx && i <= maxStageIdx);
   }, [phase, maxStageIdx]);
 
-  const loadList = useCallback(async () => {
-    setLoadingList(true);
-    setErr(null);
-    try {
-      const params = {
-        page: 1,
-        pageSize: 30,
-        ...(levelFilter ? { level: levelFilter } : {}),
-      };
-      const res =
-        sourceTab === "custom"
-          ? await listCustomReadingPassages(params)
-          : await listReadingPassages(params);
-      if (res.code !== 200) {
-        setErr(formatApiMessage(res.msg, "reading.load_list_failed"));
-        setPassages([]);
-        return;
+  const loadList = useCallback(
+    async (page = 1, reset = true) => {
+      if (loadingListRef.current) return;
+      loadingListRef.current = true;
+      if (reset) {
+        setLoadingList(true);
+        setErr(null);
+      } else {
+        setLoadingMore(true);
       }
-      const list = Array.isArray(res.data?.list) ? res.data.list : [];
-      setPassages(
-        list.map((p) => ({
+      try {
+        const params = {
+          page,
+          pageSize: LIST_PAGE_SIZE,
+          ...(levelFilter ? { level: levelFilter } : {}),
+          ...(tagFilter ? { tag: tagFilter } : {}),
+          ...(keyword ? { keyword } : {}),
+        };
+        const res =
+          sourceTab === "custom"
+            ? await listCustomReadingPassages(params)
+            : await listReadingPassages(params);
+        if (res.code !== 200) {
+          setErr(formatApiMessage(res.msg, "reading.load_list_failed"));
+          if (reset) {
+            setPassages([]);
+            setHasMore(false);
+            hasMoreRef.current = false;
+          }
+          return;
+        }
+        const list = Array.isArray(res.data?.list) ? res.data.list : [];
+        const total = typeof res.data?.total === "number" ? res.data.total : 0;
+        const mapped = list.map((p) => ({
           ...p,
           isCustom: sourceTab === "custom",
-        }))
-      );
-    } catch (e: unknown) {
-      const apiMsg =
-        e && typeof e === "object" && "msg" in e ? String((e as { msg: string }).msg) : undefined;
-      setErr(formatApiMessage(apiMsg, "reading.load_list_failed"));
-      setPassages([]);
-    } finally {
-      setLoadingList(false);
+        }));
+        setPassages((prev) => {
+          const next = reset ? mapped : [...prev, ...mapped];
+          const more = next.length < total && mapped.length > 0;
+          hasMoreRef.current = more;
+          setHasMore(more);
+          return next;
+        });
+        pageRef.current = page;
+      } catch (e: unknown) {
+        const apiMsg =
+          e && typeof e === "object" && "msg" in e
+            ? String((e as { msg: string }).msg)
+            : undefined;
+        setErr(formatApiMessage(apiMsg, "reading.load_list_failed"));
+        if (reset) {
+          setPassages([]);
+          setHasMore(false);
+          hasMoreRef.current = false;
+        }
+      } finally {
+        loadingListRef.current = false;
+        setLoadingList(false);
+        setLoadingMore(false);
+      }
+    },
+    [levelFilter, tagFilter, keyword, sourceTab]
+  );
+
+  const attachListObserver = useCallback(() => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
     }
-  }, [levelFilter, sourceTab]);
+    const node = sentinelNodeRef.current;
+    if (!node || !hasMoreRef.current) return;
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        const hit = entries[0]?.isIntersecting;
+        if (!hit || !hasMoreRef.current || loadingListRef.current) return;
+        void loadList(pageRef.current + 1, false);
+      },
+      { root: null, rootMargin: "160px", threshold: 0 }
+    );
+    observerRef.current.observe(node);
+  }, [loadList]);
+
+  const loadMoreRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      sentinelNodeRef.current = node;
+      attachListObserver();
+    },
+    [attachListObserver]
+  );
+
+  // 搜索防抖
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setKeyword(searchInput.trim());
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  // 加载标签列表
+  useEffect(() => {
+    if (sourceTab !== "system") {
+      setAvailableTags([]);
+      return;
+    }
+    void listReadingTags().then((res) => {
+      if (res.code === 200 && res.data?.tags) {
+        setAvailableTags(res.data.tags);
+      }
+    }).catch(() => {});
+  }, [sourceTab]);
 
   const [sessionReady, setSessionReady] = useState(false);
 
@@ -288,8 +378,21 @@ export default function ReadingComprehension() {
 
   useEffect(() => {
     if (!sessionReady) return;
-    if (phase === "list") void loadList();
+    if (phase !== "list") return;
+    pageRef.current = 1;
+    hasMoreRef.current = true;
+    setHasMore(true);
+    void loadList(1, true);
   }, [sessionReady, phase, loadList]);
+
+  useEffect(() => {
+    if (phase !== "list" || loadingList) return;
+    attachListObserver();
+    return () => {
+      observerRef.current?.disconnect();
+      observerRef.current = null;
+    };
+  }, [phase, loadingList, passages.length, hasMore, loadingMore, attachListObserver]);
 
   useEffect(() => {
     return () => {
@@ -572,7 +675,9 @@ export default function ReadingComprehension() {
       }
       if (attempt === "first") setFirstResult(res.data);
       else setSecondResult(res.data);
-      void loadList();
+      pageRef.current = 1;
+      hasMoreRef.current = true;
+      void loadList(1, true);
       return res.data;
     } catch (e: unknown) {
       const apiMsg =
@@ -862,7 +967,7 @@ export default function ReadingComprehension() {
   return (
     <div className="h-dvh overflow-hidden bg-[#F7F9FC] flex flex-col">
       <header className="shrink-0 bg-white border-b border-[#E2E8F0]">
-        <div className="flex items-center h-11 px-2 sm:px-3 gap-1.5">
+        <div className="flex items-center h-12 px-2 sm:px-3 gap-1.5">
           <Button type="text" shape="circle" size="small" icon={<IconLeft />} onClick={headerBack} />
           <div className="min-w-0 flex-1">
             <Typography.Text className="!font-medium !text-sm !text-[#2D3748]">
@@ -881,13 +986,23 @@ export default function ReadingComprehension() {
           </div>
           {phase === "list" && (
             <div className="flex items-center gap-1.5 shrink-0">
-              <div className="flex rounded-md bg-[#F1F5F9] p-0.5">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder={t("reading.search_placeholder")}
+                  className="w-32 sm:w-40 h-7 pl-7 pr-2 rounded-md bg-[#F1F5F9] text-[12px] text-[#2D3748] placeholder:text-[#A0AEC0] border border-transparent focus:border-[#4ECDC4] focus:bg-white outline-none transition-colors"
+                />
+                <IconSearch className="absolute left-2 top-1/2 -translate-y-1/2 text-[#A0AEC0]" style={{ fontSize: 14 }} />
+              </div>
+              <div className="flex rounded-lg bg-[#F1F5F9] p-1">
                 {(["system", "custom"] as SourceTab[]).map((key) => (
                   <button
                     key={key}
                     type="button"
                     className={cn(
-                      "px-2 py-0.5 rounded text-[11px] font-medium transition-all whitespace-nowrap",
+                      "px-3 py-1.5 rounded-md text-[13px] font-medium transition-all whitespace-nowrap",
                       sourceTab === key
                         ? "bg-white text-[#2D3748] shadow-sm"
                         : "text-[#718096] hover:text-[#2D3748]"
@@ -901,8 +1016,9 @@ export default function ReadingComprehension() {
               {sourceTab === "custom" && (
                 <Button
                   type="primary"
-                  size="mini"
+                  size="small"
                   icon={<IconPlus />}
+                  className="!h-9 !w-9 !p-0 !rounded-lg"
                   onClick={() => navigate("/reading-comprehension/custom/new")}
                 />
               )}
@@ -933,13 +1049,13 @@ export default function ReadingComprehension() {
           />
         )}
         {phase === "list" && (
-          <div className="px-3 pb-2 flex gap-1 overflow-x-auto scrollbar-hide">
+          <div className="px-3 pb-1.5 pt-1.5 flex gap-1.5 overflow-x-auto scrollbar-hide items-center">
             {LEVELS.map((lv) => (
               <button
                 key={lv || "all"}
                 type="button"
                 className={cn(
-                  "shrink-0 px-2.5 py-0.5 rounded-md text-[11px] font-medium transition-colors",
+                  "shrink-0 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors",
                   levelFilter === lv
                     ? "bg-[#2D3748] text-white"
                     : "bg-[#F1F5F9] text-[#718096] hover:bg-[#E2E8F0]"
@@ -947,6 +1063,25 @@ export default function ReadingComprehension() {
                 onClick={() => setLevelFilter(lv)}
               >
                 {levelLabel(lv)}
+              </button>
+            ))}
+          </div>
+        )}
+        {phase === "list" && availableTags.length > 0 && (
+          <div className="px-3 pb-2 pt-0.5 flex gap-1.5 overflow-x-auto scrollbar-hide items-center">
+            {availableTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                className={cn(
+                  "shrink-0 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors",
+                  tagFilter === tag
+                    ? "bg-[#2D3748] text-white"
+                    : "bg-[#F1F5F9] text-[#718096] hover:bg-[#E2E8F0]"
+                )}
+                onClick={() => setTagFilter(tagFilter === tag ? "" : tag)}
+              >
+                {tag}
               </button>
             ))}
           </div>
@@ -969,7 +1104,7 @@ export default function ReadingComprehension() {
 
       {phase === "list" && (
         <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2">
-          {loadingList || loadingPassage ? (
+          {loadingList && passages.length === 0 ? (
             <div className="flex justify-center py-12">
               <Spin tip={t("common.loading")} />
             </div>
@@ -1036,6 +1171,28 @@ export default function ReadingComprehension() {
                   </div>
                 </button>
               ))}
+
+              {hasMore ? (
+                <div ref={loadMoreRef} className="flex justify-center py-4">
+                  {loadingMore || loadingPassage ? (
+                    <Spin tip={t("common.loading")} />
+                  ) : (
+                    <button
+                      type="button"
+                      className="text-[#718096] text-sm hover:text-primary"
+                      onClick={() => {
+                        if (!loadingListRef.current) void loadList(pageRef.current + 1, false);
+                      }}
+                    >
+                      {t("reading.load_more")}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <span className="text-[#718096] text-sm">{t("reading.all_loaded")}</span>
+                </div>
+              )}
             </div>
           )}
         </div>

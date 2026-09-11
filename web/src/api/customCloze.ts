@@ -19,9 +19,10 @@ export type CustomClozePayload = {
 
 export const listCustomClozePassages = (params?: {
   level?: string
-  page?: number
-  pageSize?: number
-}): Promise<ApiResponse<{ list: ClozePassageListItem[]; total: number }>> => {
+  keyword?: string
+  cursor?: string
+  limit?: number
+}): Promise<ApiResponse<{ list: ClozePassageListItem[]; nextCursor?: string; hasMore: boolean; limit: number }>> => {
   return get('/cloze/custom/passages', { params })
 }
 

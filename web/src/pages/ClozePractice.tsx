@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router";
 import {
   Button,
   Card,
-  Empty,
   Progress,
   Radio,
   Result,
@@ -13,9 +12,10 @@ import {
   Tag,
   Typography,
 } from "@arco-design/web-react";
-import { IconLeft, IconPlus } from "@arco-design/web-react/icon";
+import { IconLeft, IconPlus, IconSearch } from "@arco-design/web-react/icon";
 import { ArrowRight } from "lucide-react";
 import { CloudButton } from "../components/cloudsteps";
+import { CloudEmpty } from "../components/cloudsteps/arco";
 import {
   getCustomClozePassage,
   listCustomClozePassages,
@@ -24,6 +24,7 @@ import {
 import {
   getClozePassage,
   listClozePassages,
+  listClozeTags,
   submitClozePassage,
   type ClozePassageDetail,
   type ClozePassageListItem,
@@ -79,6 +80,10 @@ export default function ClozePractice() {
 
   const [phase, setPhase] = useState<Phase>("list");
   const [sourceTab, setSourceTab] = useState<SourceTab>(initialTab);
+  const [tagFilter, setTagFilter] = useState<string>("");
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [searchInput, setSearchInput] = useState("");
+  const [keyword, setKeyword] = useState("");
   const [loadingList, setLoadingList] = useState(true);
   const [loadingPassage, setLoadingPassage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -91,6 +96,13 @@ export default function ClozePractice() {
   const [activeBlankId, setActiveBlankId] = useState<number | null>(null);
   const [result, setResult] = useState<ClozeSubmitResult | null>(null);
   const startedAtRef = useRef<number>(Date.now());
+  const [nextCursor, setNextCursor] = useState<string | undefined>();
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadingMoreRef = useRef(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const PAGE_LIMIT = 30;
 
   const blankNoToId = useMemo(() => {
     const map: Record<number, number> = {};
@@ -100,35 +112,91 @@ export default function ClozePractice() {
     return map;
   }, [passage]);
 
-  const loadList = async () => {
-    setLoadingList(true);
-    setErr(null);
-    try {
-      const res =
-        sourceTab === "custom"
-          ? await listCustomClozePassages({ page: 1, pageSize: 30 })
-          : await listClozePassages({ page: 1, pageSize: 30 });
-      if (res.code !== 200) {
-        setErr(formatApiMessage(res.msg, "cloze.load_list_failed"));
-        setPassages([]);
-        return;
+  const fetchPage = useCallback(
+    async (opts: { cursor?: string; append: boolean }) => {
+      if (opts.append) {
+        if (loadingMoreRef.current) return;
+        loadingMoreRef.current = true;
+        setLoadingMore(true);
+      } else {
+        setLoadingList(true);
       }
-      const list = Array.isArray(res.data?.list) ? res.data.list : [];
-      setPassages(list.map((p) => ({ ...p, isCustom: sourceTab === "custom" })));
-    } catch (e: unknown) {
-      const apiMsg =
-        e && typeof e === "object" && "msg" in e ? String((e as { msg: string }).msg) : undefined;
-      setErr(formatApiMessage(apiMsg, "cloze.load_list_failed"));
-      setPassages([]);
-    } finally {
-      setLoadingList(false);
-    }
-  };
+      setErr(null);
+      try {
+        const params: Record<string, unknown> = {
+          limit: PAGE_LIMIT,
+          ...(opts.cursor ? { cursor: opts.cursor } : {}),
+          ...(keyword ? { keyword } : {}),
+          ...(sourceTab === "system" && tagFilter ? { tag: tagFilter } : {}),
+        };
+        const res =
+          sourceTab === "custom"
+            ? await listCustomClozePassages(params)
+            : await listClozePassages(params);
+        if (res.code !== 200) {
+          setErr(formatApiMessage(res.msg, "cloze.load_list_failed"));
+          if (!opts.append) setPassages([]);
+          return;
+        }
+        const list = Array.isArray(res.data?.list) ? res.data.list : [];
+        const items = list.map((p) => ({ ...p, isCustom: sourceTab === "custom" }));
+        setPassages((prev) => (opts.append ? [...prev, ...items] : items));
+        setNextCursor(res.data?.nextCursor || undefined);
+        setHasMore(Boolean(res.data?.hasMore));
+      } catch (e: unknown) {
+        const apiMsg =
+          e && typeof e === "object" && "msg" in e ? String((e as { msg: string }).msg) : undefined;
+        setErr(formatApiMessage(apiMsg, "cloze.load_list_failed"));
+        if (!opts.append) setPassages([]);
+      } finally {
+        setLoadingList(false);
+        setLoadingMore(false);
+        loadingMoreRef.current = false;
+      }
+    },
+    [keyword, sourceTab, tagFilter]
+  );
 
   useEffect(() => {
-    if (phase === "list") void loadList();
+    const timer = window.setTimeout(() => {
+      setKeyword(searchInput.trim());
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    if (phase === "list") void fetchPage({ append: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, sourceTab]);
+  }, [phase, sourceTab, tagFilter, keyword]);
+
+  // 无限滚动
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        if (!hasMore || loadingList || loadingMoreRef.current || !nextCursor) return;
+        void fetchPage({ cursor: nextCursor, append: true });
+      },
+      { rootMargin: "120px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, nextCursor, loadingList, fetchPage]);
+
+  // 加载标签列表
+  useEffect(() => {
+    if (sourceTab !== "system") {
+      setAvailableTags([]);
+      return;
+    }
+    void listClozeTags().then((res) => {
+      if (res.code === 200 && res.data?.tags) {
+        setAvailableTags(res.data.tags);
+      }
+    }).catch(() => {});
+  }, [sourceTab]);
 
   const answeredCount = useMemo(
     () => Object.keys(answers).filter((k) => answers[Number(k)]).length,
@@ -206,7 +274,7 @@ export default function ClozePractice() {
       }
       setResult(res.data);
       setPhase("result");
-      void loadList();
+      void fetchPage({ append: false });
     } catch (e: unknown) {
       const apiMsg =
         e && typeof e === "object" && "msg" in e ? String((e as { msg: string }).msg) : undefined;
@@ -234,7 +302,7 @@ export default function ClozePractice() {
   return (
     <div className="h-dvh overflow-hidden bg-[#F7F9FC] flex flex-col">
       <header className="shrink-0 bg-white border-b border-[#E2E8F0]">
-        <div className="flex items-center h-11 px-2 sm:px-3 gap-1.5">
+        <div className="flex items-center h-12 px-2 sm:px-3 gap-1.5">
           <Button type="text" shape="circle" size="small" icon={<IconLeft />} onClick={headerBack} />
           <div className="min-w-0 flex-1">
             <Typography.Text className="!font-medium !text-sm !text-[#2D3748]">{t("cloze.title")}</Typography.Text>
@@ -246,18 +314,34 @@ export default function ClozePractice() {
           </div>
           {phase === "list" && (
             <div className="flex items-center gap-1.5 shrink-0">
-              <div className="flex rounded-md bg-[#F1F5F9] p-0.5">
+              <div className="relative">
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder={t("cloze.search_placeholder")}
+                  className="w-32 sm:w-40 h-7 pl-7 pr-2 rounded-md bg-[#F1F5F9] text-[12px] text-[#2D3748] placeholder:text-[#A0AEC0] border border-transparent focus:border-[#4ECDC4] focus:bg-white outline-none transition-colors"
+                />
+                <IconSearch
+                  className="absolute left-2 top-1/2 -translate-y-1/2 text-[#A0AEC0]"
+                  style={{ fontSize: 14 }}
+                />
+              </div>
+              <div className="flex rounded-lg bg-[#F1F5F9] p-1">
                 {(["system", "custom"] as SourceTab[]).map((key) => (
                   <button
                     key={key}
                     type="button"
                     className={cn(
-                      "px-2 py-0.5 rounded text-[11px] font-medium transition-all whitespace-nowrap",
+                      "px-3 py-1.5 rounded-md text-[13px] font-medium transition-all whitespace-nowrap",
                       sourceTab === key
                         ? "bg-white text-[#2D3748] shadow-sm"
                         : "text-[#718096] hover:text-[#2D3748]"
                     )}
-                    onClick={() => setSourceTab(key)}
+                    onClick={() => {
+                      setSourceTab(key);
+                      setTagFilter("");
+                    }}
                   >
                     {key === "system" ? t("cloze.tab_system") : t("cloze.tab_custom")}
                   </button>
@@ -266,8 +350,9 @@ export default function ClozePractice() {
               {sourceTab === "custom" && (
                 <Button
                   type="primary"
-                  size="mini"
+                  size="small"
                   icon={<IconPlus />}
+                  className="!h-9 !w-9 !p-0 !rounded-lg"
                   onClick={() => navigate("/cloze-practice/custom/new")}
                 />
               )}
@@ -281,6 +366,40 @@ export default function ClozePractice() {
         </div>
         {phase === "practice" && <Progress percent={percent} showText={false} size="small" className="!mb-0" />}
       </header>
+
+      {phase === "list" && sourceTab === "system" && availableTags.length > 0 && (
+        <div className="shrink-0 bg-white border-b border-[#E2E8F0]">
+          <div className="px-3 py-2 flex gap-1.5 overflow-x-auto scrollbar-hide items-center max-w-2xl mx-auto w-full">
+            <button
+              type="button"
+              className={cn(
+                "shrink-0 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors",
+                !tagFilter
+                  ? "bg-[#2D3748] text-white"
+                  : "bg-[#F1F5F9] text-[#718096] hover:bg-[#E2E8F0]"
+              )}
+              onClick={() => setTagFilter("")}
+            >
+              {t("cloze.tag_all")}
+            </button>
+            {availableTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                className={cn(
+                  "shrink-0 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors",
+                  tagFilter === tag
+                    ? "bg-[#2D3748] text-white"
+                    : "bg-[#F1F5F9] text-[#718096] hover:bg-[#E2E8F0]"
+                )}
+                onClick={() => setTagFilter(tagFilter === tag ? "" : tag)}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {err && (
         <div className="mx-3 mt-3 shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
@@ -296,23 +415,32 @@ export default function ClozePractice() {
                 <Spin tip={t("common.loading")} />
               </div>
             ) : passages.length === 0 ? (
-              <Card className="!rounded-xl !border-[#E2E8F0]">
-                <Empty
+              <div className="rounded-xl border border-[#E2E8F0] bg-white px-4 py-8">
+                <CloudEmpty
                   description={
-                    sourceTab === "custom" ? t("custom_cloze.empty") : t("cloze.empty_list")
+                    keyword
+                      ? t("cloze.empty_search")
+                      : sourceTab === "custom"
+                        ? t("custom_cloze.empty")
+                        : t("cloze.empty_list")
                   }
                 />
-                {sourceTab === "custom" && (
-                  <div className="flex justify-center mt-3 pb-2">
+                {sourceTab === "custom" && !keyword && (
+                  <div className="flex justify-center mt-3">
                     <Button type="primary" onClick={() => navigate("/cloze-practice/custom/new")}>
                       {t("custom_cloze.create_btn")}
                     </Button>
                   </div>
                 )}
-              </Card>
+              </div>
             ) : (
               <div className="space-y-2.5">
-                {passages.map((p) => (
+                {passages.map((p) => {
+                  const tags = (p.tags || "")
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+                  return (
                   <button
                     key={`${p.isCustom ? "c" : "s"}-${p.id}`}
                     type="button"
@@ -332,6 +460,18 @@ export default function ClozePractice() {
                             </Tag>
                           )}
                         </div>
+                        {tags.length > 0 ? (
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            {tags.map((tag) => (
+                              <span
+                                key={tag}
+                                className="inline-flex items-center rounded-md bg-[#F1F5F9] px-1.5 py-0.5 text-[10px] font-medium text-[#718096]"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
                         {p.summary ? (
                           <p className="text-xs text-[#718096] mt-1.5 line-clamp-2 leading-relaxed">
                             {p.summary}
@@ -351,7 +491,14 @@ export default function ClozePractice() {
                       )}
                     </div>
                   </button>
-                ))}
+                  );
+                })}
+                {loadingMore && (
+                  <div className="flex justify-center py-4">
+                    <Spin />
+                  </div>
+                )}
+                <div ref={sentinelRef} className="h-1" />
               </div>
             )}
           </div>

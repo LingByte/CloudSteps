@@ -6,6 +6,7 @@ export type ReadingPassageListItem = {
   id: number
   title: string
   level: string
+  tags?: string
   summary?: string
   wordCount?: number
   estimatedMinutes?: number
@@ -71,10 +72,16 @@ export type ReadingRecordListItem = {
 
 export const listReadingPassages = (params?: {
   level?: string
+  tag?: string
+  keyword?: string
   page?: number
   pageSize?: number
 }): Promise<ApiResponse<{ list: ReadingPassageListItem[]; total: number }>> => {
   return get('/reading/passages', { params })
+}
+
+export const listReadingTags = (): Promise<ApiResponse<{ tags: string[] }>> => {
+  return get('/reading/tags')
 }
 
 export const getReadingPassage = (id: number): Promise<ApiResponse<ReadingPassageDetail>> => {

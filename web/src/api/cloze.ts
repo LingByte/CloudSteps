@@ -6,6 +6,7 @@ export type ClozePassageListItem = {
   id: number
   title: string
   level: string
+  tags?: string
   summary?: string
   blankCount?: number
   estimatedMinutes?: number
@@ -56,10 +57,16 @@ export type ClozeSubmitResult = {
 
 export const listClozePassages = (params?: {
   level?: string
-  page?: number
-  pageSize?: number
-}): Promise<ApiResponse<{ list: ClozePassageListItem[]; total: number }>> => {
+  tag?: string
+  keyword?: string
+  cursor?: string
+  limit?: number
+}): Promise<ApiResponse<{ list: ClozePassageListItem[]; nextCursor?: string; hasMore: boolean; limit: number }>> => {
   return get('/cloze/passages', { params })
+}
+
+export const listClozeTags = (): Promise<ApiResponse<{ tags: string[] }>> => {
+  return get('/cloze/tags')
 }
 
 export const getClozePassage = (id: number): Promise<ApiResponse<ClozePassageDetail>> => {

@@ -384,37 +384,40 @@ export default function PreTrainingCheck() {
 
   const renderWordItem = (word: WordItem, seq: number) => (
     <div
-      className={`rounded-xl p-3.5 sm:p-4 shadow-sm transition-all cursor-pointer ${markWordCardClass(
+      className={`relative rounded-xl p-3.5 sm:p-4 shadow-sm transition-all cursor-pointer ${markWordCardClass(
         word.status,
         isWordCardTapped(word, playingId, word.id)
       )}`}
       style={markWordCardStyle(word.status, isWordCardTapped(word, playingId, word.id))}
       onClick={() => handleWordClick(word)}
     >
-      <div className="flex flex-row items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
+      <span
+        className="absolute top-2.5 left-3.5 sm:top-3 sm:left-4 text-xs leading-none tabular-nums text-[#A0AEC0]"
+        aria-hidden
+      >
+        {seq}
+      </span>
+      <div className="flex flex-row items-center justify-between gap-2 sm:gap-3 min-h-9">
+        <div className="min-w-0 flex-1 max-w-[calc(100%-7.5rem)] sm:max-w-none">
           <span
-            className="w-10 shrink-0 text-right text-2xl font-light leading-none tracking-tight text-[#94A3B8]"
-            style={{ fontFamily: 'Georgia, "Times New Roman", "Songti SC", "Noto Serif SC", serif' }}
-            aria-hidden
+            className={`${PRACTICE_WORD_CLASS} block break-words [overflow-wrap:anywhere] leading-none transition-colors hover:text-[#4ECDC4]`}
           >
-            {seq}.
+            {word.word}
           </span>
-          <div className="min-w-0">
-            <span className={`${PRACTICE_WORD_CLASS} transition-colors hover:text-[#4ECDC4]`}>
-              {word.word}
-            </span>
-            {word.showTranslation && (
-              <div className="mt-0.5 animate-in fade-in slide-in-from-top-1">
-                {word.phonetic ? (
-                  <span className="block text-sm text-[#718096] font-mono">{word.phonetic}</span>
-                ) : null}
-                {word.translation ? (
-                  <span className={`${PRACTICE_TRANS_CLASS} block`}>{word.translation}</span>
-                ) : null}
-              </div>
-            )}
-          </div>
+          {word.showTranslation && (
+            <div className="mt-0.5 animate-in fade-in slide-in-from-top-1">
+              {word.phonetic ? (
+                <span className="block text-sm text-[#718096] font-mono break-words">
+                  {word.phonetic}
+                </span>
+              ) : null}
+              {word.translation ? (
+                <span className={`${PRACTICE_TRANS_CLASS} block break-words`}>
+                  {word.translation}
+                </span>
+              ) : null}
+            </div>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-1 sm:gap-2 -mr-1 sm:mr-0">
           <div onClick={(e) => e.stopPropagation()}>
