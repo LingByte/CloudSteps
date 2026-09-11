@@ -152,13 +152,23 @@ func (h *Handlers) handleUserClozeListPassages(c *gin.Context) {
 	}
 
 	level := strings.TrimSpace(c.Query("level"))
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
-	if page < 1 {
-		page = 1
+	keyword := strings.TrimSpace(c.Query("keyword"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	if limit < 1 || limit > 100 {
+		limit = 20
 	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
+
+	// 游标格式: "sortOrder,id" (排序为 sort_order ASC, id DESC)
+	var cursorSO int
+	var cursorID uint
+	if raw := strings.TrimSpace(c.Query("cursor")); raw != "" {
+		parts := strings.SplitN(raw, ",", 2)
+		if len(parts) == 2 {
+			cursorSO, _ = strconv.Atoi(parts[0])
+			if v, err := strconv.ParseUint(parts[1], 10, 64); err == nil {
+				cursorID = uint(v)
+			}
+		}
 	}
 
 	q := db.Model(&models.UserClozePassage{}).
@@ -166,15 +176,34 @@ func (h *Handlers) handleUserClozeListPassages(c *gin.Context) {
 	if level != "" {
 		q = q.Where("level = ?", level)
 	}
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		q = q.Where("title LIKE ? OR summary LIKE ?", like, like)
+	}
+	if cursorID > 0 {
+		q = q.Where("(sort_order > ? OR (sort_order = ? AND id < ?))", cursorSO, cursorSO, cursorID)
+	}
 
-	var total int64
-	q.Count(&total)
 	var list []models.UserClozePassage
 	q.Order("sort_order ASC, id DESC").
-		Offset((page - 1) * pageSize).Limit(pageSize).Find(&list)
+		Limit(limit + 1).Find(&list)
+
+	hasMore := len(list) > limit
+	if hasMore {
+		list = list[:limit]
+	}
+
+	var nextCursor string
+	if hasMore && len(list) > 0 {
+		last := list[len(list)-1]
+		nextCursor = strconv.Itoa(last.SortOrder) + "," + strconv.FormatUint(uint64(last.ID), 10)
+	}
 
 	response.SuccessI18n(c, "common.success", gin.H{
-		"list": userClozePassageListItem(db, user.ID, list), "total": total, "page": page, "pageSize": pageSize,
+		"list":       userClozePassageListItem(db, user.ID, list),
+		"nextCursor": nextCursor,
+		"hasMore":    hasMore,
+		"limit":      limit,
 	})
 }
 

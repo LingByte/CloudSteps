@@ -19,6 +19,8 @@ type ClozePassage struct {
 	Level            string `json:"level" gorm:"size:32;index;comment:难度 初阶/中阶/高阶"`
 	Content          string `json:"content" gorm:"type:text;not null;comment:正文含 {{n}} 空位"`
 	Summary          string `json:"summary" gorm:"size:512;comment:摘要"`
+	// Tags 逗号分隔的标签列表，如 "CEPOC,故事,科普"。用于前端筛选。
+	Tags             string `json:"tags" gorm:"size:256;index;comment:标签 逗号分隔"`
 	Status           string `json:"status" gorm:"size:32;index;default:draft;comment:draft/published"`
 	BlankCount       int    `json:"blankCount" gorm:"default:0;comment:空位数"`
 	EstimatedMinutes int    `json:"estimatedMinutes" gorm:"default:5;comment:预计分钟"`

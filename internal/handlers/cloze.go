@@ -8,6 +8,7 @@ import (
 	lbconstants "github.com/LingByte/ling-base/common/constants"
 
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -41,6 +42,7 @@ func (h *Handlers) registerClozeRoutes(r *humax.Group) {
 		user.Use(auth.Required)
 		user.GET("/passages", h.handleClozeListPassages)
 		user.GET("/passages/:id", h.handleClozeGetPassage)
+		user.GET("/tags", h.handleClozeListTags)
 		user.POST("/passages/:id/submit", h.handleClozeSubmit)
 		user.GET("/records", h.handleClozeListRecords)
 		user.GET("/records/:id", h.handleClozeGetRecord)
@@ -75,13 +77,24 @@ func (h *Handlers) handleClozeListPassages(c *gin.Context) {
 	user := auth.CurrentUser(c)
 
 	level := strings.TrimSpace(c.Query("level"))
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
-	if page < 1 {
-		page = 1
+	tag := strings.TrimSpace(c.Query("tag"))
+	keyword := strings.TrimSpace(c.Query("keyword"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	if limit < 1 || limit > 100 {
+		limit = 20
 	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
+
+	// 游标格式: "sortOrder,id"
+	var cursorSO int
+	var cursorID uint
+	if raw := strings.TrimSpace(c.Query("cursor")); raw != "" {
+		parts := strings.SplitN(raw, ",", 2)
+		if len(parts) == 2 {
+			cursorSO, _ = strconv.Atoi(parts[0])
+			if v, err := strconv.ParseUint(parts[1], 10, 64); err == nil {
+				cursorID = uint(v)
+			}
+		}
 	}
 
 	q := db.Model(&models.ClozePassage{}).
@@ -89,19 +102,28 @@ func (h *Handlers) handleClozeListPassages(c *gin.Context) {
 	if level != "" {
 		q = q.Where("level = ?", level)
 	}
-
-	var total int64
-	if err := q.Count(&total).Error; err != nil {
-		response.FailI18n(c, "common.query_failed", err)
-		return
+	if tag != "" {
+		q = q.Where("tags LIKE ?", "%"+tag+"%")
+	}
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		q = q.Where("title LIKE ? OR summary LIKE ?", like, like)
+	}
+	if cursorID > 0 {
+		q = q.Where("(sort_order > ? OR (sort_order = ? AND id > ?))", cursorSO, cursorSO, cursorID)
 	}
 
 	var list []models.ClozePassage
 	if err := q.Order("sort_order ASC, id ASC").
-		Offset((page - 1) * pageSize).Limit(pageSize).
+		Limit(limit + 1).
 		Find(&list).Error; err != nil {
 		response.FailI18n(c, "common.query_failed", err)
 		return
+	}
+
+	hasMore := len(list) > limit
+	if hasMore {
+		list = list[:limit]
 	}
 
 	ids := make([]uint, 0, len(list))
@@ -126,6 +148,7 @@ func (h *Handlers) handleClozeListPassages(c *gin.Context) {
 			"id":               p.ID,
 			"title":            p.Title,
 			"level":            p.Level,
+			"tags":             p.Tags,
 			"summary":          p.Summary,
 			"blankCount":       p.BlankCount,
 			"estimatedMinutes": p.EstimatedMinutes,
@@ -140,11 +163,17 @@ func (h *Handlers) handleClozeListPassages(c *gin.Context) {
 		items = append(items, item)
 	}
 
+	var nextCursor string
+	if hasMore && len(list) > 0 {
+		last := list[len(list)-1]
+		nextCursor = strconv.Itoa(last.SortOrder) + "," + strconv.FormatUint(uint64(last.ID), 10)
+	}
+
 	response.SuccessI18n(c, "common.success", gin.H{
-		"list":     items,
-		"total":    total,
-		"page":     page,
-		"pageSize": pageSize,
+		"list":       items,
+		"nextCursor": nextCursor,
+		"hasMore":    hasMore,
+		"limit":      limit,
 	})
 }
 
@@ -437,6 +466,16 @@ func (h *Handlers) handleAdminClozeListPassages(c *gin.Context) {
 	if status := strings.TrimSpace(c.Query("status")); status != "" {
 		q = q.Where("status = ?", status)
 	}
+	if level := strings.TrimSpace(c.Query("level")); level != "" {
+		q = q.Where("level = ?", level)
+	}
+	if tag := strings.TrimSpace(c.Query("tag")); tag != "" {
+		q = q.Where("tags LIKE ?", "%"+tag+"%")
+	}
+	if kw := strings.TrimSpace(c.Query("keyword")); kw != "" {
+		like := "%" + kw + "%"
+		q = q.Where("title LIKE ? OR summary LIKE ?", like, like)
+	}
 
 	var total int64
 	q.Count(&total)
@@ -479,6 +518,7 @@ func (h *Handlers) handleAdminClozeCreatePassage(c *gin.Context) {
 		Level            string `json:"level"`
 		Content          string `json:"content" binding:"required"`
 		Summary          string `json:"summary"`
+		Tags             string `json:"tags"`
 		Status           string `json:"status"`
 		EstimatedMinutes int    `json:"estimatedMinutes"`
 		SortOrder        int    `json:"sortOrder"`
@@ -518,6 +558,7 @@ func (h *Handlers) handleAdminClozeCreatePassage(c *gin.Context) {
 			Level:            level,
 			Content:          body.Content,
 			Summary:          body.Summary,
+			Tags:             strings.TrimSpace(body.Tags),
 			Status:           status,
 			BlankCount:       countClozeMarkers(body.Content),
 			EstimatedMinutes: minutes,
@@ -569,41 +610,78 @@ func (h *Handlers) handleAdminClozeUpdatePassage(c *gin.Context) {
 		Level            *string `json:"level"`
 		Content          *string `json:"content"`
 		Summary          *string `json:"summary"`
+		Tags             *string `json:"tags"`
 		Status           *string `json:"status"`
 		EstimatedMinutes *int    `json:"estimatedMinutes"`
 		SortOrder        *int    `json:"sortOrder"`
+		// Blanks 非 nil 时整表替换该文章空位（与阅读题目 replace 语义一致）
+		Blanks *[]struct {
+			BlankNo     int           `json:"blankNo" binding:"required"`
+			Options     []clozeOption `json:"options" binding:"required"`
+			Answer      string        `json:"answer" binding:"required"`
+			Explanation string        `json:"explanation"`
+		} `json:"blanks"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		response.FailI18n(c, "common.invalid_params", nil)
 		return
 	}
 
-	if body.Title != nil {
-		passage.Title = strings.TrimSpace(*body.Title)
-	}
-	if body.Level != nil {
-		passage.Level = *body.Level
-	}
-	if body.Content != nil {
-		passage.Content = *body.Content
-		passage.BlankCount = countClozeMarkers(*body.Content)
-	}
-	if body.Summary != nil {
-		passage.Summary = *body.Summary
-	}
-	if body.Status != nil {
-		passage.Status = *body.Status
-	}
-	if body.EstimatedMinutes != nil {
-		passage.EstimatedMinutes = *body.EstimatedMinutes
-	}
-	if body.SortOrder != nil {
-		passage.SortOrder = *body.SortOrder
-	}
+	op := ""
 	if user != nil {
-		passage.SetUpdateInfo(user.Username)
+		op = user.Username
 	}
-	if err := db.Save(&passage).Error; err != nil {
+
+	err := db.Transaction(func(tx *gorm.DB) error {
+		if body.Title != nil {
+			passage.Title = strings.TrimSpace(*body.Title)
+		}
+		if body.Level != nil {
+			passage.Level = *body.Level
+		}
+		if body.Content != nil {
+			passage.Content = *body.Content
+			passage.BlankCount = countClozeMarkers(*body.Content)
+		}
+		if body.Summary != nil {
+			passage.Summary = *body.Summary
+		}
+		if body.Tags != nil {
+			passage.Tags = strings.TrimSpace(*body.Tags)
+		}
+		if body.Status != nil {
+			passage.Status = *body.Status
+		}
+		if body.EstimatedMinutes != nil {
+			passage.EstimatedMinutes = *body.EstimatedMinutes
+		}
+		if body.SortOrder != nil {
+			passage.SortOrder = *body.SortOrder
+		}
+		if body.Blanks != nil {
+			passage.BlankCount = len(*body.Blanks)
+			if err := tx.Unscoped().Where("passage_id = ?", passage.ID).Delete(&models.ClozeBlank{}).Error; err != nil {
+				return err
+			}
+			for _, b := range *body.Blanks {
+				opts, _ := json.Marshal(b.Options)
+				bb := models.ClozeBlank{
+					PassageID:   passage.ID,
+					BlankNo:     b.BlankNo,
+					Options:     string(opts),
+					Answer:      strings.ToUpper(strings.TrimSpace(b.Answer)),
+					Explanation: b.Explanation,
+				}
+				bb.SetCreateInfo(op)
+				if err := tx.Create(&bb).Error; err != nil {
+					return err
+				}
+			}
+		}
+		passage.SetUpdateInfo(op)
+		return tx.Save(&passage).Error
+	})
+	if err != nil {
 		response.FailI18n(c, "common.operation_failed", err)
 		return
 	}
@@ -702,6 +780,31 @@ func (h *Handlers) handleAdminClozeGetRecord(c *gin.Context) {
 		"passageId": record.PassageID, "title": passage.Title, "level": passage.Level,
 		"content": passage.Content, "blankCount": record.BlankCount, "correctCount": record.CorrectCount,
 		"score": record.Score, "durationSec": record.DurationSec, "isLatest": record.IsLatest,
-		"completedAt": record.CompletedAt, "answers": record.Answers, "source": "system",
+		"completedAt": record.Answers, "answers": record.Answers, "source": "system",
 	})
+}
+
+// GET /cloze/tags — 返回所有已用标签列表（去重），用于前端筛选 UI。
+func (h *Handlers) handleClozeListTags(c *gin.Context) {
+	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
+	var rows []string
+	db.Model(&models.ClozePassage{}).
+		Where("status = ? AND tags <> ''", models.ClozeStatusPublished).
+		Distinct("tags").
+		Pluck("tags", &rows)
+	tagSet := make(map[string]struct{})
+	for _, t := range rows {
+		for _, tag := range strings.Split(t, ",") {
+			tag = strings.TrimSpace(tag)
+			if tag != "" {
+				tagSet[tag] = struct{}{}
+			}
+		}
+	}
+	tags := make([]string, 0, len(tagSet))
+	for tag := range tagSet {
+		tags = append(tags, tag)
+	}
+	sort.Strings(tags)
+	response.SuccessI18n(c, "common.success", gin.H{"tags": tags})
 }

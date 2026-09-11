@@ -19,6 +19,8 @@ type ReadingPassage struct {
 	Level   string `json:"level" gorm:"size:32;index;comment:难度 初阶/中阶/高阶"`
 	Content string `json:"content" gorm:"type:text;not null;comment:正文"`
 	Summary string `json:"summary" gorm:"size:512;comment:摘要"`
+	// Tags 逗号分隔的标签列表，如 "RACE,故事,科普"。用于前端筛选。
+	Tags string `json:"tags" gorm:"size:256;index;comment:标签 逗号分隔"`
 	// KnowledgeJSON AI 知识点缓存；空=未生成，"[]"=已生成但无要点，否则为 [{title,body}]。
 	KnowledgeJSON string `json:"-" gorm:"type:text;comment:AI知识点JSON"`
 	// AnalysisJSON AI 逐句解析缓存；空=未生成，"[]"=已生成但无句子，否则为 [{sentence,translation,components,keyPhrases}]。

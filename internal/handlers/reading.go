@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -40,6 +41,7 @@ func (h *Handlers) registerReadingRoutes(r *humax.Group) {
 		user.Use(auth.Required)
 		user.GET("/passages", h.handleReadingListPassages)
 		user.GET("/passages/:id", h.handleReadingGetPassage)
+		user.GET("/tags", h.handleReadingListTags)
 		user.GET("/passages/:id/knowledge", h.handleReadingGetKnowledge)
 		user.GET("/passages/:id/analysis", h.handleReadingGetAnalysis)
 		user.POST("/passages/:id/check", h.handleReadingCheckAnswer)
@@ -90,6 +92,8 @@ func (h *Handlers) handleReadingListPassages(c *gin.Context) {
 	user := auth.CurrentUser(c)
 
 	level := strings.TrimSpace(c.Query("level"))
+	tag := strings.TrimSpace(c.Query("tag"))
+	keyword := strings.TrimSpace(c.Query("keyword"))
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "20"))
 	if page < 1 {
@@ -103,6 +107,13 @@ func (h *Handlers) handleReadingListPassages(c *gin.Context) {
 		Where("status = ?", models.ReadingStatusPublished)
 	if level != "" {
 		q = q.Where("level = ?", level)
+	}
+	if tag != "" {
+		q = q.Where("tags LIKE ?", "%"+tag+"%")
+	}
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		q = q.Where("title LIKE ? OR summary LIKE ?", like, like)
 	}
 
 	var total int64
@@ -158,6 +169,7 @@ func (h *Handlers) handleReadingListPassages(c *gin.Context) {
 			"id":               p.ID,
 			"title":            p.Title,
 			"level":            p.Level,
+			"tags":             p.Tags,
 			"summary":          p.Summary,
 			"wordCount":        p.WordCount,
 			"estimatedMinutes": p.EstimatedMinutes,
@@ -593,6 +605,7 @@ func readingPassageAdminListItem(p models.ReadingPassage) gin.H {
 		"id":               p.ID,
 		"title":            p.Title,
 		"level":            p.Level,
+		"tags":             p.Tags,
 		"summary":          p.Summary,
 		"status":           p.Status,
 		"wordCount":        p.WordCount,
@@ -628,6 +641,9 @@ func (h *Handlers) handleAdminListPassages(c *gin.Context) {
 	}
 	if level := strings.TrimSpace(c.Query("level")); level != "" {
 		q = q.Where("level = ?", level)
+	}
+	if tag := strings.TrimSpace(c.Query("tag")); tag != "" {
+		q = q.Where("tags LIKE ?", "%"+tag+"%")
 	}
 	if kw := strings.TrimSpace(c.Query("keyword")); kw != "" {
 		like := "%" + kw + "%"
@@ -769,6 +785,7 @@ func (h *Handlers) handleAdminCreatePassage(c *gin.Context) {
 		Level            string `json:"level"`
 		Content          string `json:"content" binding:"required"`
 		Summary          string `json:"summary"`
+		Tags             string `json:"tags"`
 		Status           string `json:"status"`
 		EstimatedMinutes int    `json:"estimatedMinutes"`
 		SortOrder        int    `json:"sortOrder"`
@@ -810,6 +827,7 @@ func (h *Handlers) handleAdminCreatePassage(c *gin.Context) {
 			Level:            level,
 			Content:          body.Content,
 			Summary:          body.Summary,
+			Tags:             strings.TrimSpace(body.Tags),
 			Status:           status,
 			WordCount:        countEnglishWords(body.Content),
 			EstimatedMinutes: minutes,
@@ -863,6 +881,7 @@ func (h *Handlers) handleAdminUpdatePassage(c *gin.Context) {
 		Level            *string `json:"level"`
 		Content          *string `json:"content"`
 		Summary          *string `json:"summary"`
+		Tags             *string `json:"tags"`
 		Status           *string `json:"status"`
 		EstimatedMinutes *int    `json:"estimatedMinutes"`
 		SortOrder        *int    `json:"sortOrder"`
@@ -886,6 +905,9 @@ func (h *Handlers) handleAdminUpdatePassage(c *gin.Context) {
 	}
 	if body.Summary != nil {
 		passage.Summary = *body.Summary
+	}
+	if body.Tags != nil {
+		passage.Tags = strings.TrimSpace(*body.Tags)
 	}
 	if body.Status != nil {
 		passage.Status = *body.Status
@@ -998,4 +1020,29 @@ func (h *Handlers) handleAdminUpsertQuestions(c *gin.Context) {
 		return
 	}
 	response.SuccessI18n(c, "common.saved", nil)
+}
+
+// GET /reading/tags — 返回所有已用标签列表（去重），用于前端筛选 UI。
+func (h *Handlers) handleReadingListTags(c *gin.Context) {
+	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
+	var rows []string
+	db.Model(&models.ReadingPassage{}).
+		Where("status = ? AND tags <> ''", models.ReadingStatusPublished).
+		Distinct("tags").
+		Pluck("tags", &rows)
+	tagSet := make(map[string]struct{})
+	for _, t := range rows {
+		for _, tag := range strings.Split(t, ",") {
+			tag = strings.TrimSpace(tag)
+			if tag != "" {
+				tagSet[tag] = struct{}{}
+			}
+		}
+	}
+	tags := make([]string, 0, len(tagSet))
+	for tag := range tagSet {
+		tags = append(tags, tag)
+	}
+	sort.Strings(tags)
+	response.SuccessI18n(c, "common.success", gin.H{"tags": tags})
 }
