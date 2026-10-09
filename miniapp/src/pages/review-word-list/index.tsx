@@ -8,15 +8,16 @@
  *  4. 单词列表:每行 = 序号 + 单词(点击翻面看释义) + 音频按钮 + ✓/✗ 按钮
  *  5. 底部固定操作栏:全部认识 / 清空 + 提交复习(带进度 x/total)
  */
-import React, { useEffect, useMemo, useState, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
-import { ArrowLeft, Check, Close, VolumeMax } from '@nutui/icons-react-taro'
+import { ArrowLeft, ArrowRight, Check, Close, VolumeMax } from '@nutui/icons-react-taro'
 import {
   getReviewToday,
   startReviewSession,
   completeReviewSession,
 } from '@/api/review'
+import { getLighthouseReviewWords } from '@/api/study'
 import { resolveMediaUrl } from '@/utils/mediaUrl'
 import { CloudButton } from '@/components/button'
 import { color } from '../../styles/tokens'
@@ -48,12 +49,17 @@ export default function ReviewWordList() {
   const wordBookId = Number(router.params.wordBookId || 0)
   const reviewDate = String(router.params.date || '')
   const studySessionId = Number(router.params.studySessionId || 0)
+  const reviewStudentId = Number(router.params.studentId || 0)
+  const reviewAll = router.params.all === '1' || router.params.all === 'true'
+  const lighthouseReview = router.params.lighthouse === '1' || router.params.lighthouse === 'true'
   const viewOnly = router.params.view === '1'
 
   const [words, setWords] = useState<ReviewWordItem[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [hint, setHint] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'list' | 'card'>('list')
+  const [cardIndex, setCardIndex] = useState(0)
   const [playingId, setPlayingId] = useState<number | null>(null)
   const audioCtxRef = useRef<any>(null)
 
@@ -61,11 +67,15 @@ export default function ReviewWordList() {
     let mounted = true
     ;(async () => {
       try {
-        const res = await getReviewToday(wordBookId, {
-          date: reviewDate || undefined,
-          limit: 200,
-          studySessionId: studySessionId > 0 ? studySessionId : undefined,
-        })
+        const res = lighthouseReview
+          ? await getLighthouseReviewWords(wordBookId, { page: 1, pageSize: 200, ...(reviewStudentId > 0 ? { studentId: reviewStudentId } : {}) })
+          : await getReviewToday(wordBookId, {
+              date: reviewDate || undefined,
+              limit: 200,
+              studySessionId: studySessionId > 0 ? studySessionId : undefined,
+              all: reviewAll || undefined,
+              ...(reviewStudentId > 0 ? { studentId: reviewStudentId } : {}),
+            })
         const ws = Array.isArray(res.data?.words)
           ? (res.data.words as Array<{
               id: number
@@ -95,7 +105,7 @@ export default function ReviewWordList() {
     return () => {
       mounted = false
     }
-  }, [wordBookId, reviewDate, studySessionId])
+  }, [wordBookId, reviewDate, studySessionId, reviewStudentId, reviewAll, lighthouseReview])
 
   const markedWords = useMemo(() => words.filter((w) => w.status !== null), [words])
   const markedCount = markedWords.length
@@ -189,6 +199,10 @@ export default function ReviewWordList() {
       if (res.code !== 200) {
         throw new Error(res.msg || '提交失败')
       }
+      Taro.removeStorageSync('lb_review_date')
+      Taro.removeStorageSync('lb_review_study_session_id')
+      Taro.removeStorageSync('lb_review_student_id')
+      Taro.removeStorageSync('lb_mode')
       Taro.showToast({ title: '复习完成', icon: 'success' })
       setTimeout(() => Taro.navigateBack(), 800)
     } catch {
@@ -209,7 +223,7 @@ export default function ReviewWordList() {
           <ArrowLeft size={22} color={color.charcoal} />
         </View>
         <Text className="rwl__nav-title">{viewOnly ? '查看' : '开始复习'}</Text>
-        <View className="rwl__nav-btn" />
+        <View className="rwl__nav-btn" onClick={() => setViewMode((mode) => mode === 'list' ? 'card' : 'list')}><Text className="rwl__mode-text">{viewMode === 'list' ? '卡片' : '列表'}</Text></View>
       </View>
 
       <ScrollView className="rwl__body" scrollY enableFlex>
@@ -250,8 +264,19 @@ export default function ReviewWordList() {
               </View>
             )}
 
+            {/* 卡片视图 */}
+            {viewMode === 'card' && words[cardIndex] ? (() => {
+              const item = words[cardIndex]
+              return <View className="rwl__card-view">
+                <Text className="rwl__card-count">{cardIndex + 1} / {words.length}</Text>
+                <View className="rwl__card-word" onClick={() => handleWordClick(item)}><Text className="rwl__word-text">{item.word}</Text>{item.showTranslation && item.translation ? <Text className="rwl__word-translation">{item.translation}</Text> : <Text className="rwl__card-hint">点击查看释义</Text>}</View>
+                <View className="rwl__card-actions">{item.audioUrl ? <View className="rwl__icon-btn" onClick={() => playAudio(item)}><VolumeMax size={20} color={color.secondaryBrand} /></View> : null}<View className="rwl__icon-btn rwl__icon-btn--check" onClick={() => handleStatusClick(item.id, 'correct')}><Check size={20} color={item.status === 'correct' ? color.white : color.primary} /></View><View className="rwl__icon-btn rwl__icon-btn--cross" onClick={() => handleStatusClick(item.id, 'wrong')}><Close size={20} color={item.status === 'wrong' ? color.white : color.destructive} /></View></View>
+                <View className="rwl__card-nav"><View onClick={() => setCardIndex((index) => Math.max(0, index - 1))}><ArrowLeft size={20} color={color.mutedForeground} /></View><View onClick={() => setCardIndex((index) => Math.min(words.length - 1, index + 1))}><ArrowRight size={20} color={color.mutedForeground} /></View></View>
+              </View>
+            })() : null}
+
             {/* 单词列表 */}
-            <View className="rwl__word-list">
+            <View className={`rwl__word-list ${viewMode === 'card' ? 'rwl__word-list--hidden' : ''}`}>
               {words.map((item, idx) => (
                 <View
                   key={item.id}

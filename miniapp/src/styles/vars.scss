@@ -14,6 +14,7 @@ $secondary-brand: #55A3FF;
 $background: #f6f5f4;
 $card: #ffffff;
 $surface-soft: #fafaf9;
+$muted: #f0eeec;
 $white: #ffffff;
 
 /* 边框 */
@@ -90,8 +91,9 @@ $font-sans: "Plus Jakarta Sans", "PingFang SC", "Noto Sans SC", "Microsoft YaHei
 $font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
 /* 间距(4px 基准) */
-$gap-xs: 8px;
-$gap-sm: 16px;
-$gap-md: 24px;
-$gap-lg: 32px;
-$gap-xl: 48px;
+$gap-xs: 4px;
+$gap-sm: 8px;
+$gap-md: 12px;
+$gap-lg: 16px;
+$gap-xl: 24px;
+$gap-xxl: 32px;

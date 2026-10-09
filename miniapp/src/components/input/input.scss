@@ -5,13 +5,14 @@
  */
 .cs-input {
   width: 100%;
-  height: 88px;
-  padding: 0px 32px;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 0 12px;
   border-radius: 12px;
   background-color: #ffffff;
-  border: 2px solid #c8c4be;
+  border: 1px solid #c8c4be;
   color: #37352f;
-  font-size: 30px;
+  font-size: 16px;
 
   &::placeholder {
     color: #a4a097;

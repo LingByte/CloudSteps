@@ -1,343 +1,229 @@
-/**
- * 编辑资料页样式 — 卡片式分组 + 头像角标 + 进度条 + 底部固定栏。
- */
-.edit {
-  display: flex;
-  flex-direction: column;
-  min-height: 100%;
-  background-color: #f6f5f4;
-}
+@import '../../styles/vars.scss';
 
-/* ============ 顶部导航栏 ============ */
-.edit__navbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24px 32px;
-  background-color: #ffffff;
-  border-bottom: 2px solid #e5e3df;
-  flex-shrink: 0;
-}
-
-.edit__nav-btn {
-  width: 80px;
-  display: flex;
-  align-items: center;
-}
-
-.edit__nav-back {
-  font-size: 40px;
-  color: #37352f;
-  font-weight: 400;
-}
-
-.edit__nav-title {
-  font-size: 32px;
-  font-weight: 600;
-  color: #1a1a1a;
-}
-
-/* ============ 滚动主体 ============ */
-.edit__body {
-  flex: 1;
-  padding: 32px;
-}
-
-/* ============ 头像卡片 ============ */
-.edit__avatar-card {
-  background-color: #ffffff;
-  border: 2px solid #e5e3df;
-  border-radius: 12px;
-  padding-top: 48px; padding-left: 32px; padding-right: 32px; padding-bottom: 40px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: 32px;
-}
-
-.edit__avatar-wrap {
-  position: relative;
-  width: 160px;
-  height: 160px;
-}
-
-.edit__avatar {
-  width: 160px;
-  height: 160px;
-  border-radius: 999px;
-  border: 4px solid #e5e3df;
-}
-
-.edit__avatar-placeholder {
-  width: 160px;
-  height: 160px;
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.edit__avatar-text {
-  font-size: 64px;
-  font-weight: 600;
-  color: #ffffff;
-}
-
-.edit__avatar-loading {
-  position: absolute;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  &-text {
-    color: #ffffff;
-    font-size: 22px;
-  }
-}
-
-/* 相机角标 */
-.edit__avatar-badge {
-  position: absolute;
-  right: 0px;
-  bottom: 0px;
-  width: 48px;
-  height: 48px;
-  border-radius: 999px;
-  background-color: #4ECDC4;
-  border: 4px solid #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.edit__avatar-badge-icon {
-  color: #ffffff;
-  font-size: 32px;
-  font-weight: 400;
-  line-height: 1;
-}
-
-.edit__avatar-hint {
-  font-size: 24px;
-  color: #787671;
-  margin-top: 20px;
-}
-
-/* 资料完整度进度条 */
-.edit__progress {
+.profile-edit {
   width: 100%;
-  margin-top: 32px;
-
-  &-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
-  }
-
-  &-label {
-    font-size: 26px;
-    color: #37352f;
-    font-weight: 500;
-  }
-
-  &-value {
-    font-size: 26px;
-    color: #4ECDC4;
-    font-weight: 600;
-  }
-
-  &-bar {
-    width: 100%;
-    height: 12px;
-    border-radius: 999px;
-    background-color: #fafaf9;
-    overflow: hidden;
-  }
-
-  &-fill {
-    height: 100%;
-    border-radius: 999px;
-  }
-}
-
-/* ============ 分组 section ============ */
-.edit__section {
-  margin-bottom: 32px;
-}
-
-.edit__section-title {
-  display: flex;
-  font-size: 26px;
-  font-weight: 600;
-  color: #787671;
-  margin-bottom: 16px;
-  padding-left: 8px;
-}
-
-.edit__form-card {
-  background-color: #ffffff;
-  border: 2px solid #e5e3df;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-/* ============ 表单字段 ============ */
-.edit__field {
+  max-width: 672px;
+  min-height: 100vh;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 28px 32px;
-
-  &--readonly {
-    .edit__readonly-value {
-      font-size: 28px;
-      color: #787671;
-    }
-  }
+  background: $background;
 }
 
-.edit__label {
-  font-size: 24px;
-  font-weight: 500;
-  color: #787671;
-}
-
-.edit__input {
-  width: 100%;
-  height: 80px;
-  padding: 0px;
-  color: #37352f;
-  font-size: 30px;
-}
-
-.edit__placeholder {
-  color: #a4a097;
-  font-size: 30px;
-}
-
-.edit__divider {
-  height: 2px;
-  background-color: #e5e3df;
-  margin: 0px 32px;
-}
-
-/* 时区选择器 */
-.edit__picker {
+.profile-edit__top {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 80px;
-
-  &-value {
-    font-size: 30px;
-    color: #37352f;
-  }
-
-  &-arrow {
-    color: #a4a097;
-    font-size: 32px;
-  }
+  gap: 8px;
 }
 
-/* ============ 错误提示 ============ */
-.edit__error {
-  background-color: rgba(224, 49, 49, 0.05);
-  border: 2px solid rgba(224, 49, 49, 0.2);
-  border-radius: 12px;
-  padding: 24px 32px;
-  color: #e03131;
-  font-size: 26px;
-  margin-bottom: 16px;
-}
-
-/* ============ 底部固定保存栏 ============ */
-.edit__footer {
-  flex-shrink: 0;
-  padding: 24px 32px;
-  padding-bottom: calc(24px + env(safe-area-inset-bottom));
-  background-color: #ffffff;
-  border-top: 2px solid #e5e3df;
-}
-
-.edit__save-btn {
-  width: 100%;
-}
-
-/* ============ 时区选择弹层 ============ */
-.edit__mask {
-  position: fixed;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 100;
+.profile-edit__back {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
 }
 
-.edit__sheet {
-  width: 100%;
-  background: #ffffff;
-  border-radius: 32px 32px 0 0;
+.profile-edit__heading {
+  min-width: 0;
+  flex: 1;
+}
+
+.profile-edit__title {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  color: $foreground;
+}
+
+.profile-edit__account {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+  font-size: 11px;
+  color: $muted-foreground;
+}
+
+.profile-edit__stats {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.profile-edit__stat {
+  padding: 8px 10px;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: $tint-mint;
+  text-align: center;
+}
+
+.profile-edit__stat-label {
+  display: block;
+  font-size: 10px;
+  color: $muted-foreground;
+}
+
+.profile-edit__stat-value {
+  display: block;
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: $foreground;
+}
+
+.profile-edit__body {
+  flex: 1;
+  min-height: 0;
+}
+
+.profile-edit__card {
+  padding: 14px;
+  box-sizing: border-box;
+  border: 1px solid $border;
+  border-radius: 16px;
+  background: $card;
+}
+
+.profile-edit__avatar-area {
+  padding-bottom: 2px;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
 
-  &-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 28px 32px;
-    border-bottom: 2px solid #e5e3df;
-  }
+.profile-edit__avatar-wrap {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+}
 
-  &-cancel {
-    font-size: 28px;
-    color: #787671;
-    width: 80px;
-  }
+.profile-edit__avatar {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid $border;
+  border-radius: 999px;
+  background: $primary-soft;
+  color: $primary;
+  font-size: 20px;
+  font-weight: 600;
+  box-shadow: $shadow-rest;
+}
 
-  &-title {
-    font-size: 30px;
-    font-weight: 600;
-    color: #1a1a1a;
-  }
+.profile-edit__avatar-badge {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid $border;
+  border-radius: 999px;
+  background: $card;
+  color: $charcoal;
+  box-shadow: $shadow-rest;
+}
 
-  &-list {
-    flex: 1;
-    max-height: 700px;
-  }
+.profile-edit__avatar-badge-text {
+  font-size: 12px;
+  line-height: 1;
+}
 
-  &-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 32px;
-    border-bottom: 2px solid #e5e3df;
+.profile-edit__avatar-hint {
+  font-size: 11px;
+  color: $muted-foreground;
+}
 
-    &--active {
-      background-color: rgba(78, 205, 196, 0.12);
-    }
+.profile-edit__field {
+  margin-top: 12px;
+}
 
-    &-info {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
+.profile-edit__field-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
 
-    &-tz {
-      font-size: 28px;
-      color: #37352f;
-      font-weight: 500;
-    }
+.profile-edit__label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: $charcoal;
+}
 
-    &-label {
-      font-size: 22px;
-      color: #787671;
-    }
+.profile-edit__input {
+  width: 100%;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid $input;
+  border-radius: 12px;
+  background: $card;
+  color: $charcoal;
+  font-size: 14px;
+}
 
-    &-check {
-      color: #4ECDC4;
-      font-size: 36px;
-    }
+.profile-edit__placeholder {
+  color: $muted-soft;
+}
+
+.profile-edit__readonly {
+  width: 100%;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  border: 1px solid $input;
+  border-radius: 12px;
+  background: rgba(240, 238, 236, .4);
+  color: $muted-foreground;
+  font-size: 14px;
+}
+
+.profile-edit__readonly-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: $muted-foreground;
+}
+
+.profile-edit__error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(224, 49, 49, .2);
+  border-radius: 12px;
+  background: rgba(224, 49, 49, .05);
+  color: $destructive;
+  font-size: 12px;
+}
+
+@media (min-width: 640px) {
+  .profile-edit__field-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

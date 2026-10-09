@@ -1,0 +1,40 @@
+@import '../../styles/vars.scss';
+.scenario-review { display:flex; flex-direction:column; min-height:100%; background:#f6f5f4; }
+.sr2__nav { display:flex; align-items:center; justify-content:space-between; padding:24px 32px; background:#fff; border-bottom:2px solid #e5e3df; }
+.sr2__back { width:64px; height:64px; display:flex; align-items:center; justify-content:center; }
+.sr2__title { font-size:32px; font-weight:600; color:#1a1a1a; }
+.sr2__body { flex:1; padding:24px 32px 0; }
+.sr2__state { display:flex; justify-content:center; padding:160px 0; color:#787671; font-size:26px; }
+.sr2__content { display:flex; flex-direction:column; gap:24px; }
+.sr2__hero,.sr2__card { padding:28px; background:#fff; border:2px solid #e5e3df; border-radius:16px; }
+.sr2__hero { display:flex; flex-direction:column; align-items:center; gap:8px; }
+.sr2__scenario { font-size:30px; font-weight:600; color:#1a1a1a; }
+.sr2__overall { font-size:64px; font-weight:700; color:#4ECDC4; }
+.sr2__muted { font-size:22px; color:#787671; }
+.sr2__section { display:block; margin-bottom:20px; color:#1a1a1a; font-size:28px; font-weight:600; }
+.sr2__score-row { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:18px; color:#787671; font-size:24px; }
+.sr2__score-row > text:first-child { width:120px; }
+.sr2__score-row > text:nth-child(2) { width:52px; color:#4ECDC4; text-align:right; }
+.sr2__bar { flex:1; min-width:120px; height:12px; overflow:hidden; border-radius:999px; background:#e5e3df; }
+.sr2__bar view { height:100%; border-radius:999px; background:#4ECDC4; }
+.sr2__text { display:block; color:#37352f; font-size:25px; line-height:1.7; white-space:pre-wrap; }
+.sr2__turn { padding:16px; margin-bottom:12px; border-radius:12px; background:#f6f5f4; }
+.sr2__turn--user { background:#e8f8f5; }
+.sr2__turn-role { display:block; margin-bottom:4px; color:#4ECDC4; font-size:20px; font-weight:600; }
+
+/* H5 compact mobile scale */
+.sr2__nav { padding:12px 16px; }
+.sr2__back { width:32px; height:32px; }
+.sr2__title { font-size:16px; }
+.sr2__body { padding:12px 16px 0; }
+.sr2__content { gap:12px; }
+.sr2__hero, .sr2__card { padding:14px; border-radius:12px; }
+.sr2__scenario { font-size:16px; }
+.sr2__overall { font-size:32px; }
+.sr2__muted { font-size:11px; }
+.sr2__section { margin-bottom:10px; font-size:14px; }
+.sr2__score-row { gap:6px; margin-bottom:10px; font-size:12px; }
+.sr2__text { font-size:13px; }
+.sr2__turn { padding:10px; margin-bottom:8px; }
+.sr2__turn-role { font-size:11px; }
+

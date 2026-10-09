@@ -1,0 +1,100 @@
+@import '../../styles/vars.scss';
+
+.add-student-panel {
+  padding: 16px;
+  box-sizing: border-box;
+  border: 1px solid rgba(78, 205, 196, .3);
+  border-radius: 16px;
+  background: $card;
+}
+
+.add-student-panel__head {
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.add-student-panel__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: $foreground;
+}
+
+.add-student-panel__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.add-student-panel__input {
+  min-width: 0;
+  flex: 1;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid $input;
+  border-radius: 12px;
+  background: $card;
+  color: $charcoal;
+  font-size: 14px;
+}
+
+.add-student-panel__placeholder {
+  color: $muted-soft;
+}
+
+.add-student-panel__results {
+  max-height: 160px;
+  margin-top: 12px;
+}
+
+.add-student-panel__result {
+  margin-bottom: 8px;
+  padding: 12px;
+  border: 1px solid $border;
+  border-radius: 12px;
+}
+
+.add-student-panel__result--active {
+  border-color: $primary;
+  background: $primary-soft;
+}
+
+.add-student-panel__result-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: $foreground;
+}
+
+.add-student-panel__result-meta {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: $muted-foreground;
+}
+
+.add-student-panel__quota {
+  margin-top: 12px;
+}
+
+.add-student-panel__label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: $charcoal;
+}
+
+.add-student-panel__submit {
+  width: 100%;
+  margin-top: 12px;
+}

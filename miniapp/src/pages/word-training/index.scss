@@ -1,0 +1,205 @@
+@import '../../styles/vars.scss';
+
+.word-training {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: $background;
+  overflow: hidden;
+}
+
+.word-training__nav {
+  height: 48px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-bottom: 1px solid $border;
+  background: #fff;
+}
+
+.word-training__back,
+.word-training__nav-placeholder {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.word-training__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  color: $charcoal;
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.word-training__body {
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.word-training__card {
+  margin-bottom: 12px;
+  padding: 16px;
+  box-sizing: border-box;
+  border: 1px solid $border;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(45, 55, 72, .04);
+}
+
+.word-training__card-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: $charcoal;
+}
+
+.word-training__picker {
+  min-height: 44px;
+  margin-top: 12px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid $input;
+  border-radius: 10px;
+  color: $charcoal;
+  font-size: 14px;
+}
+
+.word-training__muted {
+  display: block;
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: $muted-foreground;
+}
+
+.word-training__error {
+  display: block;
+  margin-top: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: $wrong;
+}
+
+.word-training__link {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 13px;
+  color: $primary;
+}
+
+.word-training__metrics {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.word-training__metric {
+  min-width: 0;
+  padding: 10px 6px;
+  border-radius: 10px;
+  background: #f7f9fc;
+  text-align: center;
+}
+
+.word-training__metric-value {
+  display: block;
+  font-size: 20px;
+  font-weight: 700;
+  color: $charcoal;
+}
+
+.word-training__metric-label {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: $muted-foreground;
+}
+
+.word-training__days {
+  margin-top: 16px;
+  min-height: 48px;
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.word-training__day {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 2px;
+  border-radius: 8px;
+  background: rgba(78, 205, 196, .1);
+  color: $muted-foreground;
+  font-size: 10px;
+  text-align: center;
+}
+
+.word-training__day-count {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 14px;
+  font-weight: 700;
+  color: $secondary-brand;
+}
+
+.word-training__start-wrap {
+  padding: 4px 0 16px;
+  display: flex;
+  gap: 12px;
+}
+
+.word-training__start {
+  flex: 1;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: $primary;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.word-training__start--secondary {
+  background: #fff;
+  border: 1px solid $primary;
+  color: $primary;
+}
+
+.word-training__start--disabled {
+  opacity: .5;
+}
+
+@media (min-width: 640px) {
+  .word-training__body {
+    width: 100%;
+    max-width: 768px;
+    margin: 0 auto;
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+
+  .word-training__card {
+    padding: 20px;
+  }
+}

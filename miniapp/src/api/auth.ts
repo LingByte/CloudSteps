@@ -22,6 +22,7 @@ export interface CaptchaResponse {
 
 export interface User {
   id?: string | number
+  ID?: number
   email: string
   account?: string
   displayName?: string
@@ -31,6 +32,7 @@ export interface User {
   gender?: string
   city?: string
   region?: string
+  extra?: string
   timezone: string
   avatar?: string
   role?: 'user' | 'admin'
@@ -38,10 +40,17 @@ export interface User {
   updatedAt: string
   lastLogin: string
   loginCount?: number
+  lastPasswordChange?: string
+  profileComplete?: number
+  streakDays?: number
   hasFilledDetails: boolean
   emailNotifications: boolean
-  emailVerified?: boolean
+  pushNotifications?: boolean
+  systemNotifications?: boolean
+  autoCleanUnreadEmails?: boolean
+  reviewCurvePreset?: 'times3' | 'times5' | 'times7' | 'times10' | 'standard' | 'interval3' | 'interval5' | 'interval10'
   twoFactorEnabled?: boolean
+  emailVerified?: boolean
 }
 
 export interface LoginResponseData {

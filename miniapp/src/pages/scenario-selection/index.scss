@@ -29,6 +29,12 @@
   justify-content: center;
 }
 
+.scenario__nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .scenario__nav-title {
   font-size: 32px;
   font-weight: 600;
@@ -272,5 +278,19 @@
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
 }
+
+/* H5 compact mobile scale */
+.scenario__navbar { padding:12px 16px; }
+.scenario__nav-btn { width:32px; height:32px; }
+.scenario__nav-title { font-size:16px; }
+.scenario__body { padding:12px 16px 0; }
+.scenario__list { gap:10px; }
+.scenario__item { padding:12px; border-radius:12px; }
+.scenario__item-icon { width:36px; height:36px; }
+.scenario__item-name { font-size:14px; }
+.scenario__item-desc { font-size:11px; }
+.scenario__item-tag-text { font-size:10px; }
+

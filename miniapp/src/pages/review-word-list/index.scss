@@ -15,22 +15,27 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px 32px;
+  padding: 12px 16px;
   background-color: #ffffff;
   border-bottom: 2px solid #e5e3df;
   flex-shrink: 0;
 }
 
 .rwl__nav-btn {
-  width: 64px;
-  height: 64px;
+  width: 44px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+.rwl__mode-text {
+  font-size: 11px;
+  color: #4ECDC4;
+}
+
 .rwl__nav-title {
-  font-size: 32px;
+  font-size: 16px;
   font-weight: 600;
   color: #1a1a1a;
 }
@@ -114,6 +119,51 @@
   flex-direction: column;
   gap: 16px;
 }
+
+.rwl__word-list--hidden { display: none; }
+
+.rwl__card-view {
+  margin-bottom: 16px;
+  padding: 24px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #fff;
+  text-align: center;
+}
+
+.rwl__card-count,
+.rwl__card-hint {
+  display: block;
+  font-size: 12px;
+  color: #718096;
+}
+
+.rwl__card-word {
+  min-height: 180px;
+  margin-top: 16px;
+  padding: 24px 12px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 12px;
+  background: #f7f9fc;
+}
+
+.rwl__card-word .rwl__word-text { font-size: 28px; }
+.rwl__card-actions,
+.rwl__card-nav {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.rwl__card-nav { justify-content: space-between; }
+
 
 .rwl__word-card {
   display: flex;

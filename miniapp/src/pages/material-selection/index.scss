@@ -1,110 +1,123 @@
-/**
- * 学习材料选择样式 — Warm Mint 主题。
- */
-.ms {
+@import '../../styles/vars.scss';
+
+.material-selection {
+  width: 100%;
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  min-height: 100%;
-  background-color: #f6f5f4;
+  overflow: hidden;
+  background: #f9fafb;
 }
 
-/* ============ 顶部导航 ============ */
-.ms__nav {
+.material-selection__nav {
+  flex-shrink: 0;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .05);
+}
+
+.material-selection__nav-row {
+  height: 48px;
+  padding: 0 12px;
   display: flex;
   align-items: center;
-  height: 96px;
-  padding: 0px 24px;
-  background-color: #ffffff;
-  border-bottom: 2px solid #e5e3df;
-  flex-shrink: 0;
 }
 
-.ms__nav-back {
-  width: 64px;
-  height: 64px;
+.material-selection__back {
+  position: relative;
+  z-index: 10;
+  width: 32px;
+  height: 32px;
+  margin-left: -4px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
 }
 
-.ms__nav-title {
+.material-selection__title {
   flex: 1;
-  text-align: center;
-  font-size: 32px;
+  margin-left: -32px;
+  font-size: 16px;
   font-weight: 600;
-  color: #37352f;
-}
-
-.ms__nav-placeholder {
-  width: 64px;
-  flex-shrink: 0;
-}
-
-/* ============ 内容区 ============ */
-.ms__body {
-  flex: 1;
-  min-height: 0px;
-  padding-top: 32px; padding-left: 32px; padding-right: 32px; padding-bottom: 64px;
-}
-
-.ms__subtitle {
-  display: flex;
+  color: #2d3748;
   text-align: center;
-  font-size: 24px;
-  color: #787671;
-  margin-bottom: 28px;
+  pointer-events: none;
 }
 
-.ms__list {
+.material-selection__content {
+  flex: 1;
+  min-height: 0;
+  padding: 12px 16px 64px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 20px;
 }
 
-/* ============ 材料卡片 ============ */
-.ms__card {
+.material-selection__subtitle {
+  flex-shrink: 0;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: $muted-foreground;
+  text-align: center;
+}
+
+.material-selection__list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.material-selection__item {
+  width: 100%;
+  min-height: 60px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  padding: 20px 16px;
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 32px 28px;
-  background-color: #ffffff;
-  border: 2px solid #4ECDC4;
+  justify-content: space-between;
+  gap: 12px;
+  border: 2px solid #66bb6a;
   border-radius: 12px;
-
-  &--disabled {
-    background-color: #fafaf9;
-    border-color: #e5e3df;
-    opacity: 0.55;
-  }
+  background: #ffffff;
 }
 
-.ms__card-icon {
-  width: 72px;
-  height: 72px;
-  border-radius: 8px;
-  background-color: rgba(78, 205, 196, 0.12);
+.material-selection__item:active {
+  transform: scale(.99);
+  box-shadow: $shadow-rest;
+}
+
+.material-selection__item--disabled {
+  border-color: #e5e7eb;
+  background: #f3f4f6;
+  opacity: .55;
+}
+
+.material-selection__item-title {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.6;
+  color: #2d3748;
+}
+
+.material-selection__item-title--disabled {
+  color: #a0aec0;
+}
+
+.material-selection__float {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 20;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-}
-
-.ms__card-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.ms__card-title {
-  font-size: 30px;
-  font-weight: 600;
-  color: #37352f;
-}
-
-.ms__card-desc {
-  font-size: 24px;
-  color: #787671;
-  line-height: 1.5;
+  border-radius: 999px;
+  background: $primary;
+  box-shadow: 0 10px 15px rgba(0, 0, 0, .12);
 }

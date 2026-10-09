@@ -1,35 +1,21 @@
-/**
- * 词库页 — 对齐 web/src/pages/WordBooks.tsx。
- * 搜索栏 + 分组标签横向滚动 + 词库卡片 2 列网格 + 下拉触底加载更多。
- */
 import { useCallback, useEffect, useState } from 'react'
-import { View, Text, Input, ScrollView } from '@tarojs/components'
+import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { Search, Right, Close } from '@nutui/icons-react-taro'
-import {
-  listWordBooks,
-  type WordBookItem,
-  type WordBookGroup,
-} from '../../api/wordbooks'
-import { color } from '../../styles/tokens'
+import { ArrowLeft, ArrowRight, List, Plus, Right, Search } from '@nutui/icons-react-taro'
+import { listWordBooks, type WordBookGroup, type WordBookItem } from '../../api/wordbooks'
+import { resolveMediaUrl } from '../../utils/mediaUrl'
+import { AppHeader } from '../../components/app-header/AppHeader'
 import './index.scss'
 
-const PAGE_SIZE = 20
-
+const PAGE_SIZE = 12
+const CUSTOM_GROUP: WordBookGroup = { key: 'custom', label: '自定义' }
 const DEFAULT_GROUPS: WordBookGroup[] = [
-  { key: '', label: '全部' },
-  { key: 'primary', label: '小学' },
-  { key: 'middle', label: '初中' },
-  { key: 'high', label: '高中' },
-  { key: 'cet4', label: '大学四级' },
-  { key: 'cet6', label: '大学六级' },
-  { key: 'kaoyan', label: '考研' },
-  { key: 'abroad', label: '留学考试' },
-  { key: 'tem', label: '专四专八' },
-  { key: 'textbook', label: '教材' },
+  { key: '', label: '全部' }, CUSTOM_GROUP, { key: 'primary', label: '小学' },
+  { key: 'middle', label: '初中' }, { key: 'high', label: '高中' }, { key: 'university', label: '大学' },
+  { key: 'cet4', label: '四级' }, { key: 'cet6', label: '六级' }, { key: 'kaoyan', label: '考研' },
+  { key: 'abroad', label: '留学' }, { key: 'tem', label: '专四专八' }, { key: 'textbook', label: '教材' },
 ]
 
-// 封面渐变色组(按 tag hash 分配)
 const COVER_GRADIENTS = [
   'linear-gradient(135deg, #4ECDC4, #44A5A0)',
   'linear-gradient(135deg, #5B8DEF, #4A7BC8)',
@@ -51,21 +37,10 @@ function pickGradient(tag: string): string {
   return COVER_GRADIENTS[hashStr(tag) % COVER_GRADIENTS.length]
 }
 
-interface CoverInfo {
-  tag: string
-  t1: string
-  t2: string
-}
-
-function parseCover(desc?: string): CoverInfo | null {
-  if (!desc) return null
-  try {
-    const obj = JSON.parse(desc)
-    if (obj && (obj.t1 || obj.t2 || obj.tag)) return obj
-    return null
-  } catch {
-    return null
-  }
+function withCustomGroup(list: WordBookGroup[]): WordBookGroup[] {
+  const rest = list.filter((g) => g.key !== 'custom')
+  const all = rest.find((g) => g.key === '') ?? { key: '', label: '全部' }
+  return [all, CUSTOM_GROUP, ...rest.filter((g) => g.key !== '')]
 }
 
 export default function Wordbooks() {
@@ -77,213 +52,136 @@ export default function Wordbooks() {
   const [group, setGroup] = useState('')
   const [groups, setGroups] = useState<WordBookGroup[]>(DEFAULT_GROUPS)
   const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
   const [err, setErr] = useState<string | null>(null)
-  const [hasMore, setHasMore] = useState(true)
+  const isCustomGroup = group === 'custom'
 
-  const fetchBooks = useCallback(
-    async (p: number, kw: string, g: string, append: boolean) => {
-      if (append) {
-        setLoadingMore(true)
-      } else {
-        setLoading(true)
-      }
-      setErr(null)
-      try {
-        const res = await listWordBooks({
-          page: p,
-          pageSize: PAGE_SIZE,
-          keyword: kw || undefined,
-          group: g || undefined,
-        })
-        if (res.code !== 200) {
-          setErr(res.msg || '加载失败')
-          setBooks([])
-          setTotal(0)
-          setHasMore(false)
-          return
-        }
-        const list = Array.isArray(res.data.list) ? res.data.list : []
-        setBooks((prev) => (append ? [...prev, ...list] : list))
-        setTotal(res.data.total || 0)
-        setHasMore(list.length >= PAGE_SIZE && append
-          ? true
-          : list.length >= PAGE_SIZE && p * PAGE_SIZE < (res.data.total || 0))
-        if (res.data.groups && res.data.groups.length > 0) {
-          setGroups(res.data.groups)
-        }
-      } catch (e: unknown) {
-        const msg =
-          e && typeof e === 'object' && 'msg' in e
-            ? String((e as { msg: string }).msg)
-            : '加载失败'
-        setErr(msg)
+  const fetchBooks = useCallback(async (p: number, kw: string, g: string) => {
+    setLoading(true)
+    setErr(null)
+    try {
+      const res = await listWordBooks({ page: p, pageSize: PAGE_SIZE, keyword: kw || undefined, group: g || undefined })
+      if (res.code !== 200) {
+        setErr(res.msg || '加载失败')
         setBooks([])
         setTotal(0)
-        setHasMore(false)
-      } finally {
-        setLoading(false)
-        setLoadingMore(false)
+        return
       }
-    },
-    [],
-  )
+      setBooks(Array.isArray(res.data?.list) ? res.data.list : [])
+      setTotal(res.data?.total || 0)
+      if (res.data?.groups?.length) setGroups(withCustomGroup(res.data.groups))
+    } catch (e: any) {
+      setErr(e?.msg || '加载失败')
+      setBooks([])
+      setTotal(0)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    fetchBooks(page, keyword, group, page > 1)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, keyword, group])
+    void fetchBooks(page, keyword, group)
+  }, [page, keyword, group, fetchBooks])
 
-  const handleGroupChange = (g: string) => {
-    setGroup(g)
-    setPage(1)
-  }
+  useEffect(() => {
+    listWordBooks({ page: 1, pageSize: 1 })
+      .then((res) => {
+        if (res.code === 200 && res.data?.groups?.length) setGroups(withCustomGroup(res.data.groups))
+      })
+      .catch(() => {})
+  }, [])
 
-  const handleSearch = () => {
-    setPage(1)
-    setKeyword(searchInput.trim())
-  }
+  const totalPages = Math.ceil(total / PAGE_SIZE) || 1
 
-  const handleClearSearch = () => {
-    setSearchInput('')
-    setPage(1)
-    setKeyword('')
-  }
-
-  const onScrollToLower = () => {
-    if (loadingMore || loading || !hasMore) return
-    setPage((p) => p + 1)
-  }
-
-  const openBook = (b: WordBookItem) => {
-    Taro.navigateTo({
-      url: `/pages/wordbook-words/index?id=${b.id}&name=${encodeURIComponent(b.name)}`,
-    })
+  const renderBook = (b: WordBookItem) => {
+    const coverImage = resolveMediaUrl(b.coverUrl)
+    return (
+      <View key={b.id} className="wordbooks__book" onClick={() => Taro.navigateTo({ url: `/pages/wordbook-words/index?id=${b.id}` })}>
+        <View className="wordbooks__cover" style={coverImage ? undefined : { background: pickGradient(b.name) }}>
+          {coverImage ? <Image className="wordbooks__cover-img" src={coverImage} mode="aspectFill" /> : <Text className="wordbooks__cover-name">{b.name}</Text>}
+          {b.level ? <Text className="wordbooks__level">{b.level}</Text> : null}
+        </View>
+        <View className="wordbooks__info">
+          <Text className="wordbooks__name">{b.name}</Text>
+          <View className="wordbooks__meta">
+            <View className="wordbooks__count"><List size={12} color="#787671" /><Text>{b.wordCount || 0} 词</Text></View>
+            <Right size={14} color="#a4a097" />
+          </View>
+        </View>
+      </View>
+    )
   }
 
   return (
-    <ScrollView
-      className="wordbooks"
-      scrollY
-      enableFlex
-      lowerThreshold={120}
-      onScrollToLower={onScrollToLower}
-    >
-      {/* 搜索栏 */}
-      <View className="wordbooks__search">
-        <View className="wordbooks__search-box">
-          <Search size={18} color={color.mutedSoft} />
-          <Input
-            className="wordbooks__search-input"
-            value={searchInput}
-            onInput={(e) => setSearchInput(e.detail.value)}
-            onConfirm={handleSearch}
-            placeholder="搜索词库名称…"
-            placeholderClass="wordbooks__search-placeholder"
-            confirmType="search"
-          />
-          {searchInput ? (
-            <View className="wordbooks__search-clear" onClick={() => setSearchInput('')}>
-              <Close size={14} color={color.mutedSoft} />
+    <View className="wordbooks-wrap">
+      <AppHeader />
+      <ScrollView className="wordbooks" scrollY enableFlex>
+        <View className="wordbooks__top">
+          <View className="wordbooks__title-row">
+            <Text className="wordbooks__title">词库书架</Text>
+            <View className="wordbooks__search-box">
+              <Search size={16} color="#787671" />
+              <Input
+                className="wordbooks__search-input"
+                value={searchInput}
+                placeholder="搜索词库名称…"
+                placeholderClass="wordbooks__search-placeholder"
+                confirmType="search"
+                onInput={(e) => {
+                  setSearchInput(e.detail.value)
+                  if (!e.detail.value.trim() && keyword) {
+                    setPage(1)
+                    setKeyword('')
+                  }
+                }}
+                onConfirm={() => {
+                  setPage(1)
+                  setKeyword(searchInput.trim())
+                }}
+              />
             </View>
-          ) : null}
-        </View>
-        {keyword ? (
-          <Text className="wordbooks__search-clear-btn" onClick={handleClearSearch}>
-            清除
-          </Text>
-        ) : null}
-      </View>
-
-      {err && (
-        <View className="wordbooks__error">
-          <Text>{err}</Text>
-        </View>
-      )}
-
-      {/* 分组标签横向滚动 */}
-      <ScrollView scrollX enableFlex showScrollbar={false} className="wordbooks__groups">
-        {groups.map((g) => (
-          <View
-            key={g.key || 'all'}
-            className={`wordbooks__group-tag ${group === g.key ? 'wordbooks__group-tag--active' : ''}`}
-            onClick={() => handleGroupChange(g.key)}
-          >
-            <Text>{g.label}</Text>
           </View>
-        ))}
+
+          <ScrollView className="wordbooks__groups" scrollX showScrollbar={false}>
+            <View className="wordbooks__groups-inner">
+              {groups.map((g) => (
+                <View key={g.key || 'all'} className={`wordbooks__group ${group === g.key ? 'wordbooks__group--active' : ''}`} onClick={() => { setGroup(g.key); setPage(1) }}>
+                  <Text className="wordbooks__group-text">{g.label}</Text>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        </View>
+
+        {err ? <View className="wordbooks__error"><Text>{err}</Text></View> : null}
+
+        {isCustomGroup ? (
+          <View className="wordbooks__custom-area">
+            <View className="wordbooks__custom-entry" onClick={() => Taro.navigateTo({ url: '/pages/create-custom-wordbook/index' })}>
+              <Plus size={18} color="#4ECDC4" />
+              <Text className="wordbooks__custom-text">自定义词库</Text>
+            </View>
+            {loading ? <View className="wordbooks__state"><Text>加载中…</Text></View> : books.length > 0 ? <View className="wordbooks__grid">{books.map(renderBook)}</View> : null}
+          </View>
+        ) : loading ? (
+          <View className="wordbooks__state"><Text>加载中…</Text></View>
+        ) : books.length === 0 ? (
+          <View className="wordbooks__state"><Text>{keyword ? '没有匹配的词库' : '暂无词库'}</Text></View>
+        ) : (
+          <View className="wordbooks__grid">{books.map(renderBook)}</View>
+        )}
+
+        {totalPages > 1 && !loading ? (
+          <View className="wordbooks__pager">
+            <View className={`wordbooks__pager-btn ${page <= 1 ? 'wordbooks__pager-btn--disabled' : ''}`} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+              <ArrowLeft size={16} color="#37352f" /><Text>上一页</Text>
+            </View>
+            <Text className="wordbooks__pager-info">{page} / {totalPages}</Text>
+            <View className={`wordbooks__pager-btn ${page >= totalPages ? 'wordbooks__pager-btn--disabled' : ''}`} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+              <Text>下一页</Text><ArrowRight size={16} color="#37352f" />
+            </View>
+          </View>
+        ) : null}
       </ScrollView>
-
-      {/* 词库卡片列表 */}
-      {loading ? (
-        <View className="wordbooks__status">
-          <Text>加载中…</Text>
-        </View>
-      ) : books.length === 0 ? (
-        <View className="wordbooks__status">
-          <Text>{keyword ? '未找到匹配的词库' : '暂无词库'}</Text>
-        </View>
-      ) : (
-        <View className="wordbooks__grid">
-          {books.map((b) => {
-            const cover = parseCover(b.description)
-            const gradient = pickGradient(cover?.tag || b.name)
-            return (
-              <View
-                key={b.id}
-                className="wordbooks__card"
-                onClick={() => openBook(b)}
-              >
-                {/* 封面区域 */}
-                <View
-                  className="wordbooks__cover"
-                  style={{ background: gradient }}
-                >
-                  {cover ? (
-                    <>
-                      <Text className="wordbooks__cover-t1">{cover.t1}</Text>
-                      <Text className="wordbooks__cover-t2">{cover.t2}</Text>
-                      {cover.tag ? (
-                        <Text className="wordbooks__cover-tag">{cover.tag}</Text>
-                      ) : null}
-                    </>
-                  ) : (
-                    <Text className="wordbooks__cover-name">{b.name}</Text>
-                  )}
-                  {b.level ? (
-                    <View className="wordbooks__cover-level">
-                      <Text>{b.level}</Text>
-                    </View>
-                  ) : null}
-                </View>
-                {/* 信息区域 */}
-                <View className="wordbooks__info">
-                  <Text className="wordbooks__name">{b.name}</Text>
-                  <View className="wordbooks__meta">
-                    <Text className="wordbooks__count">{b.wordCount || 0} 词</Text>
-                    <Right size={14} color={color.mutedSoft} />
-                  </View>
-                </View>
-              </View>
-            )
-          })}
-        </View>
-      )}
-
-      {loadingMore && (
-        <View className="wordbooks__loadmore">
-          <Text>加载中…</Text>
-        </View>
-      )}
-      {!loading && !loadingMore && !hasMore && books.length > 0 && (
-        <View className="wordbooks__loadmore">
-          <Text>没有更多了</Text>
-        </View>
-      )}
-
-      <View className="wordbooks__footer">
-        <Text>共 {total} 本词库</Text>
-      </View>
-    </ScrollView>
+    </View>
   )
 }

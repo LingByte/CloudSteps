@@ -1,0 +1,12 @@
+@import '../../styles/vars.scss';
+.create-appointment { display:flex; flex-direction:column; min-height:100%; background:#f6f5f4; }.ca__nav { display:flex; align-items:center; justify-content:space-between; padding:24px 32px; background:#fff; border-bottom:2px solid #e5e3df; }.ca__back { width:64px; height:64px; display:flex; align-items:center; justify-content:center; }.ca__title { font-size:32px; font-weight:600; color:#1a1a1a; }.ca__body { flex:1; padding:24px 32px; }.ca__card { padding:28px; background:#fff; border:2px solid #e5e3df; border-radius:16px; }.ca__loading { display:block; padding:30px 0; color:#787671; font-size:24px; }.ca__label { display:block; margin:20px 0 10px; color:#37352f; font-size:26px; }.ca__picker { display:flex; align-items:center; justify-content:space-between; padding:20px; border:2px solid #e5e3df; border-radius:12px; color:#37352f; font-size:25px; }.ca__picker text:last-child { color:#4ECDC4; font-size:22px; }.ca__input { box-sizing:border-box; width:100%; padding:18px 20px; border:2px solid #e5e3df; border-radius:12px; font-size:25px; }.ca__submit { height:88px; margin-top:30px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:#4ECDC4; color:#fff; font-size:28px; font-weight:600; }.ca__submit--disabled { opacity:.6; }
+/* H5 compact mobile form */
+.ca__nav { padding:12px 16px; }
+.ca__back { width:32px; height:32px; }
+.ca__title { font-size:16px; }
+.ca__body { padding:12px 16px; }
+.ca__card { padding:14px; border-radius:12px; }
+.ca__label { margin:12px 0 6px; font-size:13px; }
+.ca__picker, .ca__input { padding:9px 10px; border-radius:8px; font-size:13px; }
+.ca__submit { height:44px; margin-top:16px; border-radius:10px; font-size:14px; }
+

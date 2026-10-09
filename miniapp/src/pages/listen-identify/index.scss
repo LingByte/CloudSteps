@@ -1,0 +1,41 @@
+@import '../../styles/vars.scss';
+.listen { display:flex; flex-direction:column; min-height:100%; background:#f6f5f4; }
+.listen__navbar { display:flex; align-items:center; justify-content:space-between; padding:24px 32px; background:#fff; border-bottom:2px solid #e5e3df; }
+.listen__nav-btn { width:64px; height:64px; display:flex; align-items:center; justify-content:center; }
+.listen__nav-center { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; }
+.listen__nav-title { font-size:32px; font-weight:600; color:#1a1a1a; }
+.listen__nav-sub { font-size:22px; color:#787671; }
+.listen__body { flex:1; padding:24px 32px 0; }
+.listen__state { display:flex; justify-content:center; padding:160px 0; color:#787671; font-size:26px; }
+.listen__list { display:flex; flex-direction:column; gap:20px; }
+.listen__card { display:flex; align-items:center; gap:20px; padding:28px; background:#fff; border:2px solid #e5e3df; border-radius:16px; }
+.listen__icon { width:72px; height:72px; flex-shrink:0; border-radius:50%; background:#f6f5f4; display:flex; align-items:center; justify-content:center; }
+.listen__icon--active { background:#4ECDC4; }
+.listen__info { flex:1; display:flex; flex-direction:column; gap:6px; }
+.listen__index { color:#a4a097; font-size:20px; }
+.listen__hint { color:#787671; font-size:26px; }
+.listen__word { color:#1a1a1a; font-size:34px; font-weight:600; }
+.listen__phonetic { color:#787671; font-size:22px; font-family:monospace; }
+.listen__translation { color:#37352f; font-size:26px; }
+.listen__bottom { padding: 12px 16px; border-top: 1px solid #e5e3df; background: #fff; }
+.listen__next { height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 999px; background: #e5e3df; color: #a4a097; font-size: 14px; }
+.listen__next--active { background: #4ECDC4; color: #fff; }
+
+.listen__playing { position:fixed; left:32px; right:32px; bottom:32px; padding:20px; text-align:center; border-radius:12px; background:#4ECDC4; color:#fff; font-size:24px; }
+
+/* H5 compact mobile scale */
+.listen__navbar { padding:12px 16px; }
+.listen__nav-btn { width:32px; height:32px; }
+.listen__nav-title { font-size:16px; }
+.listen__nav-sub { font-size:11px; }
+.listen__body { padding:12px 16px 0; }
+.listen__list { gap:10px; }
+.listen__card { gap:10px; padding:12px; border-radius:12px; }
+.listen__icon { width:36px; height:36px; }
+.listen__info { gap:3px; }
+.listen__index { font-size:10px; }
+.listen__hint { font-size:12px; }
+.listen__word { font-size:17px; }
+.listen__phonetic { font-size:11px; }
+.listen__translation { font-size:13px; }
+

@@ -1,201 +1,96 @@
-/**
- * 词汇测试结果页样式 — Warm Mint 主题。
- */
-.vtr {
-  display: flex;
-  flex-direction: column;
-  min-height: 100%;
-  background-color: #f6f5f4;
+@import '../../styles/vars.scss';
+
+.vtr-page {
+  width: 100%;
+  min-height: 100vh;
+  padding-bottom: 80px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  background: #f9fafb;
 }
 
-/* ============ 顶部导航 ============ */
-.vtr__nav {
-  display: flex;
-  align-items: center;
-  height: 96px;
-  padding: 0px 24px;
-  background-color: #ffffff;
-  border-bottom: 2px solid #e5e3df;
-  flex-shrink: 0;
+.vtr-page__body {
+  min-height: calc(100vh - 44px);
+  padding: 24px 16px;
+  box-sizing: border-box;
 }
 
-.vtr__nav-back {
-  width: 64px;
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-}
-
-.vtr__nav-title {
-  flex: 1;
+.vtr-page__loading {
+  width: 100%;
+  max-width: 768px;
+  margin: 0 auto;
+  padding: 64px 0;
   text-align: center;
-  font-size: 32px;
-  font-weight: 600;
-  color: #37352f;
+  color: #718096;
+  font-size: 14px;
 }
 
-.vtr__nav-placeholder {
-  width: 64px;
-  flex-shrink: 0;
-}
-
-/* ============ 内容区 ============ */
-.vtr__body {
-  flex: 1;
-  min-height: 0px;
-  padding-top: 32px; padding-left: 32px; padding-right: 32px; padding-bottom: 64px;
-}
-
-.vtr__state {
-  padding: 96px 32px;
-  text-align: center;
-}
-
-.vtr__state-text {
-  font-size: 28px;
-  color: #787671;
-}
-
-/* ============ 空状态 ============ */
-.vtr__empty {
-  background-color: #ffffff;
-  border: 2px solid #e5e3df;
+.vtr-page__empty {
+  width: 100%;
+  max-width: 768px;
+  margin: 0 auto;
+  padding: 24px;
+  box-sizing: border-box;
+  border: 1px solid #e2e8f0;
   border-radius: 16px;
-  padding: 64px 32px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .05);
   text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
 }
 
-.vtr__empty-title {
-  font-size: 32px;
+.vtr-page__empty-title {
+  display: block;
+  font-size: 16px;
   font-weight: 600;
-  color: #37352f;
+  color: #2d3748;
 }
 
-.vtr__empty-desc {
-  font-size: 26px;
-  color: #787671;
+.vtr-page__empty-desc {
+  display: block;
+  margin-top: 8px;
+  font-size: 14px;
+  color: #718096;
 }
 
-.vtr__empty-btn {
+.vtr-page__empty-btn {
+  width: 100%;
   margin-top: 24px;
+}
+
+.vtr-page__result {
+  width: 100%;
+  max-width: 768px;
+  min-width: 0;
+  margin: 0 auto;
+}
+
+.vtr-page__actions {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vtr-page__action {
   width: 100%;
 }
 
-/* ============ 结果内容 ============ */
-.vtr__content {
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
-}
-
-/* ============ 词汇量大数字 ============ */
-.vtr__hero {
-  border-radius: 16px;
-  padding: 56px 32px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-}
-
-.vtr__hero-label {
-  font-size: 26px;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.vtr__hero-number {
-  font-size: 96px;
-  font-weight: 700;
-  color: #ffffff;
-  line-height: 1.1;
-}
-
-.vtr__hero-level {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 24px;
-  background-color: rgba(255, 255, 255, 0.2);
-  border-radius: 999px;
-}
-
-.vtr__hero-level-text {
-  font-size: 24px;
-  color: #ffffff;
-  font-weight: 500;
-}
-
-/* ============ 答题统计 ============ */
-.vtr__stats {
-  display: flex;
-  gap: 16px;
-}
-
-.vtr__stat-card {
-  flex: 1;
-  background-color: #ffffff;
-  border: 2px solid #e5e3df;
-  border-radius: 12px;
-  padding: 28px 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.vtr__stat-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 4px;
-
-  &--total {
-    background-color: rgba(85, 163, 255, 0.12);
-  }
-
-  &--correct {
-    background-color: rgba(26, 174, 57, 0.12);
-  }
-
-  &--rate {
-    background-color: rgba(78, 205, 196, 0.12);
-  }
-}
-
-.vtr__stat-value {
-  font-size: 38px;
-  font-weight: 700;
-  color: #37352f;
-  line-height: 1.2;
-}
-
-.vtr__stat-label {
-  font-size: 22px;
-  color: #787671;
-}
-
-/* ============ 操作按钮 ============ */
-.vtr__actions {
-  display: flex;
-  gap: 16px;
-}
-
-.vtr__action-btn {
-  flex: 1;
-}
-
-.vtr__refresh-btn {
+.vtr-page__refresh {
   width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  margin-top: 12px;
+}
+
+@media (min-width: 640px) {
+  .vtr-page__body {
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+
+  .vtr-page__empty {
+    padding: 32px;
+  }
+
+  .vtr-page__actions {
+    flex-direction: row;
+  }
 }

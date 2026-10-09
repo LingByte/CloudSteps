@@ -1,0 +1,409 @@
+/**
+ * 单词练习页样式 — Warm Mint 主题。
+ */
+@import '../../styles/vars.scss';
+
+.wp {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background-color: #f6f5f4;
+}
+
+/* ============ 顶部导航栏 ============ */
+.wp__navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background-color: #ffffff;
+  border-bottom: 2px solid #e5e3df;
+  flex-shrink: 0;
+}
+
+.wp__nav-btn {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wp__nav-tools { display: flex; align-items: center; gap: 4px; }
+.wp__annotation-trigger { min-width: 32px; height: 30px; padding:0 5px; box-sizing:border-box; display:flex; align-items:center; justify-content:center; border:1px solid #cbd5e1; border-radius:7px; color:#718096; font-size:11px; }
+
+.wp__nav-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.wp__nav-title {
+  font-size: 32px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.wp__nav-sub {
+  font-size: 22px;
+  color: #787671;
+}
+
+/* ============ 进度条 ============ */
+.wp__progress-bar {
+  height: 6px;
+  background-color: #e5e3df;
+  flex-shrink: 0;
+}
+
+.wp__progress-fill {
+  height: 100%;
+  background-color: #4ECDC4;
+  transition: width 0.3s ease;
+}
+
+/* ============ 空态 ============ */
+.wp__empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wp__empty-text {
+  font-size: 26px;
+  color: #787671;
+}
+
+/* ============ 滚动主体 ============ */
+.wp__body {
+  flex: 1;
+  padding: 24px 32px 0;
+}
+
+/* ============ 单词卡片 ============ */
+.wp__word-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.wp__word-card {
+  position: relative;
+  background-color: #ffffff;
+  border: 2px solid #e5e3df;
+  border-radius: 16px;
+  padding: 28px;
+
+  &--selected {
+    border-color: $primary;
+    background-color: $primary-soft;
+  }
+
+  &--remembered {
+    border-color: #1aae39;
+    background-color: rgba(26, 174, 57, 0.05);
+  }
+
+  &--forgotten {
+    border-color: #ff6b6b;
+    background-color: rgba(255, 107, 107, 0.05);
+  }
+}
+
+.wp__word-header {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.wp__word-seq {
+  font-size: 22px;
+  color: #a4a097;
+}
+
+.wp__word-text {
+  font-size: 36px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.wp__word-phonetic {
+  font-size: 22px;
+  color: #787671;
+  font-family: monospace;
+}
+
+.wp__audio {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(78, 205, 196, .1);
+}
+
+.wp__flip-hint {
+  display: block;
+  margin: -8px 0 16px;
+  font-size: 12px;
+  color: #a4a097;
+}
+
+.wp__word-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px;
+  background-color: #f6f5f4;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.wp__word-trans {
+  font-size: 26px;
+  color: #37352f;
+  line-height: 1.5;
+}
+
+.wp__word-pos {
+  font-size: 22px;
+  color: #787671;
+}
+
+.wp__next-mark {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  color: $primary;
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.wp__audio-index {
+  margin-left: 2px;
+  color: $primary;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.wp__meaning-toggle {
+  align-self: flex-start;
+  color: $primary;
+  font-size: 22px;
+}
+
+.wp__card-mode {
+  display: flex;
+  flex-direction: column;
+}
+
+.wp__big-card {
+  position: relative;
+  min-height: 62vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  border: 2px solid #e5e3df;
+  border-radius: 20px;
+
+  &--selected {
+    border-color: $primary;
+    background: $primary-soft;
+  }
+}
+
+.wp__card-count {
+  position: absolute;
+  top: 24px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: #787671;
+  font-size: 22px;
+}
+
+.wp__card-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 28px;
+}
+
+.wp__card-word {
+  font-size: 54px;
+  font-weight: 700;
+  color: #1a1a1a;
+  text-align: center;
+}
+
+.wp__card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  border-top: 1px solid #e5e3df;
+}
+
+.wp__card-nav {
+  min-width: 88px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  color: #718096;
+  font-size: 24px;
+}
+
+/* ============ 操作按钮 ============ */
+.wp__word-actions {
+  display: flex;
+  gap: 20px;
+}
+
+.wp__detail-btn {
+  min-width: 48px;
+  height: 36px;
+  padding: 0 8px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #718096;
+  font-size: 12px;
+}
+
+.wp__action-btn {
+  flex: 1;
+  height: 80px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 2px solid;
+
+  &--remembered {
+    border-color: rgba(26, 174, 57, 0.3);
+    background-color: transparent;
+  }
+
+  &--remembered-active {
+    border-color: #1aae39;
+    background-color: #1aae39;
+  }
+
+  &--forgotten {
+    border-color: rgba(255, 107, 107, 0.3);
+    background-color: transparent;
+  }
+
+  &--forgotten-active {
+    border-color: #ff6b6b;
+    background-color: #ff6b6b;
+  }
+}
+
+.wp__action-btn-text {
+  font-size: 26px;
+  font-weight: 500;
+
+  .wp__action-btn--remembered &,
+  .wp__action-btn--forgotten & {
+    color: #37352f;
+  }
+
+  .wp__action-btn--remembered-active &,
+  .wp__action-btn--forgotten-active & {
+    color: #ffffff;
+  }
+}
+
+/* ============ 底部按钮 ============ */
+.wp__bottom-bar {
+  padding: 12px 16px;
+  background-color: #ffffff;
+  border-top: 2px solid #e5e3df;
+  flex-shrink: 0;
+}
+
+.wp__btn {
+  height: 88px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  &--primary {
+    background-color: #4ECDC4;
+  }
+
+  &--disabled {
+    background-color: #e5e3df;
+  }
+}
+
+.wp__btn-text {
+  font-size: 28px;
+  font-weight: 600;
+  color: #ffffff;
+
+  .wp__btn--disabled & {
+    color: #a4a097;
+  }
+}
+
+.wp__tool-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow-x: auto;
+}
+
+.wp__tool {
+  height: 56px;
+  min-width: 88px;
+  padding: 0 20px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  color: #718096;
+  font-size: 24px;
+  white-space: nowrap;
+
+  &--active {
+    border-color: $primary;
+    background: $primary;
+    color: #fff;
+  }
+}
+
+.wp__next-btn {
+  width: 72px;
+  height: 72px;
+  margin-left: auto;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: $primary;
+}

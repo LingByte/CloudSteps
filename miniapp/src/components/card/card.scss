@@ -3,19 +3,20 @@
  * white canvas + hairline border + radius 12px + 微阴影
  */
 .cs-card {
+  box-sizing: border-box;
   background-color: #ffffff;
-  border: 2px solid #e5e3df;
-  border-radius: 12px;
+  border: 1px solid #e5e3df;
+  border-radius: 16px;
 
   &--pad-default {
-    padding: 32px;
-  }
-
-  &--pad-compact {
     padding: 24px;
   }
 
+  &--pad-compact {
+    padding: 12px;
+  }
+
   &--pad-none {
-    padding: 0px;
+    padding: 0;
   }
 }

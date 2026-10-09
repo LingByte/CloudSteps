@@ -1,23 +1,33 @@
-/**
- * 抗遗忘页(tab) — 对齐 web/src/pages/AntiForgetting.tsx。
- *
- * 1. 日期选择卡片:上一日 / 日期显示 / 下一日
- * 2. 复习任务按学生分组,每组显示学员头像/首字母 + 任务数
- * 3. 每个任务两行布局:
- *    第一行:时间(固定宽) + 词包名(flex-1)
- *    第二行:词数·训练时长(左) + 复习/查看按钮(右)
- * 4. 今天点"复习"跳转 review-word-list(标记模式)
- * 5. 非今天点"查看"跳转 review-word-list(只读模式)
- */
-import React, { useEffect, useMemo, useState } from 'react'
-import { View, Text, ScrollView, Picker } from '@tarojs/components'
-import Taro from '@tarojs/taro'
-import { ArrowLeft, ArrowRight, Clock, Eye } from '@nutui/icons-react-taro'
-import { useAuthStore } from '@/stores/authStore'
-import { listReviewBooksByDate, type ReviewBookStatRow } from '@/api/review'
-import { CloudButton } from '@/components/button'
+import { useEffect, useMemo, useState } from 'react'
+import { Picker, ScrollView, Text, View } from '@tarojs/components'
+import Taro, { useDidShow } from '@tarojs/taro'
+import { ArrowLeft, ArrowRight, Clock, Right } from '@nutui/icons-react-taro'
+import { useAuthStore } from '../../stores/authStore'
+import { listReviewBooksByDate, type ReviewBookStatRow } from '../../api/review'
+import { CloudButton } from '../../components/button'
+import { AppHeader } from '../../components/app-header/AppHeader'
 import { color } from '../../styles/tokens'
 import './index.scss'
+
+type ReviewTask = {
+  id: string
+  studentId: string
+  student: string
+  vocabularyPack: string
+  level: string
+  wordBookId: string
+  sessionId: string
+  count: number
+  timeSlot: string
+  timeSort: number
+  trainingAt: string
+}
+
+type TimeSlotGroup = {
+  timeSlot: string
+  timeSort: number
+  tasks: ReviewTask[]
+}
 
 function toDateInputValue(d: Date) {
   const yyyy = d.getFullYear()
@@ -32,98 +42,104 @@ function parseYMDLocal(ymd: string): Date {
   return new Date(y, m - 1, d)
 }
 
-function formatDateLabel(ymd: string): string {
-  const d = parseYMDLocal(ymd)
-  if (Number.isNaN(d.getTime())) return ymd
-  const today = toDateInputValue(new Date())
-  const yesterday = toDateInputValue(new Date(Date.now() - 86400000))
-  const tomorrow = toDateInputValue(new Date(Date.now() + 86400000))
-  let prefix = ''
-  if (ymd === today) prefix = '今天 · '
-  else if (ymd === yesterday) prefix = '昨天 · '
-  else if (ymd === tomorrow) prefix = '明天 · '
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  const weekdays = ['日', '一', '二', '三', '四', '五', '六']
-  return `${prefix}${mm}月${dd}日 周${weekdays[d.getDay()]}`
+function normalizeId(value: unknown): string {
+  if (value == null) return ''
+  const s = String(value).trim()
+  return s && s !== '0' ? s : ''
 }
 
-function trainingTime(cnt: number): string {
-  return `${Math.min(60, Math.max(10, Math.ceil(cnt / 20) * 10))}分钟`
-}
-
-function formatPracticeTimeRange(
-  startedAt?: string | null,
-  endedAt?: string | null,
-  timeZone = 'Asia/Shanghai'
-): string {
-  if (!startedAt) return ''
-  const start = new Date(startedAt)
-  if (Number.isNaN(start.getTime())) return ''
-  const dateFmt = new Intl.DateTimeFormat('zh-CN', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
-  const parts = dateFmt.formatToParts(start)
+function clockParts(iso: string | null | undefined, endIso: string | null | undefined, tz: string) {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  const timeFmt = new Intl.DateTimeFormat('zh-CN', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false })
+  const dateFmt = new Intl.DateTimeFormat('zh-CN', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' })
+  const parts = dateFmt.formatToParts(d)
   const y = parts.find((p) => p.type === 'year')?.value ?? ''
-  const m = parts.find((p) => p.type === 'month')?.value ?? ''
+  const mo = parts.find((p) => p.type === 'month')?.value ?? ''
   const day = parts.find((p) => p.type === 'day')?.value ?? ''
-  const dateLabel = `${y}/${m}/${day}`
-  const timeFmt = new Intl.DateTimeFormat('zh-CN', {
-    timeZone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
-  const startClock = timeFmt.format(start)
-  if (endedAt) {
-    const end = new Date(endedAt)
-    if (!Number.isNaN(end.getTime()) && end.getTime() > start.getTime()) {
-      return `${dateLabel}  ${startClock}-${timeFmt.format(end)}`
-    }
+  const slot = timeFmt.format(d)
+  const [hh, mm] = slot.split(':').map((x) => Number(x))
+  let endSlot = slot
+  if (endIso) {
+    const endD = new Date(endIso)
+    if (!Number.isNaN(endD.getTime())) endSlot = timeFmt.format(endD)
   }
-  return `${dateLabel}  ${startClock}`
-}
-
-interface ReviewTask {
-  id: string
-  practiceTimeLabel: string
-  student: string
-  vocabularyPack: string
-  trainingTime: string
-  status: 'pending' | 'completed'
-  wordBookId: number
-  sessionId: number
-  count: number
+  return {
+    slot,
+    sort: (Number.isFinite(hh) ? hh : 0) * 60 + (Number.isFinite(mm) ? mm : 0),
+    trainingAt: `${y}-${mo}-${day} ${slot}~${endSlot}`,
+  }
 }
 
 export default function AntiForgetting() {
   const user = useAuthStore((s) => s.user)
-  const [selectedDate, setSelectedDate] = useState(() => toDateInputValue(new Date()))
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const param = Taro.getCurrentInstance().router?.params?.date
+    return typeof param === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(param) ? param : toDateInputValue(new Date())
+  })
   const [bookStats, setBookStats] = useState<ReviewBookStatRow[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loadingBooks, setLoadingBooks] = useState(true)
+
+  useDidShow(() => {
+    const pending = Taro.getStorageSync('lb_anti_date')
+    if (typeof pending === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(pending)) {
+      Taro.removeStorageSync('lb_anti_date')
+      setSelectedDate(pending)
+    }
+  })
 
   useEffect(() => {
     let mounted = true
     ;(async () => {
-      setLoading(true)
+      setLoadingBooks(true)
       try {
-        const tz = 'Asia/Shanghai'
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai'
         const res = await listReviewBooksByDate(selectedDate, tz)
-        const arr = Array.isArray(res.data) ? (res.data as ReviewBookStatRow[]) : []
-        if (mounted) setBookStats(arr)
+        if (mounted) setBookStats(Array.isArray(res.data) ? res.data : [])
       } catch {
         if (mounted) setBookStats([])
       } finally {
-        if (mounted) setLoading(false)
+        if (mounted) setLoadingBooks(false)
       }
     })()
-    return () => {
-      mounted = false
-    }
+    return () => { mounted = false }
   }, [selectedDate])
+
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai'
+  const fallbackStudent = user?.displayName || user?.email?.split('@')[0] || '当前用户'
+
+  const reviewTasks = useMemo<ReviewTask[]>(() => bookStats.map((b) => {
+    const studentId = normalizeId((b as any).studentId) || 'self'
+    const wordBookId = normalizeId(b.wordBookId)
+    const sessionId = normalizeId(b.sessionId)
+    const clock = clockParts(b.practiceStartedAt, b.practiceEndedAt, timeZone)
+    return {
+      id: `${studentId}-${wordBookId}-${sessionId || '0'}`,
+      studentId,
+      student: String((b as any).studentName || '').trim() || fallbackStudent,
+      vocabularyPack: b.name,
+      level: String(b.level || '').trim(),
+      wordBookId,
+      sessionId,
+      count: b.cnt,
+      timeSlot: clock?.slot || '—',
+      timeSort: clock?.sort ?? 9999,
+      trainingAt: clock?.trainingAt || '—',
+    }
+  }), [bookStats, fallbackStudent, timeZone])
+
+  const timelineGroups = useMemo<TimeSlotGroup[]>(() => {
+    const map = new Map<string, TimeSlotGroup>()
+    for (const task of reviewTasks) {
+      const group = map.get(task.timeSlot)
+      if (group) group.tasks.push(task)
+      else map.set(task.timeSlot, { timeSlot: task.timeSlot, timeSort: task.timeSort, tasks: [task] })
+    }
+    return Array.from(map.values())
+      .sort((a, b) => a.timeSort - b.timeSort || a.timeSlot.localeCompare(b.timeSlot))
+      .map((group) => ({ ...group, tasks: [...group.tasks].sort((x, y) => x.student.localeCompare(y.student, 'zh-CN')) }))
+  }, [reviewTasks])
 
   const shiftDate = (deltaDays: number) => {
     const d = parseYMDLocal(selectedDate)
@@ -133,138 +149,94 @@ export default function AntiForgetting() {
 
   const isToday = selectedDate === toDateInputValue(new Date())
 
-  const reviewTasks = useMemo<ReviewTask[]>(() => {
-    const student = user?.displayName || user?.email?.split('@')[0] || '当前用户'
-    const tz = 'Asia/Shanghai'
-    return bookStats.map((b) => ({
-      id: `${b.wordBookId}-${b.sessionId ?? 0}`,
-      practiceTimeLabel: formatPracticeTimeRange(b.practiceStartedAt, b.practiceEndedAt, tz),
-      student,
-      vocabularyPack: b.name,
-      trainingTime: trainingTime(b.cnt),
-      status: 'pending',
-      wordBookId: b.wordBookId,
-      sessionId: b.sessionId ?? 0,
-      count: b.cnt,
-    }))
-  }, [bookStats, user])
-
-  const groupedByStudent = useMemo(() => {
-    const groups: { [key: string]: ReviewTask[] } = {}
-    reviewTasks.forEach((task) => {
-      if (!groups[task.student]) groups[task.student] = []
-      groups[task.student].push(task)
-    })
-    return groups
-  }, [reviewTasks])
-
   const handleOpenTask = (task: ReviewTask) => {
-    if (task.count <= 0) return
-    const sessionQ = task.sessionId > 0 ? `&studySessionId=${encodeURIComponent(String(task.sessionId))}` : ''
-    const params = `?wordBookId=${task.wordBookId}&date=${encodeURIComponent(selectedDate)}${sessionQ}${isToday ? '' : '&view=1'}`
-    Taro.navigateTo({
-      url: `/pages/review-word-list/index${params}`,
-    })
+    if (task.count <= 0 || !task.wordBookId) return
+    Taro.setStorageSync('lb_review_wordbook_id', task.wordBookId)
+    Taro.setStorageSync('lb_review_wordbook_name', task.vocabularyPack)
+    Taro.setStorageSync('lb_review_date', selectedDate)
+    Taro.setStorageSync('lb_review_return', '/pages/anti-forgetting/index')
+    if (task.studentId && task.studentId !== 'self') Taro.setStorageSync('lb_review_student_id', task.studentId)
+    else Taro.removeStorageSync('lb_review_student_id')
+    if (task.sessionId) Taro.setStorageSync('lb_review_study_session_id', task.sessionId)
+    else Taro.removeStorageSync('lb_review_study_session_id')
+    if (isToday) Taro.setStorageSync('lb_mode', 'review')
+    else Taro.removeStorageSync('lb_mode')
+
+    const studentQ = task.studentId && task.studentId !== 'self' ? `&studentId=${encodeURIComponent(task.studentId)}` : ''
+    const sessionQ = task.sessionId ? `&studySessionId=${encodeURIComponent(task.sessionId)}` : ''
+    Taro.navigateTo({ url: `/pages/review-word-list/index?wordBookId=${task.wordBookId}&date=${encodeURIComponent(selectedDate)}${sessionQ}${studentQ}${isToday ? '' : '&view=1'}` })
   }
 
   return (
-    <ScrollView className="anti" scrollY enableFlex>
-      {/* 日期选择卡片 */}
-      <View className="anti__date-card">
-        <View className="anti__date-arrow" onClick={() => shiftDate(-1)}>
-          <ArrowLeft size={22} color={color.primary} />
-        </View>
-        <Picker
-          mode="date"
-          value={selectedDate}
-          onChange={(e) => setSelectedDate(String(e.detail.value))}
-        >
-          <View className="anti__date-center">
+    <View className="anti-wrap">
+      <AppHeader />
+      <ScrollView className="anti" scrollY enableFlex>
+        <View className="anti__date-card">
+          <View className="anti__date-arrow" onClick={() => shiftDate(-1)}>
+            <ArrowLeft size={20} color={color.charcoal} />
+          </View>
+          <View className="anti__date-center-wrap">
             <Text className="anti__date-label">选择日期</Text>
-            <Text className="anti__date-value">{formatDateLabel(selectedDate)}</Text>
+            <Picker mode="date" value={selectedDate} onChange={(e) => setSelectedDate(String(e.detail.value))}>
+              <View className="anti__date-picker"><Text>{selectedDate}</Text></View>
+            </Picker>
           </View>
-        </Picker>
-        <View className="anti__date-arrow" onClick={() => shiftDate(1)}>
-          <ArrowRight size={22} color={color.primary} />
+          <View className="anti__date-arrow" onClick={() => shiftDate(1)}>
+            <ArrowRight size={20} color={color.charcoal} />
+          </View>
         </View>
-      </View>
 
-      {/* 任务列表 */}
-      {loading ? (
-        <View className="anti__state">
-          <Text className="anti__state-text">加载中...</Text>
-        </View>
-      ) : reviewTasks.length === 0 ? (
-        <View className="anti__empty">
-          <View className="anti__empty-icon">
+        {loadingBooks ? (
+          <View className="anti__state"><Text>加载中…</Text></View>
+        ) : reviewTasks.length === 0 ? (
+          <View className="anti__empty">
             <Clock size={40} color={color.mutedSoft} />
+            <Text className="anti__empty-text">该日暂无待复习词库任务</Text>
           </View>
-          <Text className="anti__empty-text">
-            该日暂无待复习词库任务{'\n'}可切换日期查看其它天的计划
-          </Text>
-        </View>
-      ) : (
-        <View className="anti__groups">
-          {Object.entries(groupedByStudent).map(([student, tasks]) => (
-            <View key={student} className="anti__group">
-              {/* 学生头部 */}
-              <View className="anti__group-header">
-                <View className="anti__group-avatar">
-                  <Text className="anti__group-avatar-text">
-                    {student.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <View className="anti__group-info">
-                  <Text className="anti__group-name">{student}</Text>
-                  <Text className="anti__group-count">
-                    本日 {tasks.length} 个复习任务（按所选日期统计）
-                  </Text>
-                </View>
-              </View>
-
-              {/* 任务列表 */}
-              <View className="anti__task-list">
-                {tasks.map((task) => (
-                  <View key={task.id} className="anti__task">
-                    {/* 第一行:时间 + 词包名 */}
-                    <View className="anti__task-line">
-                      {task.practiceTimeLabel ? (
-                        <View className="anti__task-time">
-                          <Clock size={14} color={color.primary} />
-                          <Text className="anti__task-time-text">{task.practiceTimeLabel}</Text>
+        ) : (
+          <View className="anti__timeline-card">
+            <View className="anti__timeline-header">
+              <Text className="anti__timeline-date">{selectedDate}</Text>
+              <Right className="anti__timeline-down" size={14} color={color.mutedForeground} />
+            </View>
+            <View className="anti__timeline-body">
+              <View className="anti__timeline-line" />
+              {timelineGroups.map((group, groupIdx) => (
+                <View key={group.timeSlot} className="anti__group">
+                  {group.tasks.map((task, idx) => {
+                    const hasNextTask = idx < group.tasks.length - 1 || groupIdx < timelineGroups.length - 1
+                    return (
+                      <View key={task.id} className={`anti__task ${hasNextTask ? 'anti__task--border' : ''}`}>
+                        <View className="anti__task-time-col">
+                          {idx === 0 ? <View className="anti__time-badge"><Text>{group.timeSlot}</Text></View> : <View className="anti__time-spacer" />}
                         </View>
-                      ) : null}
-                      <Text className="anti__task-pack-name" numberOfLines={1}>{task.vocabularyPack}</Text>
-                    </View>
-                    {/* 第二行:词数/训练时长(左) + 按钮(右) */}
-                    <View className="anti__task-line anti__task-line--bottom">
-                      <Text className="anti__task-meta">
-                        {task.count} 词 · {task.trainingTime}
-                      </Text>
-                      <View className="anti__task-btn-wrap">
-                        <CloudButton
-                          variant="brand"
-                          size="sm"
-                          disabled={task.count <= 0}
-                          onClick={() => handleOpenTask(task)}
-                        >
-                          <View className="anti__task-btn-inner">
-                            <Eye size={14} color={color.white} />
-                            <Text className="anti__task-btn-text">
-                              {task.count <= 0 ? '暂无词' : isToday ? '复习' : '查看'}
+                        <View className="anti__task-content">
+                          <View className="anti__task-tick" />
+                          <Text className="anti__student">{task.student}</Text>
+                          <View className="anti__task-text" onClick={() => handleOpenTask(task)}>
+                            <Text className="anti__bullet">•</Text>
+                            <Text className="anti__pack">
+                              {task.level ? `【${task.level}】` : ''}
+                              {task.count > 0 ? `【待复习 ${task.count} 词】` : ''}
+                              {task.vocabularyPack}
                             </Text>
                           </View>
-                        </CloudButton>
+                          <Text className="anti__trained-at">训练时间：{task.trainingAt}</Text>
+                          <View className="anti__review-btn">
+                            <CloudButton variant="brand" size="pill" disabled={task.count <= 0} onClick={() => handleOpenTask(task)}>
+                              {isToday ? '开始复习' : '查看'}
+                            </CloudButton>
+                          </View>
+                        </View>
                       </View>
-                    </View>
-                  </View>
-                ))}
-              </View>
+                    )
+                  })}
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
-      )}
-      <View style={{ height: '48rpx' }} />
-    </ScrollView>
+          </View>
+        )}
+      </ScrollView>
+    </View>
   )
 }

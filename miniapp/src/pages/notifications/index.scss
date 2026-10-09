@@ -1,221 +1,210 @@
-/**
- * 通知页样式 — Warm Mint 主题。
- */
 @import '../../styles/vars.scss';
 
-.notif {
+.notifications {
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  min-height: 100%;
-  background-color: #f6f5f4;
+  overflow: hidden;
+  background: $background;
 }
 
-/* ============ 顶部导航栏 ============ */
-.notif__navbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24px 32px;
-  background-color: #ffffff;
-  border-bottom: 2px solid #e5e3df;
-  flex-shrink: 0;
-}
-
-.notif__nav-btn {
-  width: 64px;
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.notif__nav-title {
-  font-size: 32px;
-  font-weight: 600;
-  color: #1a1a1a;
-}
-
-.notif__nav-action {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 20px;
-  border-radius: 8px;
-  background-color: rgba(78, 205, 196, 0.12);
-
-  &--disabled {
-    opacity: 0.4;
-  }
-}
-
-.notif__nav-action-text {
-  font-size: 24px;
-  color: #3DB8B0;
-  font-weight: 500;
-}
-
-/* ============ 未读摘要 ============ */
-.notif__summary {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 24px; margin-left: 32px; margin-right: 32px; margin-bottom: 0px;
-  padding: 20px 24px;
-  background-color: #e8f8f5;
-  border-radius: 12px;
-}
-
-.notif__summary-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
-  background-color: rgba(255, 255, 255, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.notif__summary-text {
-  font-size: 26px;
-  color: #37352f;
-}
-
-/* ============ 滚动主体 ============ */
-.notif__body {
+.notifications__scroll {
   flex: 1;
-  padding-top: 24px; padding-left: 32px; padding-right: 32px; padding-bottom: 0px;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 12px;
+  overflow-x: hidden;
 }
 
-/* ============ 状态/空态 ============ */
-.notif__state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 80px 0px;
-
-  &--error {
-    .notif__state-text {
-      color: #e03131;
-    }
-  }
-}
-
-.notif__state-text {
-  font-size: 26px;
-  color: #787671;
-}
-
-.notif__empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 120px 0px;
-}
-
-.notif__empty-icon {
-  width: 112px;
-  height: 112px;
-  border-radius: 999px;
-  background-color: #fafaf9;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.notif__empty-text {
-  font-size: 28px;
-  color: #787671;
-}
-
-/* ============ 通知列表 ============ */
-.notif__list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.notif__item {
-  position: relative;
+.notifications__head {
+  margin-bottom: 24px;
   display: flex;
   align-items: flex-start;
+  justify-content: space-between;
   gap: 16px;
-  padding-top: 28px; padding-left: 28px; padding-right: 28px; padding-bottom: 24px;
-  background-color: #ffffff;
-  border: 2px solid #e5e3df;
-  border-left: 6px solid #4ECDC4;
-  border-radius: 12px;
-
-  &--read {
-    border-left-color: #e5e3df;
-    opacity: 0.85;
-  }
 }
 
-.notif__item-main {
+.notifications__head-text {
+  min-width: 0;
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
-.notif__item-title-row {
+.notifications__title {
+  display: block;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #2d3748;
+}
+
+.notifications__subtitle {
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #718096;
+}
+
+.notifications__list-card {
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.notifications__state {
+  padding: 24px 20px;
+  font-size: 14px;
+  color: #718096;
+}
+
+.notifications__state--error {
+  color: #dc2626;
+}
+
+.notifications__item {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 16px 20px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.notifications__item:last-child {
+  border-bottom: none;
+}
+
+.notifications__item-main {
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+
+.notifications__item-title-row {
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
-.notif__dot {
-  width: 14px;
-  height: 14px;
+.notifications__dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
   border-radius: 999px;
-  background-color: #4ECDC4;
-  flex-shrink: 0;
+  background: #4ecdc4;
 }
 
-.notif__item-title {
-  font-size: 30px;
-  font-weight: 600;
-  color: #1a1a1a;
+.notifications__item-title {
+  min-width: 0;
   overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 16px;
+  font-weight: 500;
+  color: #2d3748;
 }
 
-.notif__item-content {
-  font-size: 26px;
-  color: #787671;
-  line-height: 1.5;
+.notifications__item-content {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-}
-
-.notif__item-time {
-  font-size: 22px;
-  color: #a4a097;
   margin-top: 4px;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #718096;
 }
 
-.notif__item-badge {
+.notifications__item-time {
   flex-shrink: 0;
-  padding: 4px 14px;
-  border-radius: 999px;
-  background-color: rgba(78, 205, 196, 0.12);
-  font-size: 20px;
-  color: #3DB8B0;
-  font-weight: 500;
+  font-size: 12px;
+  white-space: nowrap;
+  color: #a0aec0;
 }
 
-/* ============ 加载更多 ============ */
-.notif__more {
+.notifications__mask {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  padding: 16px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px 0px;
+  background: rgba(0, 0, 0, .4);
 }
 
-.notif__more-text {
-  font-size: 22px;
-  color: #a4a097;
+.notifications__dialog {
+  width: 100%;
+  max-width: 512px;
+  max-height: 85vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.notifications__dialog-head {
+  flex-shrink: 0;
+  padding: 20px 20px 0;
+}
+
+.notifications__dialog-title {
+  display: block;
+  padding-right: 24px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #1a1a1a;
+  text-align: left;
+}
+
+.notifications__dialog-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+  color: #718096;
+  text-align: left;
+}
+
+.notifications__dialog-body {
+  flex: 1;
+  min-height: 0;
+  padding: 16px 20px;
+  box-sizing: border-box;
+}
+
+.notifications__dialog-content {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #2d3748;
+  white-space: pre-wrap;
+}
+
+.notifications__dialog-footer {
+  flex-shrink: 0;
+  padding: 0 20px 20px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.notifications__action {
+  height: 36px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  color: #2d3748;
+  font-size: 14px;
+  font-weight: 500;
 }

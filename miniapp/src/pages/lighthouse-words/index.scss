@@ -1,0 +1,120 @@
+@import '../../styles/vars.scss';
+
+.lhw {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background-color: #f6f5f4;
+}
+
+.lhw__navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 32px;
+  background-color: #ffffff;
+  border-bottom: 2px solid #e5e3df;
+}
+
+.lhw__nav-btn {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lhw__nav-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.lhw__nav-title {
+  font-size: 32px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.lhw__nav-sub {
+  font-size: 22px;
+  color: #787671;
+}
+
+.lhw__body {
+  flex: 1;
+  padding: 24px 32px 0;
+}
+
+.lhw__state {
+  display: flex;
+  justify-content: center;
+  padding: 160px 0;
+  color: #787671;
+  font-size: 26px;
+}
+
+.lhw__list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.lhw__card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px;
+  background-color: #ffffff;
+  border: 2px solid #e5e3df;
+  border-radius: 16px;
+}
+
+.lhw__index {
+  width: 44px;
+  color: #a4a097;
+  font-size: 22px;
+  text-align: center;
+}
+
+.lhw__info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lhw__word {
+  font-size: 30px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.lhw__phonetic {
+  color: #787671;
+  font-size: 22px;
+  font-family: monospace;
+}
+
+.lhw__translation {
+  color: #37352f;
+  font-size: 24px;
+}
+
+/* H5 mobile scale and interactive reveal/audio controls */
+.lhw__navbar { padding: 12px 16px; }
+.lhw__nav-btn { width: 32px; height: 32px; }
+.lhw__nav-title { font-size: 16px; }
+.lhw__nav-sub { font-size: 11px; }
+.lhw__body { padding: 12px 16px 0; }
+.lhw__list { gap: 10px; }
+.lhw__card { min-width: 0; padding: 12px; gap: 8px; border-width: 1px; border-radius: 12px; }
+.lhw__index { width: 22px; font-size: 11px; }
+.lhw__info { min-width: 0; flex: 1; gap: 4px; }
+.lhw__word { font-size: 17px; }
+.lhw__phonetic { font-size: 11px; }
+.lhw__translation { font-size: 13px; line-height: 1.4; }
+.lhw__hint { font-size: 12px; color: #a4a097; }
+.lhw__audio { width: 32px; height: 32px; flex: 0 0 32px; display: flex; align-items: center; justify-content: center; border-radius: 999px; background: rgba(78,205,196,.1); }
+

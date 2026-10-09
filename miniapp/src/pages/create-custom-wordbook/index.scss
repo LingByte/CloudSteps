@@ -1,0 +1,253 @@
+@import '../../styles/vars.scss';
+
+.create-custom-wordbook {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: $background;
+}
+
+.create-custom-wordbook__content {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding: 16px 0;
+  box-sizing: border-box;
+}
+
+.create-custom-wordbook__card,
+.create-custom-wordbook__preview {
+  margin: 0 16px 16px;
+  box-sizing: border-box;
+  border: 1px solid $border;
+  border-radius: 12px;
+  background: $card;
+}
+
+.create-custom-wordbook__card {
+  padding: 16px;
+}
+
+.create-custom-wordbook__field {
+  margin-bottom: 20px;
+}
+
+.create-custom-wordbook__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: $foreground;
+}
+
+.create-custom-wordbook__input {
+  width: 100%;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid $input;
+  border-radius: 12px;
+  background: $card;
+  color: $charcoal;
+  font-size: 14px;
+}
+
+.create-custom-wordbook__tabs {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid $border;
+}
+
+.create-custom-wordbook__tab {
+  position: relative;
+  flex: 1;
+  padding: 2px 0 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: $muted-foreground;
+  text-align: center;
+}
+
+.create-custom-wordbook__tab--active {
+  font-weight: 600;
+  color: $primary;
+}
+
+.create-custom-wordbook__tab-line {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 20px;
+  height: 2px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: $primary;
+}
+
+.create-custom-wordbook__import-body {
+  padding-top: 12px;
+  text-align: center;
+}
+
+.create-custom-wordbook__import-btn {
+  min-width: 136px;
+}
+
+.create-custom-wordbook__import-hint {
+  display: block;
+  margin-top: 8px;
+  font-size: 14px;
+  color: $muted-foreground;
+}
+
+.create-custom-wordbook__import-sub,
+.create-custom-wordbook__file {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: $muted-foreground;
+}
+
+.create-custom-wordbook__excel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.create-custom-wordbook__preview {
+  overflow: hidden;
+}
+
+.create-custom-wordbook__preview-head {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid $border;
+}
+
+.create-custom-wordbook__preview-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: $foreground;
+}
+
+.create-custom-wordbook__preview-count {
+  font-size: 12px;
+  color: $muted-foreground;
+  font-variant-numeric: tabular-nums;
+}
+
+.create-custom-wordbook__word-list {
+  max-height: 46vh;
+}
+
+.create-custom-wordbook__word {
+  padding: 10px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-bottom: 1px solid $border;
+}
+
+.create-custom-wordbook__index {
+  width: 20px;
+  flex: 0 0 20px;
+  padding-top: 10px;
+  font-size: 12px;
+  color: $muted-foreground;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.create-custom-wordbook__word-fields {
+  min-width: 0;
+  flex: 1;
+}
+
+.create-custom-wordbook__word-grid {
+  margin-top: 6px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.create-custom-wordbook__remove {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.create-custom-wordbook__submit-wrap {
+  padding: 0 16px 32px;
+  box-sizing: border-box;
+}
+
+.create-custom-wordbook__submit {
+  width: 100%;
+  min-height: 44px;
+}
+
+.create-custom-wordbook__mask {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  padding: 16px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .4);
+}
+
+.create-custom-wordbook__modal {
+  width: 100%;
+  max-width: 448px;
+  padding: 20px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  background: $card;
+}
+
+.create-custom-wordbook__modal-title {
+  display: block;
+  margin-bottom: 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: $foreground;
+}
+
+.create-custom-wordbook__textarea {
+  width: 100%;
+  min-height: 192px;
+  padding: 12px;
+  box-sizing: border-box;
+  border: 1px solid $input;
+  border-radius: 12px;
+  background: $card;
+  color: $charcoal;
+  font-size: 14px;
+}
+
+.create-custom-wordbook__modal-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (min-width: 640px) {
+  .create-custom-wordbook__word-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -1,7 +1,6 @@
 /**
  * 关于我们 — 对齐 web/src/pages/About.tsx。
  */
-import React from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
 import './index.scss'
 

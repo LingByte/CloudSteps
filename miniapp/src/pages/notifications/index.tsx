@@ -1,216 +1,186 @@
-/**
- * 通知页 — 对齐 web/src/pages/Notifications.tsx。
- *
- * 移动端布局:
- *  1. 顶部导航:返回 + "通知" + 全部已读按钮
- *  2. 通知列表:未读红点 + 标题 + 内容 + 时间
- *  3. 点击单条标记已读
- *  4. 触底加载更多
- */
-import React, { useCallback, useEffect, useState } from 'react'
-import { View, Text, ScrollView } from '@tarojs/components'
+import { useEffect, useMemo, useState } from 'react'
+import { ScrollView, Text, View } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { ArrowLeft, Check, Notice } from '@nutui/icons-react-taro'
+import { Right } from '@nutui/icons-react-taro'
 import {
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
   type ApiNotification,
 } from '../../api/notifications'
+import { CloudButton } from '../../components/button'
+import { PageBackHeader } from '../../components/page-back-header/PageBackHeader'
 import { color } from '../../styles/tokens'
 import './index.scss'
 
-const PAGE_SIZE = 20
+type NotificationItem = {
+  id: number
+  title: string
+  content: string
+  time: string
+  read: boolean
+  actionUrl?: string
+  actionLabel?: string
+}
 
-function formatTime(iso: string): string {
-  if (!iso) return ''
-  const d = new Date(iso.replace(/-/g, '/'))
-  if (Number.isNaN(d.getTime())) return ''
-  const now = new Date()
-  const diff = (now.getTime() - d.getTime()) / 1000
-  if (diff < 60) return '刚刚'
-  if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`
-  if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}天前`
-  const yyyy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  const hh = String(d.getHours()).padStart(2, '0')
-  const mi = String(d.getMinutes()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`
+function toItem(n: ApiNotification): NotificationItem {
+  const date = new Date(n.createdAt)
+  return {
+    id: n.id,
+    title: n.title,
+    content: n.content,
+    time: Number.isNaN(date.getTime()) ? '' : date.toLocaleString('zh-CN'),
+    read: !!n.read,
+    actionUrl: n.actionUrl,
+    actionLabel: n.actionLabel,
+  }
+}
+
+function stripMarkdown(input: string): string {
+  return input
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]*)`/g, '$1')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/[*_~>#-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 export default function Notifications() {
-  const [items, setItems] = useState<ApiNotification[]>([])
+  const [items, setItems] = useState<NotificationItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
   const [totalUnread, setTotalUnread] = useState(0)
-  const [hasMore, setHasMore] = useState(false)
+  const [detail, setDetail] = useState<NotificationItem | null>(null)
+  const unreadCount = useMemo(() => totalUnread, [totalUnread])
 
-  const fetchPage = useCallback(
-    async (p: number, append: boolean) => {
-      if (append) {
-        setLoadingMore(true)
-      } else {
-        setLoading(true)
-      }
-      setError(null)
-      try {
-        const res = await listNotifications({ page: p, size: PAGE_SIZE })
-        if (res.code !== 200) {
-          setError(res.msg || '加载通知失败')
-          if (!append) setItems([])
-          return
-        }
-        const data = res.data
-        const list = data?.list ?? []
-        setItems((prev) => (append ? [...prev, ...list] : list))
-        setTotalUnread(data?.totalUnread ?? 0)
-        setHasMore(list.length >= PAGE_SIZE && items.length + list.length < (data?.total ?? 0))
-      } catch (e: any) {
-        setError(e?.msg || e?.message || '加载通知失败')
-        if (!append) setItems([])
-      } finally {
-        setLoading(false)
-        setLoadingMore(false)
-      }
-    },
-    [items.length],
-  )
-
-  useEffect(() => {
-    void fetchPage(1, false)
-  }, [])
-
-  const onScrollToLower = () => {
-    if (loading || loadingMore || !hasMore) return
-    const next = page + 1
-    setPage(next)
-    void fetchPage(next, true)
+  const fetchNotifications = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await listNotifications({ page: 1, size: 50 })
+      setTotalUnread(res.data?.totalUnread ?? 0)
+      setItems((res.data?.list ?? []).map(toItem))
+    } catch (e: any) {
+      setError(e?.msg || e?.message || '加载通知失败')
+    } finally {
+      setLoading(false)
+    }
   }
 
+  useEffect(() => {
+    void fetchNotifications()
+  }, [])
+
   const markAllRead = async () => {
-    if (loading || items.length === 0 || totalUnread === 0) return
     try {
       const res = await markAllNotificationsRead()
       if (res.code !== 200) {
-        Taro.showToast({ title: res.msg || '操作失败', icon: 'none' })
+        setError(res.msg || '操作失败')
         return
       }
       setItems((prev) => prev.map((i) => ({ ...i, read: true })))
       setTotalUnread(0)
-      Taro.showToast({ title: '已全部标为已读', icon: 'success' })
+      setDetail((d) => (d ? { ...d, read: true } : d))
     } catch (e: any) {
-      Taro.showToast({ title: e?.msg || '操作失败', icon: 'none' })
+      setError(e?.msg || '操作失败')
     }
   }
 
   const markOneRead = async (id: number) => {
     const target = items.find((i) => i.id === id)
     if (!target || target.read) return
-    // 乐观更新
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, read: true } : i)))
-    setTotalUnread((prev) => Math.max(0, prev - 1))
     try {
-      const res = await markNotificationRead(id)
-      if (res.code !== 200) {
-        // 回滚
-        setItems((prev) => prev.map((i) => (i.id === id ? { ...i, read: false } : i)))
-        setTotalUnread((prev) => prev + 1)
-        Taro.showToast({ title: res.msg || '标记失败', icon: 'none' })
-      }
+      await markNotificationRead(id)
+      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, read: true } : i)))
+      setTotalUnread((prev) => Math.max(0, prev - 1))
+      setDetail((d) => (d?.id === id ? { ...d, read: true } : d))
     } catch (e: any) {
-      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, read: false } : i)))
-      setTotalUnread((prev) => prev + 1)
-      Taro.showToast({ title: e?.msg || '标记失败', icon: 'none' })
+      setError(e?.msg || '标记已读失败')
     }
   }
 
+  const openDetail = (item: NotificationItem) => {
+    setDetail(item)
+    if (!item.read) void markOneRead(item.id)
+  }
+
+  const openAction = () => {
+    const url = detail?.actionUrl
+    if (!url) return
+    if (url.startsWith('/pages/')) {
+      setDetail(null)
+      Taro.navigateTo({ url })
+      return
+    }
+    Taro.setClipboardData({ data: url })
+  }
+
   return (
-    <View className="notif">
-      {/* 顶部导航栏 */}
-      <View className="notif__navbar">
-        <View className="notif__nav-btn" onClick={() => Taro.navigateBack()}>
-          <ArrowLeft size={22} color={color.charcoal} />
+    <View className="notifications">
+      <PageBackHeader title="通知" fallbackTo="/pages/coach/index" />
+      <ScrollView className="notifications__scroll" scrollY enableFlex>
+        <View className="notifications__head">
+          <View className="notifications__head-text">
+            <Text className="notifications__title">通知</Text>
+            <Text className="notifications__subtitle">
+              {unreadCount > 0 ? `你有 ${unreadCount} 条未读通知` : '暂无未读通知'}
+            </Text>
+          </View>
+          <CloudButton variant="outline" disabled={loading || items.length === 0 || unreadCount === 0} onClick={markAllRead}>
+            全部已读
+          </CloudButton>
         </View>
-        <Text className="notif__nav-title">通知</Text>
-        <View
-          className={`notif__nav-action ${totalUnread === 0 ? 'notif__nav-action--disabled' : ''}`}
-          onClick={markAllRead}
-        >
-          <Check size={16} color={color.primary} />
-          <Text className="notif__nav-action-text">全部已读</Text>
-        </View>
-      </View>
 
-      {/* 未读摘要 */}
-      <View className="notif__summary">
-        <View className="notif__summary-icon">
-          <Notice size={18} color={color.primary} />
-        </View>
-        <Text className="notif__summary-text">
-          {totalUnread > 0 ? `你有 ${totalUnread} 条未读通知` : '暂无未读通知'}
-        </Text>
-      </View>
-
-      <ScrollView
-        className="notif__body"
-        scrollY
-        enableFlex
-        lowerThreshold={120}
-        onScrollToLower={onScrollToLower}
-      >
-        {loading ? (
-          <View className="notif__state">
-            <Text className="notif__state-text">加载中...</Text>
-          </View>
-        ) : error ? (
-          <View className="notif__state notif__state--error">
-            <Text className="notif__state-text">{error}</Text>
-          </View>
-        ) : items.length === 0 ? (
-          <View className="notif__empty">
-            <View className="notif__empty-icon">
-              <Notice size={40} color={color.mutedSoft} />
-            </View>
-            <Text className="notif__empty-text">暂无通知</Text>
-          </View>
-        ) : (
-          <View className="notif__list">
-            {items.map((n) => (
-              <View
-                key={n.id}
-                className={`notif__item ${n.read ? 'notif__item--read' : ''}`}
-                onClick={() => markOneRead(n.id)}
-              >
-                <View className="notif__item-main">
-                  <View className="notif__item-title-row">
-                    {!n.read && <View className="notif__dot" />}
-                    <Text className="notif__item-title">{n.title}</Text>
+        <View className="notifications__list-card">
+          {loading ? (
+            <View className="notifications__state"><Text>加载通知中…</Text></View>
+          ) : error ? (
+            <View className="notifications__state notifications__state--error"><Text>{error}</Text></View>
+          ) : items.length === 0 ? (
+            <View className="notifications__state"><Text>暂无通知</Text></View>
+          ) : (
+            items.map((n) => (
+              <View key={n.id} className="notifications__item" onClick={() => openDetail(n)}>
+                <View className="notifications__item-main">
+                  <View className="notifications__item-title-row">
+                    {!n.read ? <View className="notifications__dot" /> : null}
+                    <Text className="notifications__item-title">{n.title}</Text>
                   </View>
-                  <Text className="notif__item-content">{n.content}</Text>
-                  <Text className="notif__item-time">{formatTime(n.createdAt)}</Text>
+                  <Text className="notifications__item-content">{stripMarkdown(n.content)}</Text>
                 </View>
-                {!n.read && <View className="notif__item-badge">未读</View>}
+                <Text className="notifications__item-time">{n.time}</Text>
               </View>
-            ))}
-
-            {loadingMore && (
-              <View className="notif__more">
-                <Text className="notif__more-text">加载中...</Text>
-              </View>
-            )}
-            {!loading && !hasMore && items.length > 0 && (
-              <View className="notif__more">
-                <Text className="notif__more-text">没有更多了</Text>
-              </View>
-            )}
-          </View>
-        )}
-        <View style={{ height: '48rpx' }} />
+            ))
+          )}
+        </View>
       </ScrollView>
+
+      {detail ? (
+        <View className="notifications__mask" onClick={() => setDetail(null)}>
+          <View className="notifications__dialog" onClick={(e) => e.stopPropagation()}>
+            <View className="notifications__dialog-head">
+              <Text className="notifications__dialog-title">{detail.title}</Text>
+              <Text className="notifications__dialog-sub">
+                {detail.time} · {detail.read ? '已读' : '未读'}
+              </Text>
+            </View>
+            <ScrollView className="notifications__dialog-body" scrollY>
+              <Text className="notifications__dialog-content">{detail.content}</Text>
+            </ScrollView>
+            {detail.actionUrl ? (
+              <View className="notifications__dialog-footer">
+                <View className="notifications__action" onClick={openAction}>
+                  <Right size={16} color={color.charcoal} />
+                  <Text>{detail.actionLabel || '查看详情'}</Text>
+                </View>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
     </View>
   )
 }

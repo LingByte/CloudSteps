@@ -1,0 +1,56 @@
+@import '../../styles/vars.scss';
+.recharge { display:flex; flex-direction:column; min-height:100%; background:#f6f5f4; }
+.rc__nav { display:flex; align-items:center; justify-content:space-between; padding:24px 32px; background:#fff; border-bottom:2px solid #e5e3df; }
+.rc__back { width:64px; height:64px; display:flex; align-items:center; justify-content:center; }
+.rc__title { font-size:32px; font-weight:600; color:#1a1a1a; }
+.rc__body { flex:1; padding:24px 32px 0; }
+.rc__current { display:flex; align-items:center; gap:20px; padding:26px; margin-bottom:24px; background:rgba(78,205,196,.08); border:2px solid rgba(78,205,196,.4); border-radius:16px; }
+.rc__current-badge { width:72px; height:72px; border-radius:16px; background:#4ECDC4; color:#fff; font-size:26px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.rc__current-info { flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
+.rc__current-name { font-size:28px; font-weight:600; color:#1a1a1a; }
+.rc__current-expire { font-size:22px; color:#787671; }
+.rc__hero { margin-bottom:24px; }
+.rc__hero-kicker { display:block; font-size:20px; font-weight:600; color:#4ECDC4; letter-spacing:4px; margin-bottom:8px; }
+.rc__hero-title { display:block; font-size:40px; font-weight:700; color:#1a1a1a; }
+.rc__hero-sub { display:block; margin-top:8px; font-size:24px; color:#787671; }
+.rc__card { padding:28px; margin-bottom:24px; background:#fff; border:2px solid #e5e3df; border-radius:16px; }
+.rc__card-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.rc__card-title { font-size:30px; font-weight:600; color:#1a1a1a; }
+.rc__card-hint { font-size:22px; color:#a4a097; }
+/* H5 compact mobile scale */
+.rc__nav { padding:12px 16px; }
+.rc__back { width:32px; height:32px; }
+.rc__title { font-size:16px; }
+.rc__body { padding:12px 16px 0; }
+.rc__card { padding:14px; margin-bottom:12px; border-radius:12px; }
+.rc__card-title { font-size:16px; }
+.rc__card-hint { font-size:11px; }
+
+.rc__noauto { font-size:20px; color:#4ECDC4; background:rgba(78,205,196,.12); padding:6px 14px; border-radius:999px; }
+.rc__tabs { display:flex; gap:8px; padding:8px; background:#f6f5f4; border-radius:14px; }
+.rc__tab { position:relative; flex:1; padding:16px 4px; border-radius:10px; display:flex; align-items:center; justify-content:center; }
+.rc__tab--active { background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.rc__tab-text { font-size:24px; color:#787671; }
+.rc__tab--active .rc__tab-text { color:#1a1a1a; font-weight:600; }
+.rc__tab-badge { position:absolute; top:-14px; right:-4px; padding:2px 10px; border-radius:999px; background:#55A3FF; color:#fff; font-size:18px; }
+.rc__plan { margin-top:24px; padding:28px; border:2px solid rgba(78,205,196,.3); border-radius:14px; background:rgba(78,205,196,.05); }
+.rc__plan-top { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
+.rc__plan-info { display:flex; flex-direction:column; gap:8px; }
+.rc__plan-name { font-size:32px; font-weight:600; color:#1a1a1a; }
+.rc__plan-period { font-size:24px; color:#787671; }
+.rc__plan-price-box { display:flex; flex-direction:column; align-items:flex-end; gap:6px; }
+.rc__save { font-size:20px; font-weight:600; color:#4ECDC4; background:rgba(78,205,196,.14); padding:4px 12px; border-radius:8px; }
+.rc__price { font-size:52px; font-weight:700; color:#1a1a1a; }
+.rc__price-hint { font-size:20px; color:#a4a097; }
+.rc__features { margin-top:24px; padding-top:24px; border-top:2px solid rgba(78,205,196,.15); display:flex; flex-direction:column; gap:14px; }
+.rc__feature { display:flex; align-items:center; gap:12px; }
+.rc__feature-text { font-size:26px; color:#37352f; }
+.rc__order-row { display:flex; justify-content:space-between; padding-bottom:20px; border-bottom:2px solid #f6f5f4; }
+.rc__order-name { font-size:26px; color:#787671; }
+.rc__order-price { font-size:26px; font-weight:500; color:#1a1a1a; }
+.rc__order-total { display:flex; justify-content:space-between; align-items:flex-end; margin-top:20px; }
+.rc__order-label { font-size:26px; color:#787671; }
+.rc__order-final { font-size:44px; font-weight:700; color:#4ECDC4; }
+.rc__pay { margin-top:24px; width:100%; height:88px; border-radius:12px; background:#4ECDC4; color:#fff; font-size:30px; font-weight:600; display:flex; align-items:center; justify-content:center; border:none; }
+.rc__pay::after { border:none; }
+.rc__pay-hint { display:block; margin-top:14px; text-align:center; font-size:20px; color:#a4a097; }

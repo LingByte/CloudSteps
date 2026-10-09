@@ -1,364 +1,295 @@
-/**
- * 我的学生页样式 — Warm Mint 主题。
- */
 @import '../../styles/vars.scss';
 
-.students {
+.my-students {
+  width: 100%;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  min-height: 100%;
-  background-color: #f6f5f4;
+  gap: 12px;
+  overflow: hidden;
+  background: $background;
 }
 
-/* ============ 顶部导航栏 ============ */
-.students__navbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24px 32px;
-  background-color: #ffffff;
-  border-bottom: 2px solid #e5e3df;
+.my-students__top {
   flex-shrink: 0;
-}
-
-.students__nav-btn {
-  width: 64px;
-  height: 64px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
 }
 
-.students__nav-title {
-  font-size: 32px;
-  font-weight: 600;
-  color: #1a1a1a;
-  flex: 1;
-  text-align: center;
-}
-
-.students__nav-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.students__nav-icon {
-  width: 56px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-}
-
-.students__nav-create {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 20px;
-  border-radius: 8px;
-  background-color: rgba(78, 205, 196, 0.12);
-}
-
-.students__nav-create-text {
-  font-size: 24px;
-  color: #3DB8B0;
-  font-weight: 500;
-}
-
-/* ============ 搜索框 ============ */
-.students__search {
-  padding-top: 24px; padding-left: 32px; padding-right: 32px; padding-bottom: 8px;
-  flex-shrink: 0;
-}
-
-.students__search-box {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 18px 24px;
-  background-color: #ffffff;
-  border: 2px solid #e5e3df;
-  border-radius: 12px;
-}
-
-.students__search-input {
-  flex: 1;
-  font-size: 28px;
-  color: #1a1a1a;
-}
-
-.students__search-placeholder {
-  color: #a4a097;
-  font-size: 28px;
-}
-
-.students__search-clear {
+.my-students__back {
   width: 36px;
   height: 36px;
-  border-radius: 999px;
-  background-color: #fafaf9;
+  flex: 0 0 36px;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 8px;
 }
 
-.students__search-clear-text {
-  font-size: 28px;
-  color: #787671;
-  line-height: 1;
-}
-
-/* ============ 滚动主体 ============ */
-.students__body {
+.my-students__title-wrap {
+  min-width: 0;
   flex: 1;
-  padding-top: 16px; padding-left: 32px; padding-right: 32px; padding-bottom: 0px;
 }
 
-.students__state,
-.students__empty {
+.my-students__title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-weight: 600;
+  color: $foreground;
+}
+
+.my-students__create {
+  flex-shrink: 0;
+}
+
+.my-students__search {
+  flex-shrink: 0;
+  height: 40px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid $input;
+  border-radius: 12px;
+  background: $card;
+}
+
+.my-students__search-input {
+  min-width: 0;
+  flex: 1;
+  font-size: 14px;
+  color: $charcoal;
+}
+
+.my-students__search-placeholder {
+  color: $muted-soft;
+}
+
+.my-students__clear {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 120px 32px;
+  color: $muted-soft;
+  font-size: 18px;
 }
 
-.students__state-text,
-.students__empty-text {
-  font-size: 26px;
-  color: #787671;
+.my-students__list {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+}
+
+.my-students__state {
+  padding: 40px 12px;
+  border: 1px solid $border;
+  border-radius: 16px;
+  background: $card;
+  color: $muted-foreground;
+  font-size: 14px;
   text-align: center;
-  line-height: 1.6;
 }
 
-/* ============ 学员卡片 ============ */
-.students__list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.students__card {
-  background-color: #ffffff;
-  border: 2px solid #e5e3df;
-  border-radius: 12px;
-  padding: 24px;
-}
-
-.students__card-main {
+.my-students__card {
+  margin-bottom: 8px;
+  padding: 12px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
+  border: 1px solid $border;
+  border-radius: 16px;
+  background: $card;
 }
 
-.students__avatar {
-  width: 88px;
-  height: 88px;
-  border-radius: 999px;
-  background-color: rgba(78, 205, 196, 0.12);
-  border: 2px solid #e5e3df;
+.my-students__card-main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.my-students__avatar {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-}
-
-.students__avatar-img {
-  width: 100%;
-  height: 100%;
+  border: 1px solid $border;
   border-radius: 999px;
+  background: $primary-soft;
 }
 
-.students__avatar-text {
-  font-size: 32px;
+.my-students__avatar-img {
+  width: 44px;
+  height: 44px;
+}
+
+.my-students__avatar-text {
+  font-size: 14px;
   font-weight: 600;
-  color: #4ECDC4;
+  color: $primary;
 }
 
-.students__info {
+.my-students__info {
+  min-width: 0;
   flex: 1;
+}
+
+.my-students__name-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.my-students__name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-weight: 600;
+  color: $foreground;
+}
+
+.my-students__lessons {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 6px;
+  background: $primary-soft;
+  color: $primary;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.my-students__lessons--low {
+  background: rgba(224, 49, 49, .05);
+  color: $destructive;
+}
+
+.my-students__meta {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  color: $muted-foreground;
+}
+
+.my-students__stats {
+  color: $muted-foreground;
+}
+
+.my-students__pwd {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid $border;
+  border-radius: 12px;
+  background: $card;
+}
+
+.my-students__more {
+  padding: 8px 0;
+  color: $muted-foreground;
+  font-size: 14px;
+  text-align: center;
+}
+
+.my-students__more--end {
+  padding: 4px 0;
+  font-size: 11px;
+  color: $muted-soft;
+}
+
+.my-students__mask {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  padding: 16px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .4);
+}
+
+.my-students__modal {
+  width: 100%;
+  max-width: 448px;
+  padding: 20px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  background: $card;
+}
+
+.my-students__modal-head {
+  margin-bottom: 16px;
+}
+
+.my-students__modal-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: $foreground;
+}
+
+.my-students__modal-desc {
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+  color: $muted-foreground;
+}
+
+.my-students__modal-input {
+  width: 100%;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid $input;
+  border-radius: 12px;
+  background: $card;
+  color: $charcoal;
+  font-size: 14px;
+}
+
+.my-students__modal-placeholder {
+  color: $muted-soft;
+}
+
+.my-students__modal-actions {
+  margin-top: 16px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.students__name-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.students__name {
-  font-size: 30px;
-  font-weight: 600;
-  color: #1a1a1a;
-  overflow: hidden;
+.my-students__modal-btn {
   flex: 1;
 }
 
-.students__mins {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 12px;
-  border-radius: 8px;
-  background-color: rgba(78, 205, 196, 0.12);
-  flex-shrink: 0;
-
-  &--low {
-    background-color: rgba(224, 49, 49, 0.08);
+@media (min-width: 640px) {
+  .my-students__modal-actions {
+    flex-direction: row;
   }
-}
-
-.students__mins-text {
-  font-size: 22px;
-  font-weight: 500;
-}
-
-.students__account {
-  font-size: 24px;
-  color: #787671;
-  overflow: hidden;
-}
-
-.students__stats {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.students__stat {
-  font-size: 22px;
-  color: #787671;
-}
-
-.students__stat-num {
-  font-weight: 600;
-  color: #37352f;
-}
-
-.students__stat-divider {
-  font-size: 22px;
-  color: #a4a097;
-}
-
-/* ============ 卡片操作 ============ */
-.students__card-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 2px solid #e5e3df;
-}
-
-.students__action-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 20px;
-  border-radius: 8px;
-  background-color: rgba(78, 205, 196, 0.12);
-}
-
-.students__action-text {
-  font-size: 24px;
-  color: #3DB8B0;
-  font-weight: 500;
-}
-
-/* ============ 加载更多 ============ */
-.students__more {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px 0px;
-}
-
-.students__more-text {
-  font-size: 22px;
-  color: #a4a097;
-}
-
-/* ============ 密码 Modal ============ */
-.students__mask {
-  position: fixed;
-  background-color: rgba(0, 0, 0, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 48px;
-}
-
-.students__modal {
-  width: 100%;
-  background-color: #ffffff;
-  border-radius: 16px;
-  padding: 32px;
-}
-
-.students__modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.students__modal-title {
-  font-size: 32px;
-  font-weight: 600;
-  color: #1a1a1a;
-}
-
-.students__modal-close {
-  width: 56px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background-color: #fafaf9;
-}
-
-.students__modal-close-icon {
-  font-size: 32px;
-  color: #787671;
-  line-height: 1;
-}
-
-.students__modal-desc {
-  font-size: 24px;
-  color: #787671;
-  margin-bottom: 24px;
-}
-
-.students__modal-field {
-  margin-bottom: 32px;
-}
-
-.students__modal-input {
-  width: 100%;
-  padding: 20px 24px;
-  font-size: 28px;
-  color: #1a1a1a;
-  background-color: #fafaf9;
-  border: 2px solid #e5e3df;
-  border-radius: 12px;
-}
-
-.students__modal-placeholder {
-  color: #a4a097;
-}
-
-.students__modal-footer {
-  display: flex;
-  gap: 16px;
-}
-
-.students__modal-btn {
-  flex: 1;
 }

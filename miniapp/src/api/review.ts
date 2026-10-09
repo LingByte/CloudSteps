@@ -30,18 +30,20 @@ export interface CompleteReviewResult {
 }
 
 export type ReviewBookStatRow = {
-  wordBookId: number
+  studentId?: string | number
+  studentName?: string
+  wordBookId: string | number
   cnt: number
   name: string
   level: string
-  sessionId?: number
+  sessionId?: string | number
   practiceStartedAt?: string
   practiceEndedAt?: string | null
 }
 
 export function getReviewToday(
   wordBookId: number,
-  opts?: { date?: string; timeZone?: string; limit?: number; studySessionId?: number }
+  opts?: { date?: string; timeZone?: string; limit?: number; studySessionId?: number; all?: boolean; studentId?: number }
 ): Promise<ApiResponse<ReviewTodayResponse>> {
   const tz = opts?.timeZone || 'Asia/Shanghai'
   return get<ReviewTodayResponse>('/review/today', {
@@ -50,6 +52,8 @@ export function getReviewToday(
     timeZone: tz,
     ...(opts?.limit ? { limit: opts.limit } : {}),
     ...(opts?.studySessionId ? { studySessionId: opts.studySessionId } : {}),
+    ...(opts?.all ? { all: 1 } : {}),
+    ...(opts?.studentId ? { studentId: opts.studentId } : {}),
   } as any)
 }
 
@@ -66,6 +70,6 @@ export function startReviewSession(data: StartReviewSessionRequest): Promise<Api
   return post<StartReviewSessionResponse>('/review/session/start', data)
 }
 
-export function completeReviewSession(sessionId: number, results: CompleteReviewResult[]): Promise<ApiResponse<null>> {
+export function completeReviewSession(sessionId: number | string, results: CompleteReviewResult[]): Promise<ApiResponse<null>> {
   return post<null>(`/review/session/${sessionId}/complete`, { results })
 }

@@ -3,7 +3,7 @@
  * 小程序适配:用独立子页面替代 web 端的 Dialog 弹窗。
  * 包含:修改密码 / 绑定邮箱 / 消息通知 / 账号安全
  */
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { View, Text, Input, Switch, ScrollView } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { CloudButton } from '../../components/button'
@@ -194,7 +194,14 @@ export default function Settings() {
     { id: 'security' as const, label: '账号安全', desc: '登录记录与设备' },
   ]
 
+  const isAdmin = (user as { role?: string } | null)?.role === 'admin'
   const otherLinks = [
+    ...(isAdmin ? [{ label: '订阅管理', url: '/pages/admin-subscriptions/index' }] : []),
+    { label: '公告中心', url: '/pages/announcements/index' },
+    { label: '使用指南', url: '/pages/guides/index' },
+    { label: '词库书架', url: '/pages/wordbook-shelf/index' },
+    { label: '邀请码', url: '/pages/invite-code/index' },
+    { label: '意见反馈', url: '/pages/feedback/index' },
     { label: '关于我们', url: '/pages/about/index' },
     { label: '用户协议', url: '/pages/terms/index' },
     { label: '隐私政策', url: '/pages/privacy/index' },
@@ -259,9 +266,9 @@ export default function Settings() {
             <View className="settings__code-row">
               <Input className="settings__input settings__input--code" value={bindEmailCode}
                 onInput={(e) => setBindEmailCode(e.detail.value)} placeholder="输入验证码" placeholderClass="settings__placeholder" />
-              <View className={`settings__send-btn ${bindEmailCountdown > 0 ? 'settings__send-btn--disabled' : ''}`}
-                onClick={() => bindEmailCountdown <= 0 && onSendBindCode()}>
-                <Text>{bindEmailCountdown > 0 ? `${bindEmailCountdown}s` : '发送验证码'}</Text>
+              <View className={`settings__send-btn ${bindEmailCountdown > 0 || sendingBindEmailCode ? 'settings__send-btn--disabled' : ''}`}
+                onClick={() => bindEmailCountdown <= 0 && !sendingBindEmailCode && onSendBindCode()}>
+                <Text>{sendingBindEmailCode ? '发送中' : bindEmailCountdown > 0 ? `${bindEmailCountdown}s` : '发送验证码'}</Text>
               </View>
             </View>
           </View>

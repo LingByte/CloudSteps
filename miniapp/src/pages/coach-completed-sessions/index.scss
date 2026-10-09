@@ -1,0 +1,39 @@
+@import '../../styles/vars.scss';
+.ccs { display:flex; flex-direction:column; height:100%; background:#f6f5f4; }
+.ccs__nav { display:flex; align-items:center; justify-content:space-between; padding:24px 32px; background:#fff; border-bottom:2px solid #e5e3df; }
+.ccs__back, .ccs__refresh { width:64px; height:64px; display:flex; align-items:center; justify-content:center; }
+.ccs__title { font-size:32px; font-weight:600; color:#1a1a1a; }
+.ccs__sub { padding:14px 32px; background:#fff; border-bottom:2px solid #e5e3df; font-size:22px; color:#787671; }
+.ccs__body { flex:1; min-height:0; }
+.ccs__state { display:flex; justify-content:center; padding:160px 0; color:#787671; font-size:26px; }
+.ccs__list { display:flex; flex-direction:column; }
+.ccs__item { padding:26px 32px; background:#fff; border-bottom:2px solid #f0efec; }
+.ccs__item-top { display:flex; align-items:center; gap:12px; }
+.ccs__item-title { flex:1; font-size:28px; font-weight:500; color:#1a1a1a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ccs__source { flex-shrink:0; font-size:20px; padding:4px 12px; border-radius:8px; border:2px solid #e5e3df; color:#787671; }
+.ccs__source--practice { border-color:#fde68a; background:#fffbeb; color:#b45309; }
+.ccs__item-meta { display:flex; flex-wrap:wrap; gap:8px 24px; margin-top:12px; }
+.ccs__meta { font-size:24px; color:#787671; }
+.ccs__item-billing { display:block; margin-top:10px; font-size:22px; color:#a4a097; }
+.ccs__pager { display:flex; align-items:center; justify-content:space-between; padding:20px 32px; background:#fff; border-top:2px solid #e5e3df; }
+.ccs__pager-info { font-size:24px; color:#787671; }
+.ccs__pager-btns { display:flex; gap:16px; }
+.ccs__pager-btn { padding:12px 28px; border:2px solid #e5e3df; border-radius:10px; background:#fff; font-size:24px; color:#1a1a1a; }
+.ccs__pager-btn--disabled { opacity:.4; }
+.ccs__mask { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:100; }
+.ccs__dialog { width:600px; max-height:80%; background:#fff; border-radius:16px; padding:32px; overflow-y:auto; }
+.ccs__dialog-title { font-size:32px; font-weight:600; color:#1a1a1a; }
+.ccs__dialog-head { margin-top:20px; padding:24px; background:#f6f5f4; border-radius:12px; display:flex; flex-direction:column; gap:8px; }
+.ccs__dialog-name { font-size:30px; font-weight:600; color:#1a1a1a; }
+.ccs__dialog-source { font-size:22px; color:#787671; }
+.ccs__grid { display:flex; flex-wrap:wrap; gap:16px; margin-top:20px; }
+.ccs__grid-item { width:calc(50% - 8px); padding:18px; border:2px solid #e5e3df; border-radius:12px; display:flex; flex-direction:column; gap:6px; box-sizing:border-box; }
+.ccs__grid-label { font-size:20px; color:#787671; }
+.ccs__grid-value { font-size:26px; color:#1a1a1a; }
+.ccs__billing { margin-top:20px; padding:24px; border:2px solid #e5e3df; border-radius:12px; display:flex; flex-direction:column; gap:14px; }
+.ccs__billing-row { display:flex; justify-content:space-between; font-size:26px; color:#1a1a1a; }
+.ccs__billing-row--muted { padding-top:14px; border-top:2px solid #f0efec; font-size:20px; color:#787671; }
+.ccs__dialog-btns { display:flex; gap:16px; margin-top:28px; }
+.ccs__dialog-btn { flex:1; height:80px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:28px; }
+.ccs__dialog-btn--outline { border:2px solid #e5e3df; color:#1a1a1a; }
+.ccs__dialog-btn--brand { background:#4ECDC4; color:#fff; font-weight:600; }

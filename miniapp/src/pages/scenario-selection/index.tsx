@@ -5,15 +5,16 @@
  *  1. 顶部导航:返回 + "情景口语"
  *  2. 口语能力概览卡片:综合分 + 练习次数 + 累计分钟
  *  3. 场景列表:场景图标 + 名称 + 难度标签 + 描述
- *  4. 点击场景 showToast "语音功能待开发"(小程序不支持 realtime voice)
+ *  4. 点击场景 startSession → scenario-dialogue 实时语音页
  */
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
 import Taro from '@tarojs/taro'
-import { ArrowLeft, Star, Notice } from '@nutui/icons-react-taro'
+import { ArrowLeft, Star, Clock, Plus } from '@nutui/icons-react-taro'
 import {
   listScenarios,
   getSpeakingStats,
+  startSession,
   type Scenario,
   type SpeakingStats,
 } from '../../api/scenarioDialogue'
@@ -40,6 +41,7 @@ export default function ScenarioSelection() {
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [stats, setStats] = useState<SpeakingStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [starting, setStarting] = useState<number | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -60,8 +62,22 @@ export default function ScenarioSelection() {
     }
   }, [])
 
-  const handleSelect = () => {
-    Taro.showToast({ title: '语音功能待开发', icon: 'none' })
+  const handleSelect = async (s: Scenario) => {
+    if (starting) return
+    setStarting(s.id)
+    try {
+      const res = await startSession(s.id)
+      if (res.code !== 200 || !res.data) {
+        Taro.showToast({ title: res.msg || '创建会话失败', icon: 'none' })
+        return
+      }
+      Taro.setStorageSync('lb_scenario_session', JSON.stringify(res.data))
+      Taro.navigateTo({ url: '/pages/scenario-dialogue/index' })
+    } catch (e: any) {
+      Taro.showToast({ title: e?.msg || '创建会话失败', icon: 'none' })
+    } finally {
+      setStarting(null)
+    }
   }
 
   return (
@@ -72,25 +88,19 @@ export default function ScenarioSelection() {
           <ArrowLeft size={22} color={color.charcoal} />
         </View>
         <Text className="scenario__nav-title">情景口语</Text>
-        <View className="scenario__nav-btn" />
+        <View className="scenario__nav-actions">
+          <View className="scenario__nav-btn" onClick={() => Taro.navigateTo({ url: '/pages/scenario-history/index' })}>
+            <Clock size={18} color={color.charcoal} />
+          </View>
+          <View className="scenario__nav-btn" onClick={() => Taro.navigateTo({ url: '/pages/create-custom-scenario/index' })}>
+            <Plus size={18} color={color.primary} />
+          </View>
+        </View>
       </View>
 
       <ScrollView className="scenario__body" scrollY enableFlex>
         {/* 流程提示 */}
         <Text className="scenario__flow">选择场景 → 语音对话 → 实时纠错 → 课后复盘</Text>
-
-        {/* 语音提示 */}
-        <View className="scenario__voice-hint">
-          <View className="scenario__voice-hint-icon">
-            <Notice size={16} color={color.warning} />
-          </View>
-          <View className="scenario__voice-hint-content">
-            <Text className="scenario__voice-hint-title">语音功能待开发</Text>
-            <Text className="scenario__voice-hint-desc">
-              小程序暂不支持实时语音对话,敬请期待
-            </Text>
-          </View>
-        </View>
 
         {/* 口语能力概览 */}
         {stats && stats.totalSessions > 0 && (
@@ -142,7 +152,7 @@ export default function ScenarioSelection() {
                 <View
                   key={s.id}
                   className="scenario__item"
-                  onClick={() => handleSelect()}
+                  onClick={() => void handleSelect(s)}
                 >
                   <View className="scenario__item-main">
                     <View

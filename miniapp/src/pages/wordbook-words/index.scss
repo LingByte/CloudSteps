@@ -1,241 +1,508 @@
-/**
- * 词库单词列表样式 — Warm Mint 主题。
- */
+@import '../../styles/vars.scss';
+
 .wbw {
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
-  min-height: 100%;
-  background-color: #f6f5f4;
-
-  &--empty {
-    align-items: center;
-    justify-content: center;
-    padding: 64px;
-    gap: 24px;
-  }
+  overflow: hidden;
+  background: rgba(240, 238, 236, .4);
 }
 
-.wbw__empty-text {
-  font-size: 28px;
-  color: #787671;
+.wbw--invalid {
+  align-items: center;
+  justify-content: center;
+  color: $muted-foreground;
+  font-size: 14px;
 }
 
-.wbw__back-link {
-  font-size: 28px;
-  color: #4ECDC4;
+.wbw__toolbar {
+  flex-shrink: 0;
+  z-index: 40;
+  padding: 0 12px;
+  border-bottom: 1px solid $border;
+  background: $card;
 }
 
-/* ============ 顶部导航 ============ */
-.wbw__nav {
+.wbw__toolbar-row {
+  height: 46px;
   display: flex;
   align-items: center;
-  height: 96px;
-  padding: 0px 24px;
-  background-color: #ffffff;
-  border-bottom: 2px solid #e5e3df;
-  flex-shrink: 0;
+  gap: 8px;
 }
 
-.wbw__nav-back {
-  width: 64px;
-  height: 64px;
+.wbw__count {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  color: $muted-foreground;
+}
+
+.wbw__actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.wbw__tool {
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: 8px;
+  color: $primary;
 }
 
-.wbw__nav-title {
-  flex: 1;
-  text-align: center;
-  font-size: 32px;
-  font-weight: 600;
-  color: #37352f;
-  overflow: hidden;
+.wbw__tool--active,
+.wbw__tool:active {
+  background: $primary-soft;
 }
 
-.wbw__nav-placeholder {
-  width: 64px;
-  flex-shrink: 0;
+.wbw__settings-wrap {
+  position: relative;
 }
 
-/* ============ 搜索框 ============ */
+.wbw__settings-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 50;
+  min-width: 136px;
+  padding: 4px 0;
+  border: 1px solid $border;
+  border-radius: 12px;
+  background: $card;
+  box-shadow: 0 10px 15px rgba(0, 0, 0, .1);
+}
+
+.wbw__settings-option {
+  padding: 8px 12px;
+  font-size: 14px;
+  color: $foreground;
+}
+
+.wbw__settings-option--active {
+  background: $primary;
+  color: #ffffff;
+}
+
 .wbw__search {
+  height: 36px;
+  margin-bottom: 10px;
+  padding: 0 12px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-top: 24px; margin-left: 32px; margin-right: 32px; margin-bottom: 0px;
-  padding: 0px 24px;
-  height: 80px;
-  background-color: #ffffff;
-  border: 2px solid #e5e3df;
-  border-radius: 12px;
-  flex-shrink: 0;
+  gap: 8px;
+  border: 1px solid $border;
+  border-radius: 8px;
+  background: $background;
 }
 
 .wbw__search-input {
+  min-width: 0;
   flex: 1;
-  font-size: 28px;
-  color: #37352f;
-  height: 80px;
-  line-height: 80px;
+  font-size: 14px;
+  color: $foreground;
 }
 
 .wbw__search-ph {
-  color: #a4a097;
-  font-size: 28px;
+  color: $muted-foreground;
 }
 
-.wbw__search-clear {
-  font-size: 24px;
-  color: #4ECDC4;
-  padding: 8px 12px;
-}
-
-/* ============ 统计 ============ */
-.wbw__meta {
-  padding-top: 16px; padding-left: 32px; padding-right: 32px; padding-bottom: 0px;
-  flex-shrink: 0;
-}
-
-.wbw__meta-text {
-  font-size: 24px;
-  color: #787671;
-}
-
-/* ============ 错误 ============ */
-.wbw__error {
-  margin-top: 24px; margin-left: 32px; margin-right: 32px; margin-bottom: 0px;
-  padding: 24px;
-  background-color: #ffffff;
-  border: 2px solid rgba(224, 49, 49, 0.3);
-  border-radius: 12px;
-  flex-shrink: 0;
-}
-
-.wbw__error-text {
-  font-size: 26px;
-  color: #e03131;
-}
-
-/* ============ 列表 ============ */
 .wbw__list {
   flex: 1;
-  min-height: 0px;
-  padding-top: 24px; padding-left: 32px; padding-right: 32px; padding-bottom: 48px;
+  min-height: 0;
+  padding: 12px;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
-.wbw__cards {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+.wbw__error {
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  border: 1px solid rgba(224, 49, 49, .2);
+  border-radius: 12px;
+  background: rgba(224, 49, 49, .05);
+  color: $destructive;
+  font-size: 14px;
+}
+
+.wbw__state {
+  padding: 40px 16px;
+  border: 1px solid $border;
+  border-radius: 12px;
+  background: $card;
+  color: $muted-foreground;
+  font-size: 14px;
+  text-align: center;
 }
 
 .wbw__card {
-  display: flex;
-  align-items: flex-start;
-  gap: 24px;
-  padding: 28px;
-  background-color: #ffffff;
-  border: 2px solid #e5e3df;
-  border-radius: 12px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  border: 1px solid $border;
+  border-radius: 16px;
+  background: $card;
 }
 
 .wbw__card-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  padding: 16px;
 }
 
 .wbw__word-row {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.wbw__word-wrap {
+  min-width: 0;
+  flex: 1;
+  display: flex;
   flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  row-gap: 2px;
 }
 
 .wbw__word {
-  font-size: 36px;
+  font-size: 18px;
   font-weight: 600;
-  color: #37352f;
+  line-height: 1.35;
+  color: $foreground;
 }
 
-.wbw__pos {
-  font-size: 22px;
-  color: #787671;
-  background-color: #fafaf9;
-  padding: 4px 14px;
-  border-radius: 8px;
+.wbw__word--hidden {
+  padding: 0 8px;
+  border-radius: 6px;
+  background: $muted;
+  color: transparent;
+  user-select: none;
 }
 
 .wbw__phonetic {
-  font-size: 26px;
-  color: #55A3FF;
+  font-size: 14px;
+  color: $muted-foreground;
 }
 
-.wbw__meaning {
-  font-size: 28px;
-  color: #37352f;
-  line-height: 1.6;
-}
-
-.wbw__example {
-  font-size: 24px;
-  color: #787671;
-  font-style: italic;
-  border-left: 4px solid rgba(78, 205, 196, 0.4);
-  padding-left: 20px;
-  line-height: 1.6;
-}
-
-/* ============ 播放按钮 ============ */
 .wbw__play {
-  flex-shrink: 0;
-  padding: 16px 28px;
-  border-radius: 999px;
-  background-color: rgba(78, 205, 196, 0.12);
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-
-  &--playing {
-    background-color: #4ECDC4;
-  }
-
-  &--disabled {
-    background-color: #e5e3df;
-  }
+  border-radius: 8px;
 }
 
-.wbw__play-text {
-  font-size: 24px;
-  color: #3DB8B0;
+.wbw__play--active,
+.wbw__play:active {
+  background: $primary-soft;
 }
 
-.wbw__play--playing .wbw__play-text {
-  color: #ffffff;
+.wbw__play--disabled {
+  opacity: .45;
 }
 
-.wbw__play--disabled .wbw__play-text {
-  color: #a4a097;
+.wbw__meaning-area {
+  margin-top: 12px;
 }
 
-/* ============ 状态占位 ============ */
-.wbw__state {
-  padding: 64px 32px;
-  text-align: center;
-  background-color: #ffffff;
-  border: 2px solid #e5e3df;
-  border-radius: 12px;
+.wbw__meaning-mask {
+  height: 56px;
+  border-radius: 8px;
+  background: $muted;
 }
 
-.wbw__state--more {
+.wbw__meaning-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wbw__meaning {
+  font-size: 14px;
+  line-height: 1.6;
+  color: $muted-foreground;
+}
+
+.wbw__no-meaning {
+  font-size: 14px;
+  color: $muted-soft;
+}
+
+.wbw__card-footer {
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  border-top: 1px solid $border;
+}
+
+.wbw__mini-action {
+  padding: 6px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: $muted-foreground;
+}
+
+.wbw__mini-action--danger:active {
+  color: $destructive;
+}
+
+.wbw__mini-action--detail {
+  font-weight: 500;
+  color: $primary;
+}
+
+.wbw__pager {
+  padding-top: 4px;
+  padding-bottom: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: $muted-foreground;
+  font-size: 14px;
+}
+
+.wbw__pager-text {
+  flex-shrink: 0;
+}
+
+.wbw__mask {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  padding: 16px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .4);
+}
+
+.wbw__dialog {
+  width: 100%;
+  max-width: 672px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 16px;
+  background: $card;
+}
+
+.wbw__dialog--edit {
+  max-width: 448px;
+}
+
+.wbw__dialog-head {
+  flex-shrink: 0;
+  padding: 20px 20px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wbw__dialog-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 20px;
+  font-weight: 600;
+  color: $foreground;
+}
+
+.wbw__dialog-close {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+
+.wbw__dialog-body {
+  flex: 1;
+  min-height: 0;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.wbw__detail-head {
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid $border;
+}
+
+.wbw__detail-word-area {
+  min-width: 0;
+  flex: 1;
+}
+
+.wbw__detail-word {
+  display: block;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #1e3a5f;
+}
+
+.wbw__detail-meta {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 12px;
+  row-gap: 4px;
+  font-size: 14px;
+  color: $muted-foreground;
+}
+
+.wbw__detail-pos {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: $muted;
+  font-size: 12px;
+}
+
+.wbw__detail-section {
   margin-top: 20px;
-  padding: 32px;
 }
 
-.wbw__state-text {
-  font-size: 28px;
-  color: #787671;
+.wbw__detail-section-head {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: $muted-foreground;
+}
+
+.wbw__detail-dot {
+  width: 4px;
+  height: 12px;
+  border-radius: 999px;
+  background: $primary;
+}
+
+.wbw__detail-text {
+  font-size: 14px;
+  line-height: 1.7;
+  color: $foreground;
+}
+
+.wbw__detail-text--muted {
+  color: $muted-foreground;
+}
+
+.wbw__detail-example {
+  margin-bottom: 12px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(78, 205, 196, .3);
+}
+
+.wbw__detail-en {
+  display: block;
+  font-size: 14px;
+  line-height: 1.6;
+  color: $foreground;
+}
+
+.wbw__detail-cn {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: $muted-foreground;
+}
+
+.wbw__detail-phrase {
+  margin-bottom: 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 14px;
+  color: $muted-foreground;
+}
+
+.wbw__detail-phrase-name {
+  font-weight: 500;
+  color: #1e3a5f;
+}
+
+.wbw__detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wbw__detail-tag {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: $muted;
+  font-size: 12px;
+  color: $foreground;
+}
+
+.wbw__edit-fields {
+  padding: 16px 20px;
+}
+
+.wbw__edit-field {
+  margin-bottom: 12px;
+}
+
+.wbw__edit-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: $foreground;
+}
+
+.wbw__edit-input,
+.wbw__edit-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid $input;
+  border-radius: 12px;
+  background: $card;
+  color: $charcoal;
+  font-size: 14px;
+}
+
+.wbw__edit-input {
+  min-height: 40px;
+}
+
+.wbw__edit-textarea {
+  min-height: 96px;
+}
+
+.wbw__dialog-footer {
+  flex-shrink: 0;
+  padding: 0 20px 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }

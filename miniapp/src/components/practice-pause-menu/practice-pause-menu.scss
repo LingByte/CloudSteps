@@ -1,0 +1,7 @@
+.practice-pause-mask { position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; padding:24px; box-sizing:border-box; background:rgba(0,0,0,.4); }
+.practice-pause-panel { width:100%; max-width:360px; padding:24px; box-sizing:border-box; border-radius:16px; background:#fff; text-align:center; }
+.practice-pause-title { display:block; font-size:18px; font-weight:700; color:#2d3748; }
+.practice-pause-desc { display:block; margin-top:8px; font-size:13px; line-height:1.5; color:#718096; }
+.practice-pause-primary, .practice-pause-secondary { height:44px; margin-top:16px; display:flex; align-items:center; justify-content:center; border-radius:999px; font-size:14px; }
+.practice-pause-primary { background:#4ecdc4; color:#fff; }
+.practice-pause-secondary { margin-top:8px; background:#f1f5f9; color:#718096; }

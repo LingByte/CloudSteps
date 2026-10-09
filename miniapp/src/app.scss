@@ -6,6 +6,11 @@
 
 /* ============ CSS 变量(运行时,对齐 web theme.css :root) ============ */
 page {
+  width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+
   /* 字体 */
   --font-sans: "Plus Jakarta Sans", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -20,6 +25,7 @@ page {
   --background: #f6f5f4;
   --card: #ffffff;
   --surface-soft: #fafaf9;
+  --muted: #f0eeec;
 
   /* 边框 */
   --border: #e5e3df;

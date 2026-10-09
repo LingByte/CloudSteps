@@ -118,6 +118,18 @@ export function getVoiceReady(): Promise<ApiResponse<VoiceReadyStatus>> {
   return get<VoiceReadyStatus>('/scenario-dialogue/voice/ready')
 }
 
+export type CustomScenarioPayload = {
+  name: string
+  description?: string
+  aiRole: string
+  prompt: string
+  difficulty: string
+}
+
+export function createCustomScenario(payload: CustomScenarioPayload): Promise<ApiResponse<Scenario>> {
+  return post<Scenario>('/scenario-dialogue/custom/scenarios', payload)
+}
+
 export function activateSession(sessionId: number): Promise<ApiResponse<any>> {
   return post(`/scenario-dialogue/sessions/${sessionId}/activate`, {})
 }

@@ -1,0 +1,190 @@
+@import '../../styles/vars.scss';
+
+.create-student {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: $background;
+}
+
+.create-student__content {
+  flex: 1;
+  min-height: 0;
+  padding: 12px 0;
+  box-sizing: border-box;
+}
+
+.create-student__section {
+  overflow: hidden;
+  border-top: 1px solid $border;
+  border-bottom: 1px solid $border;
+  background: $card;
+}
+
+.create-student__section-head {
+  padding: 10px 16px;
+  border-bottom: 1px solid $border;
+}
+
+.create-student__section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: $foreground;
+}
+
+.create-student__section-body {
+  padding: 12px 16px;
+}
+
+.create-student__field {
+  margin-bottom: 12px;
+}
+
+.create-student__field:last-child {
+  margin-bottom: 0;
+}
+
+.create-student__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: $charcoal;
+}
+
+.create-student__required {
+  color: $destructive;
+}
+
+.create-student__input {
+  width: 100%;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid $input;
+  border-radius: 12px;
+  background: $card;
+  color: $charcoal;
+  font-size: 14px;
+}
+
+.create-student__hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: $muted-foreground;
+}
+
+.create-student__link {
+  width: 100%;
+  padding: 8px 12px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  color: $muted-foreground;
+}
+
+.create-student__submit-wrap {
+  padding: 4px 12px 16px;
+  box-sizing: border-box;
+}
+
+.create-student__submit {
+  width: 100%;
+}
+
+.create-student__mask {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  padding: 16px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .4);
+}
+
+.create-student__modal {
+  width: 100%;
+  max-width: 448px;
+  padding: 20px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  background: $card;
+}
+
+.create-student__modal-head {
+  margin-bottom: 16px;
+}
+
+.create-student__modal-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: $foreground;
+}
+
+.create-student__modal-desc {
+  display: block;
+  margin-top: 4px;
+  font-size: 14px;
+  color: $muted-foreground;
+}
+
+.create-student__credential {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid $border;
+  border-radius: 12px;
+  background: rgba(240, 238, 236, .6);
+}
+
+.create-student__credential-info {
+  min-width: 0;
+}
+
+.create-student__credential-label {
+  display: block;
+  font-size: 11px;
+  color: $muted-foreground;
+}
+
+.create-student__credential-value {
+  display: block;
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: $foreground;
+}
+
+.create-student__modal-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+.create-student__modal-btn {
+  flex: 1;
+}
+
+@media (min-width: 640px) {
+  .create-student__section {
+    border: 1px solid $border;
+    border-radius: 16px;
+  }
+
+  .create-student__content {
+    padding: 12px;
+  }
+}

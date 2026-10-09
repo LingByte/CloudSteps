@@ -12,16 +12,16 @@
 .tr__nav {
   display: flex;
   align-items: center;
-  height: 96px;
-  padding: 0px 24px;
+  height: 48px;
+  padding: 0 12px;
   background-color: #ffffff;
   border-bottom: 2px solid #e5e3df;
   flex-shrink: 0;
 }
 
 .tr__nav-back {
-  width: 64px;
-  height: 64px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -31,7 +31,7 @@
 .tr__nav-title {
   flex: 1;
   text-align: center;
-  font-size: 32px;
+  font-size: 16px;
   font-weight: 600;
   color: #37352f;
 }
@@ -213,7 +213,7 @@
 }
 
 .tr__state-title {
-  font-size: 32px;
+  font-size: 16px;
   font-weight: 600;
   color: #37352f;
 }

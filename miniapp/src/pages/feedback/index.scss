@@ -1,0 +1,12 @@
+@import '../../styles/vars.scss';
+.feedback { display:flex; flex-direction:column; min-height:100%; background:#f6f5f4; }.fb__nav { display:flex; align-items:center; justify-content:space-between; padding:24px 32px; background:#fff; border-bottom:2px solid #e5e3df; }.fb__back { width:64px; height:64px; display:flex; align-items:center; justify-content:center; }.fb__title { font-size:32px; font-weight:600; color:#1a1a1a; }.fb__body { flex:1; padding:24px 32px 0; }.fb__card,.fb__ticket { padding:28px; margin-bottom:24px; background:#fff; border:2px solid #e5e3df; border-radius:16px; }.fb__section,.fb__history { display:block; margin-bottom:18px; color:#1a1a1a; font-size:28px; font-weight:600; }.fb__textarea,.fb__input { box-sizing:border-box; width:100%; padding:18px 20px; margin-bottom:16px; border:2px solid #e5e3df; border-radius:12px; font-size:25px; }.fb__textarea { min-height:200px; }.fb__submit { height:80px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:#4ECDC4; color:#fff; font-size:26px; font-weight:600; }.fb__state { display:block; padding:60px 0; text-align:center; color:#787671; font-size:24px; }.fb__list { display:flex; flex-direction:column; gap:16px; }.fb__ticket { margin-bottom:0; }.fb__ticket-top { display:flex; justify-content:space-between; margin-bottom:14px; }.fb__ticket-status { color:#4ECDC4; font-size:22px; }.fb__date { color:#a4a097; font-size:20px; }.fb__content,.fb__reply { display:block; color:#37352f; font-size:25px; line-height:1.6; }.fb__reply { margin-top:14px; padding:14px; border-radius:10px; background:#e8f8f5; color:#3d7772; }
+/* H5 compact mobile scale */
+.fb__nav { padding:12px 16px; }
+.fb__back { width:32px; height:32px; }
+.fb__title { font-size:16px; }
+.fb__body { padding:12px 16px 0; }
+.fb__card, .fb__ticket { padding:14px; margin-bottom:12px; border-radius:12px; }
+.fb__section, .fb__history { margin-bottom:10px; font-size:14px; }
+.fb__textarea, .fb__input { padding:9px 10px; margin-bottom:10px; border-radius:8px; font-size:13px; }
+.fb__submit { height:44px; font-size:14px; }
+

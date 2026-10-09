@@ -1,0 +1,278 @@
+/**
+ * 学习报告页样式 — Warm Mint 主题。
+ */
+@import '../../styles/vars.scss';
+
+.sr {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background-color: #f6f5f4;
+}
+
+.sr__navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 32px;
+  background-color: #ffffff;
+  border-bottom: 2px solid #e5e3df;
+  flex-shrink: 0;
+}
+
+.sr__nav-btn {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sr__nav-title {
+  font-size: 32px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.sr__body {
+  flex: 1;
+  padding: 24px 32px 0;
+}
+
+.sr__state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 160px 0;
+}
+
+.sr__state-text {
+  font-size: 26px;
+  color: #787671;
+}
+
+.sr__content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ============ 概览 ============ */
+.sr__overview {
+  background-color: #ffffff;
+  border: 2px solid #e5e3df;
+  border-radius: 16px;
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sr__overview-title {
+  font-size: 32px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.sr__overview-student {
+  font-size: 24px;
+  color: #787671;
+}
+
+.sr__overview-time {
+  font-size: 22px;
+  color: #a4a097;
+}
+
+/* ============ 核心数据 ============ */
+.sr__stats-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.sr__stat-card {
+  flex: 1;
+  min-width: 160px;
+  border-radius: 16px;
+  padding: 28px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+
+  &--mint {
+    background-color: #e8f8f5;
+  }
+
+  &--green {
+    background-color: rgba(26, 174, 57, 0.08);
+  }
+
+  &--red {
+    background-color: rgba(255, 107, 107, 0.08);
+  }
+
+  &--sky {
+    background-color: #e8f2fc;
+  }
+}
+
+.sr__stat-value {
+  font-size: 44px;
+  font-weight: 700;
+
+  .sr__stat-card--mint & {
+    color: #4ECDC4;
+  }
+
+  .sr__stat-card--green & {
+    color: #1aae39;
+  }
+
+  .sr__stat-card--red & {
+    color: #ff6b6b;
+  }
+
+  .sr__stat-card--sky & {
+    color: #55A3FF;
+  }
+}
+
+.sr__stat-label {
+  font-size: 22px;
+  color: #787671;
+}
+
+/* ============ 信息区 ============ */
+.sr__section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sr__section-title {
+  font-size: 28px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.sr__info-card {
+  background-color: #ffffff;
+  border: 2px solid #e5e3df;
+  border-radius: 16px;
+  padding: 8px 28px;
+}
+
+.sr__info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 0;
+  border-bottom: 2px solid #f6f5f4;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.sr__info-label {
+  font-size: 26px;
+  color: #787671;
+}
+
+.sr__info-value {
+  font-size: 26px;
+  font-weight: 500;
+  color: #1a1a1a;
+}
+
+/* ============ 单词标签 ============ */
+.sr__word-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.sr__word-tag {
+  padding: 10px 20px;
+  border-radius: 12px;
+
+  &--wrong {
+    background-color: rgba(255, 107, 107, 0.08);
+    border: 2px solid rgba(255, 107, 107, 0.2);
+  }
+
+  &--correct {
+    background-color: rgba(26, 174, 57, 0.08);
+    border: 2px solid rgba(26, 174, 57, 0.2);
+  }
+}
+
+.sr__word-tag-text {
+  font-size: 24px;
+  color: #37352f;
+}
+
+/* ============ AI 报告 ============ */
+.sr__ai-card {
+  background-color: #ffffff;
+  border: 2px solid #e5e3df;
+  border-radius: 16px;
+  padding: 28px;
+}
+
+.sr__ai-text {
+  font-size: 26px;
+  color: #37352f;
+  line-height: 1.7;
+}
+
+/* ============ 底部按钮 ============ */
+.sr__bottom-bar {
+  padding: 24px 32px;
+  background-color: #ffffff;
+  border-top: 2px solid #e5e3df;
+  flex-shrink: 0;
+}
+
+.sr__btn {
+  height: 88px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &--primary {
+    background-color: #4ECDC4;
+  }
+
+  &--secondary {
+    margin-bottom: 8px;
+    border: 1px solid #4ECDC4;
+    background-color: #ffffff;
+  }
+
+  &--secondary .sr__btn-text {
+    color: #4ECDC4;
+  }
+}
+
+.sr__btn-text {
+  font-size: 28px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+/* H5 compact mobile scale */
+.sr__navbar { padding:12px 16px; }
+.sr__nav-btn { width:32px; height:32px; }
+.sr__nav-title { font-size:16px; }
+.sr__body { padding:12px 16px 0; }
+.sr__content { gap:12px; }
+.sr__overview { border-radius:12px; padding:16px 14px; }
+.sr__overview-title { font-size:16px; }
+.sr__overview-student { font-size:12px; }
+.sr__state-text { font-size:14px; }
+.sr__btn-text { font-size:14px; }
+

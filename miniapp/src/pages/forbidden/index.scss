@@ -1,0 +1,11 @@
+@import '../../styles/vars.scss';
+.forbidden { display:flex; align-items:center; justify-content:center; min-height:100%; background:#f6f5f4; padding:32px; }
+.fb__card { width:100%; max-width:640px; background:#fff; border:2px solid #e5e3df; border-radius:20px; padding:48px; }
+.fb__title { font-size:36px; font-weight:700; color:#1a1a1a; }
+.fb__desc { display:block; margin-top:16px; font-size:26px; color:#787671; }
+.fb__btns { display:flex; gap:20px; margin-top:40px; }
+.fb__btn { flex:1; height:80px; border-radius:12px; display:flex; align-items:center; justify-content:center; }
+.fb__btn--primary { background:#4ECDC4; }
+.fb__btn--outline { border:2px solid #e5e3df; }
+.fb__btn-text { font-size:28px; font-weight:600; color:#fff; }
+.fb__btn-text--dark { color:#1a1a1a; }

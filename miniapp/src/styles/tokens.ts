@@ -22,6 +22,7 @@ export const color = {
   background: '#f6f5f4',
   card: '#ffffff',
   surfaceSoft: '#fafaf9',
+  muted: '#f0eeec',
 
   /* 边框 */
   border: '#e5e3df',

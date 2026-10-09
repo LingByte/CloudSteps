@@ -1,26 +1,17 @@
-/**
- * 词汇测试结果页 — 对齐 web/src/pages/VocabularyTestResult.tsx。
- *
- * 调用 getVocabResult() 获取结果(优先读取缓存)。
- * 显示:估算词汇量(大数字)+等级+答题统计(总数/正确数/正确率)。
- */
-import { useEffect, useState } from 'react'
-import { View, Text, ScrollView } from '@tarojs/components'
-import Taro from '@tarojs/taro'
-import { ArrowLeft, Refresh, Star, Check, Clock } from '@nutui/icons-react-taro'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ScrollView, Text, View } from '@tarojs/components'
+import Taro, { getCurrentInstance } from '@tarojs/taro'
+import { Refresh } from '@nutui/icons-react-taro'
 import { CloudButton } from '../../components/button'
+import { TopBar } from '../../components/top-bar/TopBar'
 import { getVocabResult } from '../../api/vocab'
+import { getStudentVocabRecordAsTeacher } from '../../api/coaching'
+import { clearVocabTestResultCache, refreshVocabTestQuestions } from '../../utils/vocabTestCache'
+import { VocabTestResultView, type VocabTestResultPayload } from '../../components/vocab-test-result-view/VocabTestResultView'
 import { color } from '../../styles/tokens'
 import './index.scss'
 
-interface VocabResult {
-  level: string
-  estimatedVocab: number
-  correctCount: number
-  totalCount: number
-}
-
-function normalizeVocabResult(raw: any): VocabResult | null {
+function normalizeVocabResult(raw: any): VocabTestResultPayload | null {
   const data = raw?.record || raw
   if (!data) return null
   const estimatedVocab = Number(data.estimatedVocab)
@@ -36,152 +27,81 @@ function normalizeVocabResult(raw: any): VocabResult | null {
 }
 
 export default function VocabTestResult() {
-  const [result, setResult] = useState<VocabResult | null>(null)
+  const params = getCurrentInstance().router?.params || {}
+  const studentId = String(params.studentId || '')
+  const recordId = String(params.recordId || '')
+  const isHistory = Boolean(studentId && recordId)
+  const [result, setResult] = useState<VocabTestResultPayload | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const handleBack = () => {
-    Taro.navigateBack({ delta: 2 }).catch(() => {
-      Taro.reLaunch({ url: '/pages/material-selection/index' })
+  const handleBack = useCallback(() => {
+    Taro.navigateBack({ delta: 1 }).catch(() => {
+      if (isHistory) {
+        Taro.redirectTo({ url: `/pages/student-detail/index?id=${encodeURIComponent(studentId)}&tab=vocab` })
+      } else {
+        Taro.reLaunch({ url: '/pages/home/index' })
+      }
     })
-  }
+  }, [isHistory, studentId])
 
-  const handleRetry = () => {
-    Taro.redirectTo({ url: '/pages/vocab-test/index' })
-  }
-
-  const handleHome = () => {
-    Taro.reLaunch({ url: '/pages/home/index' })
-  }
-
-  const handleRefresh = async () => {
+  const loadResult = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await getVocabResult()
-      if (res.code === 200) {
-        const mapped = normalizeVocabResult(res.data)
-        if (mapped) setResult(mapped)
+      setResult(null)
+      if (isHistory) {
+        const res = await getStudentVocabRecordAsTeacher(studentId, recordId)
+        if (res.code === 200) setResult(normalizeVocabResult(res.data))
+        return
       }
+      const cached = Taro.getStorageSync('vocabulary_test_result')
+      if (cached) {
+        const parsed = normalizeVocabResult(typeof cached === 'string' ? JSON.parse(cached) : cached)
+        if (parsed) {
+          setResult(parsed)
+          return
+        }
+        Taro.removeStorageSync('vocabulary_test_result')
+      }
+      const res = await getVocabResult()
+      if (res.code === 200) setResult(normalizeVocabResult(res.data))
     } catch {
-      /* ignore */
+      /* noop */
     } finally {
       setLoading(false)
     }
-  }
+  }, [isHistory, studentId, recordId])
+
+  useEffect(() => { void loadResult() }, [loadResult])
 
   useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        setLoading(true)
-        // 优先读取缓存(测试页提交时写入)
-        const cached = Taro.getStorageSync('vocabulary_test_result')
-        if (cached) {
-          const parsed = normalizeVocabResult(
-            typeof cached === 'string' ? JSON.parse(cached) : cached
-          )
-          if (parsed) {
-            if (mounted) setResult(parsed)
-            return
-          }
-        }
-        const res = await getVocabResult()
-        if (mounted && res.code === 200) {
-          const mapped = normalizeVocabResult(res.data)
-          if (mapped) setResult(mapped)
-        }
-      } catch {
-        /* ignore */
-      } finally {
-        if (mounted) setLoading(false)
-      }
-    })()
-    return () => {
-      mounted = false
-    }
-  }, [])
+    if (!result || isHistory) return
+    refreshVocabTestQuestions().catch(() => {})
+  }, [result, isHistory])
 
-  const correctRate =
-    result && result.totalCount > 0
-      ? Math.round((result.correctCount / result.totalCount) * 100)
-      : 0
+  const hasResult = useMemo(() => Boolean(result), [result])
 
   return (
-    <View className="vtr">
-      {/* 顶部导航 */}
-      <View className="vtr__nav">
-        <View className="vtr__nav-back" onClick={handleBack}>
-          <ArrowLeft size={20} color={color.charcoal} />
-        </View>
-        <Text className="vtr__nav-title">测试结果</Text>
-        <View className="vtr__nav-placeholder" />
-      </View>
-
-      <ScrollView className="vtr__body" scrollY enableFlex>
-        {loading ? (
-          <View className="vtr__state">
-            <Text className="vtr__state-text">结果加载中...</Text>
-          </View>
-        ) : !result ? (
-          <View className="vtr__empty">
-            <Text className="vtr__empty-title">暂无测试结果</Text>
-            <Text className="vtr__empty-desc">去开始一次词汇量测试吧</Text>
-            <CloudButton variant="brand" size="pill" className="vtr__empty-btn" onClick={handleBack}>
-              返回资料选择
-            </CloudButton>
+    <View className="vtr-page">
+      <TopBar title="测试结果" onBack={handleBack} />
+      <ScrollView className="vtr-page__body" scrollY enableFlex>
+        {loading ? <View className="vtr-page__loading"><Text>结果加载中...</Text></View> : !hasResult || !result ? (
+          <View className="vtr-page__empty">
+            <Text className="vtr-page__empty-title">暂无测试结果</Text>
+            <Text className="vtr-page__empty-desc">{isHistory ? '这条测评记录不存在或无权查看' : '去开始一次词汇量测试吧'}</Text>
+            <CloudButton variant="brand" size="pill" className="vtr-page__empty-btn" onClick={() => isHistory ? handleBack() : Taro.redirectTo({ url: '/pages/vocab-test/index' })}>{isHistory ? '返回' : '去测试'}</CloudButton>
           </View>
         ) : (
-          <View className="vtr__content">
-            {/* 词汇量大数字 */}
-            <View className="vtr__hero">
-              <Text className="vtr__hero-label">估算词汇量</Text>
-              <Text className="vtr__hero-number">{result.estimatedVocab.toLocaleString()}</Text>
-              {result.level ? (
-                <View className="vtr__hero-level">
-                  <Star size={18} color={color.primary} />
-                  <Text className="vtr__hero-level-text">{result.level}</Text>
+          <View className="vtr-page__result">
+            <VocabTestResultView result={result} />
+            {isHistory ? <CloudButton variant="outline" size="pill" className="vtr-page__action" onClick={handleBack}>返回</CloudButton> : (
+              <>
+                <View className="vtr-page__actions">
+                  <CloudButton variant="brand" size="pill" className="vtr-page__action" onClick={() => { clearVocabTestResultCache(); Taro.redirectTo({ url: '/pages/vocab-test-testing/index' }) }}>重新测试</CloudButton>
+                  <CloudButton variant="outline" size="pill" className="vtr-page__action" onClick={handleBack}>返回</CloudButton>
                 </View>
-              ) : null}
-            </View>
-
-            {/* 答题统计 */}
-            <View className="vtr__stats">
-              <View className="vtr__stat-card">
-                <View className="vtr__stat-icon vtr__stat-icon--total">
-                  <Clock size={22} color={color.secondaryBrand} />
-                </View>
-                <Text className="vtr__stat-value">{result.totalCount}</Text>
-                <Text className="vtr__stat-label">总题数</Text>
-              </View>
-              <View className="vtr__stat-card">
-                <View className="vtr__stat-icon vtr__stat-icon--correct">
-                  <Check size={22} color={color.success} />
-                </View>
-                <Text className="vtr__stat-value">{result.correctCount}</Text>
-                <Text className="vtr__stat-label">正确数</Text>
-              </View>
-              <View className="vtr__stat-card">
-                <View className="vtr__stat-icon vtr__stat-icon--rate">
-                  <Star size={22} color={color.primary} />
-                </View>
-                <Text className="vtr__stat-value">{correctRate}%</Text>
-                <Text className="vtr__stat-label">正确率</Text>
-              </View>
-            </View>
-
-            {/* 操作按钮 */}
-            <View className="vtr__actions">
-              <CloudButton variant="brand" size="pill" className="vtr__action-btn" onClick={handleRetry}>
-                重新测试
-              </CloudButton>
-              <CloudButton variant="outline" size="pill" className="vtr__action-btn" onClick={handleHome}>
-                返回首页
-              </CloudButton>
-            </View>
-
-            <CloudButton variant="ghost" size="pill" className="vtr__refresh-btn" onClick={handleRefresh}>
-              <Refresh size={16} color={color.mutedForeground} />
-              <Text style={{ marginLeft: '8rpx' }}>刷新结果</Text>
-            </CloudButton>
+                <CloudButton variant="outline" size="pill" className="vtr-page__refresh" onClick={() => void loadResult()}><Refresh size={16} color={color.mutedForeground} /> 刷新结果</CloudButton>
+              </>
+            )}
           </View>
         )}
       </ScrollView>

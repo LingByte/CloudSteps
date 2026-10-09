@@ -4,7 +4,7 @@
 .profile {
   min-height: 100%;
   background-color: #f6f5f4;
-  padding-top: 32px; padding-left: 32px; padding-right: 32px; padding-bottom: 64px;
+  padding: 16px 16px 32px;
 
   &--loading {
     display: flex;
@@ -22,15 +22,15 @@
 .profile__header {
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 32px;
-  border-radius: 16px;
-  margin-bottom: 32px;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 16px;
 }
 
 .profile__avatar {
-  width: 128px;
-  height: 128px;
+  width: 64px;
+  height: 64px;
   border-radius: 999px;
   background-color: rgba(255, 255, 255, 0.25);
   display: flex;

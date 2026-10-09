@@ -1,0 +1,13 @@
+.practice-font-trigger { width: 32px; height: 32px; display:flex; align-items:center; justify-content:center; }
+.practice-font-mask { position:fixed; inset:0; z-index:95; padding:16px; box-sizing:border-box; display:flex; align-items:flex-end; background:rgba(0,0,0,.4); }
+.practice-font-panel { width:100%; padding:20px; box-sizing:border-box; border-radius:16px 16px 0 0; background:#fff; }
+.practice-font-title { display:block; margin-bottom:16px; font-size:16px; font-weight:600; color:#2d3748; }
+.practice-font-row { min-height:44px; display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid #f1f5f9; font-size:14px; color:#2d3748; }
+.practice-font-step { display:flex; align-items:center; gap:14px; color:#55a3ff; }
+.practice-font-step > View { width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:999px; background:#eff6ff; }
+.practice-font-switch, .practice-font-family { padding:5px 9px; border-radius:7px; background:#f1f5f9; color:#718096; font-size:12px; }
+.practice-font-switch--active, .practice-font-family--active { background:rgba(78,205,196,.15); color:#2c7a7b; }
+.practice-font-families { display:flex; gap:6px; }
+.practice-font-preview { margin-top:16px; padding:16px; border-radius:10px; background:#f7f9fc; color:#2d3748; text-align:center; }
+.practice-font-close { height:42px; margin-top:16px; display:flex; align-items:center; justify-content:center; border-radius:999px; background:#4ecdc4; color:#fff; font-size:14px; }
+@media (min-width:640px) { .practice-font-mask { align-items:center; justify-content:center; } .practice-font-panel { max-width:420px; border-radius:16px; } }

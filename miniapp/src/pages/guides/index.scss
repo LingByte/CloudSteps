@@ -1,0 +1,32 @@
+@import '../../styles/vars.scss';
+.guides { display:flex; flex-direction:column; height:100%; background:#f6f5f4; }
+.gd__nav { display:flex; align-items:center; justify-content:space-between; padding:24px 32px; background:#fff; border-bottom:2px solid #e5e3df; }
+.gd__back { width:64px; height:64px; display:flex; align-items:center; justify-content:center; }
+.gd__title { font-size:32px; font-weight:600; color:#1a1a1a; }
+/* H5 compact mobile scale */
+.gd__nav { padding:12px 16px; }
+.gd__back { width:32px; height:32px; }
+.gd__title { font-size:16px; }
+.gd__body { padding:12px 16px; }
+
+.gd__counter { width:64px; text-align:right; font-size:22px; color:#787671; }
+.gd__tabs { display:flex; gap:32px; padding:0 32px; background:#fff; border-bottom:2px solid #e5e3df; }
+.gd__tab { padding:20px 4px; border-bottom:4px solid transparent; }
+.gd__tab--active { border-bottom-color:#4ECDC4; }
+.gd__tab-text { font-size:26px; color:#787671; }
+.gd__tab--active .gd__tab-text { color:#1a1a1a; font-weight:600; }
+.gd__swiper { flex:1; min-height:0; padding:24px 32px 0; box-sizing:border-box; }
+.gd__slide { height:100%; display:flex; align-items:center; justify-content:center; background:#fff; border:2px solid #e5e3df; border-radius:16px; overflow:hidden; }
+.gd__image { width:100%; height:100%; }
+.gd__placeholder { display:flex; align-items:center; justify-content:center; height:100%; }
+.gd__placeholder-text { color:#a4a097; font-size:26px; }
+.gd__footer { padding:16px 32px 24px; }
+.gd__caption-row { display:flex; justify-content:space-between; margin-bottom:12px; }
+.gd__caption { font-size:26px; font-weight:500; color:#1a1a1a; }
+.gd__progress { height:8px; border-radius:999px; background:#e5e3df; overflow:hidden; margin-bottom:16px; }
+.gd__progress-bar { height:100%; border-radius:999px; background:#4ECDC4; }
+.gd__thumbs { white-space:nowrap; }
+.gd__thumb { display:inline-flex; align-items:center; justify-content:center; width:88px; height:56px; margin-right:12px; border-radius:10px; background:#fff; border:2px solid #e5e3df; }
+.gd__thumb--active { border-color:#4ECDC4; }
+.gd__thumb-num { font-size:22px; color:#787671; }
+.gd__thumb--active .gd__thumb-num { color:#3DB8B0; font-weight:600; }

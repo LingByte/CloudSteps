@@ -1,18 +1,9 @@
-/**
- * 我的学生页 — 对齐 web/src/pages/MyStudents.tsx。
- *
- * 移动端布局:
- *  1. 顶部导航:返回 + "我的学生" + 新建按钮
- *  2. 搜索框
- *  3. 学员卡片列表:头像 + 姓名 + 剩余课时(低于1节红色) + 账号 + 统计(测评/陪练/训练)
- *  4. 密码设置:点击弹出 modal 设置密码
- *  5. 触底加载更多(游标分页)
- */
-import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { View, Text, Input, Image, ScrollView } from '@tarojs/components'
-import Taro from '@tarojs/taro'
-import { ArrowLeft, Search, Plus, Clock, Setting, Refresh } from '@nutui/icons-react-taro'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Image, Input, ScrollView, Text, View } from '@tarojs/components'
+import Taro, { getCurrentInstance } from '@tarojs/taro'
+import { ArrowLeft, Clock, Plus, Refresh, Search, ShieldCheck } from '@nutui/icons-react-taro'
 import { CloudButton } from '../../components/button'
+import { AddStudentPanel } from '../../components/add-student-panel/AddStudentPanel'
 import {
   getTeacherCoachingQuotas,
   setTeacherStudentPassword,
@@ -42,12 +33,8 @@ function loginAccount(row: TeacherCoachingQuotaRow) {
   return row.student?.username || row.student?.email || ''
 }
 
-function lessonsLabel(n: number) {
-  if (!Number.isFinite(n)) return '—'
-  return `剩${Math.max(0, Math.round(n))}节`
-}
-
 export default function MyStudents() {
+  const params = getCurrentInstance().router?.params || {}
   const [rows, setRows] = useState<TeacherCoachingQuotaRow[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -55,59 +42,45 @@ export default function MyStudents() {
   const [debouncedQ, setDebouncedQ] = useState('')
   const [nextCursor, setNextCursor] = useState<string | undefined>()
   const [hasMore, setHasMore] = useState(false)
-
-  // 密码 modal
+  const [showAdd, setShowAdd] = useState(() => params.link === '1')
   const [pwdTarget, setPwdTarget] = useState<TeacherCoachingQuotaRow | null>(null)
   const [pwdValue, setPwdValue] = useState(DEFAULT_PASSWORD)
   const [pwdSaving, setPwdSaving] = useState(false)
-
   const loadingMoreRef = useRef(false)
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current)
-    debounceTimer.current = setTimeout(() => setDebouncedQ(keyword.trim()), 300)
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current)
-    }
+    const timer = setTimeout(() => setDebouncedQ(keyword.trim()), 300)
+    return () => clearTimeout(timer)
   }, [keyword])
 
-  const fetchPage = useCallback(
-    async (opts: { cursor?: string; append: boolean; q: string }) => {
-      if (opts.append) {
-        if (loadingMoreRef.current) return
-        loadingMoreRef.current = true
-        setLoadingMore(true)
-      } else {
-        setLoading(true)
-      }
-      try {
-        const res = await getTeacherCoachingQuotas({
-          cursor: opts.cursor,
-          limit: PAGE_LIMIT,
-          q: opts.q || undefined,
-        })
-        if (res.code !== 200) {
-          Taro.showToast({ title: res.msg || '加载失败', icon: 'none' })
-          if (!opts.append) setRows([])
-          return
-        }
-        const data = res.data as any
-        const list: TeacherCoachingQuotaRow[] = Array.isArray(data?.list) ? data.list : []
-        setRows((prev) => (opts.append ? [...prev, ...list] : list))
-        setNextCursor(data?.nextCursor || undefined)
-        setHasMore(Boolean(data?.hasMore))
-      } catch (e: any) {
-        Taro.showToast({ title: e?.msg || '加载失败', icon: 'none' })
+  const fetchPage = useCallback(async (opts: { cursor?: string; append: boolean; q: string }) => {
+    if (opts.append) {
+      if (loadingMoreRef.current) return
+      loadingMoreRef.current = true
+      setLoadingMore(true)
+    } else {
+      setLoading(true)
+    }
+    try {
+      const res = await getTeacherCoachingQuotas({ cursor: opts.cursor, limit: PAGE_LIMIT, q: opts.q || undefined })
+      if (res.code !== 200) {
+        Taro.showToast({ title: res.msg || '查询失败', icon: 'none' })
         if (!opts.append) setRows([])
-      } finally {
-        setLoading(false)
-        setLoadingMore(false)
-        loadingMoreRef.current = false
+        return
       }
-    },
-    [],
-  )
+      const list = Array.isArray(res.data?.list) ? res.data.list : []
+      setRows((prev) => (opts.append ? [...prev, ...list] : list))
+      setNextCursor(res.data?.nextCursor || undefined)
+      setHasMore(Boolean(res.data?.hasMore))
+    } catch (e: any) {
+      Taro.showToast({ title: e?.msg || '查询失败', icon: 'none' })
+      if (!opts.append) setRows([])
+    } finally {
+      setLoading(false)
+      setLoadingMore(false)
+      loadingMoreRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     void fetchPage({ append: false, q: debouncedQ })
@@ -116,6 +89,10 @@ export default function MyStudents() {
   const onScrollToLower = () => {
     if (loading || loadingMore || !hasMore || !nextCursor) return
     void fetchPage({ cursor: nextCursor, append: true, q: debouncedQ })
+  }
+
+  const openDetail = (r: TeacherCoachingQuotaRow) => {
+    Taro.navigateTo({ url: `/pages/student-detail/index?id=${r.studentId}&name=${encodeURIComponent(studentLabel(r))}` })
   }
 
   const openPwdModal = (r: TeacherCoachingQuotaRow) => {
@@ -140,214 +117,105 @@ export default function MyStudents() {
     try {
       const res = await setTeacherStudentPassword(pwdTarget.studentId, pwd)
       if (res.code !== 200) {
-        Taro.showToast({ title: res.msg || '设置失败', icon: 'none' })
+        Taro.showToast({ title: res.msg || '操作失败', icon: 'none' })
         return
       }
       const account = res.data?.username || loginAccount(pwdTarget) || studentLabel(pwdTarget)
-      Taro.showToast({
-        title: resetDefault ? `已重置:${account}` : '密码已更新',
-        icon: 'success',
-      })
+      Taro.showToast({ title: resetDefault ? `已重置：${account}` : '密码已更新', icon: 'success' })
       setPwdTarget(null)
     } catch (e: any) {
-      Taro.showToast({ title: e?.msg || '设置失败', icon: 'none' })
+      Taro.showToast({ title: e?.msg || '操作失败', icon: 'none' })
     } finally {
       setPwdSaving(false)
     }
   }
 
-  const handleCreate = () => {
-    Taro.showToast({ title: '新建学员待开发', icon: 'none' })
-  }
-
   return (
-    <View className="students">
-      {/* 顶部导航栏 */}
-      <View className="students__navbar">
-        <View className="students__nav-btn" onClick={() => Taro.navigateBack()}>
-          <ArrowLeft size={22} color={color.charcoal} />
+    <View className="my-students">
+      <View className="my-students__top">
+        <View className="my-students__back" onClick={() => Taro.switchTab({ url: '/pages/home/index' })}>
+          <ArrowLeft size={20} color={color.charcoal} />
         </View>
-        <Text className="students__nav-title">我的学生</Text>
-        <View className="students__nav-actions">
-          <View
-            className="students__nav-icon"
-            onClick={() => void fetchPage({ append: false, q: debouncedQ })}
-          >
-            <Refresh size={18} color={color.mutedForeground} />
-          </View>
-          <View className="students__nav-create" onClick={handleCreate}>
-            <Plus size={16} color={color.primary} />
-            <Text className="students__nav-create-text">新建</Text>
-          </View>
-        </View>
+        <View className="my-students__title-wrap"><Text className="my-students__title">我的学生</Text></View>
+        <CloudButton variant="outline" size="sm" className="my-students__create" onClick={() => Taro.navigateTo({ url: '/pages/create-student/index' })}>
+          <Plus size={14} color={color.charcoal} /> 新建
+        </CloudButton>
+        <CloudButton variant="ghost" size="sm" onClick={() => setShowAdd((v) => !v)}>关联</CloudButton>
+        <CloudButton variant="outline" size="icon" disabled={loading} onClick={() => void fetchPage({ append: false, q: debouncedQ })}>
+          <Refresh size={16} color={color.charcoal} />
+        </CloudButton>
       </View>
 
-      {/* 搜索框 */}
-      <View className="students__search">
-        <View className="students__search-box">
-          <Search size={18} color={color.mutedSoft} />
-          <Input
-            className="students__search-input"
-            value={keyword}
-            onInput={(e) => setKeyword(e.detail.value)}
-            placeholder="搜索姓名 / 账号 / 手机…"
-            placeholderClass="students__search-placeholder"
-            confirmType="search"
-          />
-          {keyword.length > 0 && (
-            <View className="students__search-clear" onClick={() => setKeyword('')}>
-              <Text className="students__search-clear-text">×</Text>
-            </View>
-          )}
-        </View>
+      <AddStudentPanel open={showAdd} onClose={() => setShowAdd(false)} onAdded={() => void fetchPage({ append: false, q: debouncedQ })} />
+
+      <View className="my-students__search">
+        <Search size={16} color={color.mutedForeground} />
+        <Input
+          className="my-students__search-input"
+          value={keyword}
+          onInput={(e) => setKeyword(e.detail.value)}
+          placeholder="搜索学员姓名、账号或手机号…"
+          placeholderClass="my-students__search-placeholder"
+          confirmType="search"
+        />
+        {keyword ? <Text className="my-students__clear" onClick={() => setKeyword('')}>×</Text> : null}
       </View>
 
-      <ScrollView
-        className="students__body"
-        scrollY
-        enableFlex
-        lowerThreshold={120}
-        onScrollToLower={onScrollToLower}
-      >
+      <ScrollView className="my-students__list" scrollY enableFlex lowerThreshold={120} onScrollToLower={onScrollToLower}>
         {loading ? (
-          <View className="students__state">
-            <Text className="students__state-text">加载中...</Text>
-          </View>
+          <View className="my-students__state"><Text>加载中…</Text></View>
         ) : rows.length === 0 ? (
-          <View className="students__empty">
-            <Text className="students__empty-text">
-              {debouncedQ ? '没有匹配的学员' : '暂无学员,点击右上角「新建」创建账号'}
-            </Text>
-          </View>
+          <View className="my-students__state"><Text>{debouncedQ ? '没有匹配的学员' : '暂无学员，点击“关联”或“新建”添加'}</Text></View>
         ) : (
-          <View className="students__list">
-            {rows.map((r) => {
-              const low = (r.remainingLessons || 0) < 1
-              const account = loginAccount(r)
-              const avatar = studentAvatarUrl(r)
-              return (
-                <View key={r.id} className="students__card">
-                  <View className="students__card-main">
-                    <View className="students__avatar">
-                      {avatar ? (
-                        <Image className="students__avatar-img" src={avatar} mode="aspectFill" />
-                      ) : (
-                        <Text className="students__avatar-text">{studentInitial(r)}</Text>
-                      )}
-                    </View>
-
-                    <View className="students__info">
-                      <View className="students__name-row">
-                        <Text className="students__name">{studentLabel(r)}</Text>
-                        <View
-                          className={`students__mins ${low ? 'students__mins--low' : ''}`}
-                        >
-                          <Clock size={12} color={low ? color.destructive : color.primary} />
-                          <Text
-                            className="students__mins-text"
-                            style={{ color: low ? color.destructive : color.primary }}
-                          >
-                            {lessonsLabel(r.remainingLessons || 0)}
-                          </Text>
-                        </View>
-                      </View>
-                      <Text className="students__account">
-                        {account || '—'}
-                      </Text>
-                      <View className="students__stats">
-                        <Text className="students__stat">
-                          测评 <Text className="students__stat-num">{r.vocabTestCount ?? 0}</Text>
-                        </Text>
-                        <Text className="students__stat-divider">·</Text>
-                        <Text className="students__stat">
-                          陪练 <Text className="students__stat-num">{r.coachingSessionCount ?? 0}</Text>
-                        </Text>
-                        <Text className="students__stat-divider">·</Text>
-                        <Text className="students__stat">
-                          训练 <Text className="students__stat-num">{r.studySessionCount ?? 0}</Text>
-                        </Text>
-                      </View>
-                    </View>
+          rows.map((r) => {
+            const low = (r.remainingLessons || 0) < 1
+            const account = loginAccount(r)
+            const avatar = studentAvatarUrl(r)
+            return (
+              <View key={r.id} className="my-students__card">
+                <View className="my-students__card-main" onClick={() => openDetail(r)}>
+                  <View className="my-students__avatar">
+                    {avatar ? <Image className="my-students__avatar-img" src={avatar} mode="aspectFill" /> : <Text className="my-students__avatar-text">{studentInitial(r)}</Text>}
                   </View>
-
-                  <View className="students__card-actions">
-                    <View
-                      className="students__action-btn"
-                      onClick={() => openPwdModal(r)}
-                    >
-                      <Setting size={14} color={color.primary} />
-                      <Text className="students__action-text">密码</Text>
+                  <View className="my-students__info">
+                    <View className="my-students__name-row">
+                      <Text className="my-students__name">{studentLabel(r)}</Text>
+                      <View className={`my-students__lessons ${low ? 'my-students__lessons--low' : ''}`}>
+                        <Clock size={10} color={low ? color.destructive : color.primary} />
+                        <Text>剩 {r.remainingLessons || 0} 节</Text>
+                      </View>
                     </View>
+                    <Text className="my-students__meta">
+                      {account || '—'} <Text className="my-students__stats">测评 {r.vocabTestCount ?? 0} · 陪练 {r.coachingSessionCount ?? 0} · 训练 {r.studySessionCount ?? 0}</Text>
+                    </Text>
                   </View>
                 </View>
-              )
-            })}
-
-            {loadingMore && (
-              <View className="students__more">
-                <Text className="students__more-text">加载中...</Text>
+                <View className="my-students__pwd" onClick={() => openPwdModal(r)}>
+                  <ShieldCheck size={14} color={color.charcoal} />
+                </View>
               </View>
-            )}
-            {!loading && !hasMore && rows.length > 0 && (
-              <View className="students__more">
-                <Text className="students__more-text">没有更多了</Text>
-              </View>
-            )}
-          </View>
+            )
+          })
         )}
-        <View style={{ height: '48rpx' }} />
+        {loadingMore ? <View className="my-students__more"><Text>加载中…</Text></View> : null}
+        {!loading && !hasMore && rows.length ? <View className="my-students__more my-students__more--end"><Text>没有更多了</Text></View> : null}
       </ScrollView>
 
-      {/* 密码设置 Modal */}
-      {pwdTarget && (
-        <View className="students__mask" onClick={closePwdModal}>
-          <View className="students__modal" onClick={(e) => e.stopPropagation()}>
-            <View className="students__modal-header">
-              <Text className="students__modal-title">设置登录密码</Text>
-              <View className="students__modal-close" onClick={closePwdModal}>
-                <Text className="students__modal-close-icon">×</Text>
-              </View>
+      {pwdTarget ? (
+        <View className="my-students__mask" onClick={closePwdModal}>
+          <View className="my-students__modal" onClick={(e) => e.stopPropagation()}>
+            <View className="my-students__modal-head">
+              <Text className="my-students__modal-title">设置登录密码</Text>
+              <Text className="my-students__modal-desc">{studentLabel(pwdTarget)}{loginAccount(pwdTarget) ? ` · ${loginAccount(pwdTarget)}` : ''}</Text>
             </View>
-            <Text className="students__modal-desc">
-              {studentLabel(pwdTarget)}
-              {loginAccount(pwdTarget) ? ` · ${loginAccount(pwdTarget)}` : ''}
-            </Text>
-
-            <View className="students__modal-field">
-              <Input
-                className="students__modal-input"
-                value={pwdValue}
-                onInput={(e) => setPwdValue(e.detail.value)}
-                placeholder={DEFAULT_PASSWORD}
-                placeholderClass="students__modal-placeholder"
-                password
-                maxlength={32}
-              />
-            </View>
-
-            <View className="students__modal-footer">
-              <CloudButton
-                variant="outline"
-                size="lg"
-                disabled={pwdSaving}
-                onClick={() => void savePassword(true)}
-                className="students__modal-btn"
-              >
-                重置为默认
-              </CloudButton>
-              <CloudButton
-                variant="brand"
-                size="lg"
-                loading={pwdSaving}
-                onClick={() => void savePassword(false)}
-                className="students__modal-btn"
-              >
-                保存密码
-              </CloudButton>
+            <Input className="my-students__modal-input" value={pwdValue} onInput={(e) => setPwdValue(e.detail.value)} placeholder={DEFAULT_PASSWORD} placeholderClass="my-students__modal-placeholder" />
+            <View className="my-students__modal-actions">
+              <CloudButton variant="outline" className="my-students__modal-btn" disabled={pwdSaving} onClick={() => void savePassword(true)}>重置为 {DEFAULT_PASSWORD}</CloudButton>
+              <CloudButton variant="brand" className="my-students__modal-btn" loading={pwdSaving} onClick={() => void savePassword(false)}>保存密码</CloudButton>
             </View>
           </View>
         </View>
-      )}
+      ) : null}
     </View>
   )
 }

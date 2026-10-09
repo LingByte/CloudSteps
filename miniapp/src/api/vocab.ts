@@ -12,12 +12,16 @@ export interface VocabNextRequest {
 }
 
 export interface VocabSubmitRequest {
-  answers: Array<{ questionId: number; answer: string }>
-  studentId?: number
+  answers: Array<{ questionId: number | string; answer: string }>
+  studentId?: number | string
 }
 
 export function getVocabStart(): Promise<ApiResponse<any>> {
   return get<any>('/vocab/start')
+}
+
+export function getVocabPoolRevision(): Promise<ApiResponse<{ poolRevision: number }>> {
+  return get<{ poolRevision: number }>('/vocab/pool-revision')
 }
 
 export function getVocabNext(data: VocabNextRequest): Promise<ApiResponse<any>> {

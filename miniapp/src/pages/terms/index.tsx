@@ -1,7 +1,6 @@
 /**
  * 用户协议 — 对齐 web/src/pages/Terms.tsx。
  */
-import React from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
 import './index.scss'
 

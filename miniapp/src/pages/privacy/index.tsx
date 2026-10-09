@@ -1,7 +1,6 @@
 /**
  * 隐私政策 — 对齐 web/src/pages/Privacy.tsx。
  */
-import React from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
 import './index.scss'
 

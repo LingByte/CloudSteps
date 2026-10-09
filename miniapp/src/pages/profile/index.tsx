@@ -87,10 +87,6 @@ export default function Profile() {
     }
   }
 
-  const handleSettingClick = (id: string) => {
-    Taro.navigateTo({ url: '/pages/settings/index' })
-  }
-
   const handleAbout = () => {
     Taro.navigateTo({ url: '/pages/about/index' })
   }

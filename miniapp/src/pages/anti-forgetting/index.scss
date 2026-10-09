@@ -1,215 +1,288 @@
-/**
- * 抗遗忘页样式 — Warm Mint 主题,对齐 web AntiForgetting.tsx。
- */
 @import '../../styles/vars.scss';
 
-.anti {
-  min-height: 100%;
-  background-color: #f6f5f4;
-  padding: 32px;
+.anti-wrap {
+  width: 100%;
+  height: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: $background;
 }
 
-/* ============ 日期选择卡片 ============ */
+.anti {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  overflow-x: hidden;
+}
+
 .anti__date-card {
+  margin-bottom: 16px;
+  padding: 16px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 24px 24px;
-  background-color: #ffffff;
-  border: 2px solid #e5e3df;
-  border-radius: 12px;
-  margin-bottom: 24px;
+  gap: 8px;
+  border: 1px solid $border;
+  border-radius: 16px;
+  background: $card;
 }
 
 .anti__date-arrow {
-  width: 72px;
-  height: 72px;
-  border-radius: 9999px;
-  background-color: rgba(78, 205, 196, 0.12);
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  border-radius: 8px;
 }
 
-.anti__date-center {
+.anti__date-center-wrap {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 8px 0px;
+  gap: 8px;
 }
 
 .anti__date-label {
-  font-size: 22px;
-  color: #787671;
+  font-size: 12px;
+  color: $muted-foreground;
 }
 
-.anti__date-value {
-  font-size: 30px;
-  font-weight: 600;
-  color: #1a1a1a;
-}
-
-/* ============ 状态/空态 ============ */
-.anti__state {
+.anti__date-picker {
+  width: 100%;
+  max-width: 280px;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 0 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 120px 0px;
+  border: 1px solid $input;
+  border-radius: 12px;
+  background: $card;
+  color: $charcoal;
+  font-size: 16px;
 }
 
-.anti__state-text {
-  font-size: 26px;
-  color: #787671;
-}
-
+.anti__state,
 .anti__empty {
+  padding: 40px 16px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
-  padding: 120px 48px;
-}
-
-.anti__empty-icon {
-  width: 112px;
-  height: 112px;
-  border-radius: 9999px;
-  background-color: #fafaf9;
-  display: flex;
-  align-items: center;
   justify-content: center;
+  gap: 12px;
+  border: 1px solid $border;
+  border-radius: 16px;
+  background: $card;
+  color: $muted-foreground;
+  font-size: 14px;
 }
 
 .anti__empty-text {
-  font-size: 26px;
-  color: #787671;
+  font-size: 14px;
+  line-height: 1.5;
+  color: $muted-foreground;
   text-align: center;
-  line-height: 1.7;
 }
 
-/* ============ 分组列表 ============ */
-.anti__groups {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.anti__group {
-  background-color: #ffffff;
-  border: 2px solid #e5e3df;
-  border-radius: 12px;
+.anti__timeline-card {
   overflow: hidden;
-}
-
-/* 学生头部 */
-.anti__group-header {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding: 28px 28px;
-  border-bottom: 2px solid #e5e3df;
-}
-
-.anti__group-avatar {
-  width: 80px;
-  height: 80px;
+  border: 1px solid rgba(78, 205, 196, .2);
   border-radius: 16px;
-  background-color: rgba(78, 205, 196, 0.12);
+  background: $card;
+}
+
+.anti__timeline-header {
+  padding: 10px 16px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  gap: 6px;
+  border-bottom: 1px solid rgba(78, 205, 196, .2);
+  background: rgba(78, 205, 196, .12);
+  font-size: 14px;
+  color: $muted-foreground;
 }
 
-.anti__group-avatar-text {
-  font-size: 28px;
-  font-weight: 600;
-  color: #4ECDC4;
+.anti__timeline-date {
+  font-weight: 500;
+  color: rgba(26, 26, 26, .8);
 }
 
-.anti__group-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.anti__timeline-down {
+  opacity: .5;
+  transform: rotate(90deg);
 }
 
-.anti__group-name {
-  font-size: 30px;
-  font-weight: 600;
-  color: #1a1a1a;
-  overflow: hidden;
+.anti__timeline-body {
+  position: relative;
+  padding: 16px 12px;
+  box-sizing: border-box;
 }
 
-.anti__group-count {
-  font-size: 22px;
-  color: #787671;
-}
-
-/* 任务列表 */
-.anti__task-list {
-  display: flex;
-  flex-direction: column;
+.anti__timeline-line {
+  position: absolute;
+  left: 70px;
+  top: 16px;
+  bottom: 16px;
+  width: 1px;
+  background: rgba(78, 205, 196, .25);
 }
 
 .anti__task {
+  position: relative;
   display: flex;
-  flex-direction: column;
   gap: 12px;
-  padding: 24px 28px;
-  border-bottom: 2px solid #e5e3df;
+  padding: 12px 0;
 }
 
-.anti__task-line {
+.anti__task--border {
+  margin-left: -12px;
+  margin-right: -12px;
+  padding-left: 12px;
+  padding-right: 12px;
+  border-bottom: 1px solid rgba(78, 205, 196, .25);
+}
+
+.anti__task-time-col {
+  width: 52px;
+  flex: 0 0 52px;
   display: flex;
   align-items: center;
-  gap: 12px;
-
-  &--bottom {
-    justify-content: space-between;
-  }
+  justify-content: center;
 }
 
-.anti__task-btn-wrap {
-  flex-shrink: 0;
-}
-
-.anti__task-time {
+.anti__time-badge {
+  position: relative;
+  z-index: 1;
+  width: 48px;
+  min-width: 0;
+  box-sizing: border-box;
+  transform: translateX(50%);
+  padding: 8px 6px;
   display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  width: 120px;
-}
-
-.anti__task-time-text {
-  font-size: 26px;
+  justify-content: center;
+  border: 1px solid rgba(78, 205, 196, .3);
+  border-radius: 6px;
+  background: $primary-soft;
+  color: $primary;
+  text-align: center;
+  font-size: 12px;
   font-weight: 500;
-  color: #1a1a1a;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
 }
 
-.anti__task-pack-name {
-  font-size: 26px;
-  color: #37352f;
+.anti__time-spacer {
+  width: 48px;
+}
+
+.anti__task-content {
+  position: relative;
   flex: 1;
-  overflow: hidden;
+  min-width: 0;
+  padding: 2px 96px 0 4px;
+  box-sizing: border-box;
 }
 
-.anti__task-meta {
-  font-size: 22px;
-  color: #787671;
+.anti__task-tick {
+  position: absolute;
+  left: -18px;
+  top: 14px;
+  width: 10px;
+  height: 1px;
+  background: rgba(78, 205, 196, .35);
 }
 
-.anti__task-btn-inner {
+.anti__student {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: $foreground;
+}
+
+.anti__task-text {
+  width: 100%;
   display: flex;
-  align-items: center;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
 }
 
-.anti__task-btn-text {
-  font-size: 24px;
-  color: #fff;
+.anti__bullet {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: $muted-foreground;
+}
+
+.anti__pack {
+  min-width: 0;
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.6;
+  color: $foreground;
+}
+
+.anti__trained-at {
+  display: block;
+  margin-top: 4px;
+  padding-left: 14px;
+  font-size: 12px;
+  color: $muted-foreground;
+}
+
+.anti__review-btn {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .anti__date-card {
+    padding: 20px;
+    gap: 16px;
+  }
+
+  .anti__timeline-body {
+    padding: 20px;
+  }
+
+  .anti__timeline-line {
+    left: 78px;
+  }
+
+  .anti__task {
+    gap: 16px;
+  }
+
+  .anti__task--border {
+    margin-left: -20px;
+    margin-right: -20px;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .anti__task-time-col {
+    width: 60px;
+    flex-basis: 60px;
+  }
+
+  .anti__task-content {
+    padding-right: 112px;
+  }
+
+  .anti__task-tick {
+    left: -22px;
+  }
 }

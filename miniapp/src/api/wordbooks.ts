@@ -1,7 +1,7 @@
 /**
  * 词库 API — 对齐 web/src/api/wordbooks.ts
  */
-import { get } from '../utils/request'
+import { del, get, post, put } from '../utils/request'
 import type { ApiResponse } from '../types/api'
 
 export interface WordBookItem {
@@ -11,6 +11,8 @@ export interface WordBookItem {
   wordCount?: number
   category?: string
   description?: string
+  coverUrl?: string
+  ownerUserId?: number
 }
 
 export interface WordBookListResult {
@@ -57,10 +59,12 @@ export interface WordBookWord {
   phoneticUs?: string
   phoneticUk?: string
   translation?: string
+  translationShort?: string
   definition?: string
   partOfSpeech?: string
   exampleSentence?: string
   audioUrl?: string
+  overridden?: boolean
 }
 
 export function listWordBookWords(
@@ -71,6 +75,23 @@ export function listWordBookWords(
     `/wordbooks/${wordBookId}/words`,
     { page: params.page, pageSize: params.pageSize, keyword: params.keyword || undefined } as any
   )
+}
+
+export function updateWordBookWord(
+  wordBookId: number,
+  wordId: number,
+  body: {
+    word?: string
+    phonetic?: string
+    translation?: string
+    translationShort?: string
+  }
+): Promise<ApiResponse<WordBookWord>> {
+  return put<WordBookWord>(`/wordbooks/${wordBookId}/words/${wordId}`, body)
+}
+
+export function deleteWordBookWord(wordBookId: number, wordId: number): Promise<ApiResponse<null>> {
+  return del<null>(`/wordbooks/${wordBookId}/words/${wordId}`)
 }
 
 export interface WordDetail {
@@ -102,4 +123,24 @@ export interface WordDetail {
 
 export function getWordDetail(id: number): Promise<ApiResponse<WordDetail>> {
   return get<WordDetail>(`/words/${id}`)
+}
+
+export type CustomParsedWord = {
+  word: string
+  phonetic?: string
+  translation?: string
+  translationShort?: string
+}
+
+export function enrichCustomWordBookWords(
+  words: CustomParsedWord[]
+): Promise<ApiResponse<{ list: CustomParsedWord[]; total: number }>> {
+  return post<{ list: CustomParsedWord[]; total: number }>('/wordbooks/custom/enrich', { words })
+}
+
+export function createCustomWordBook(body: {
+  name: string
+  words: CustomParsedWord[]
+}): Promise<ApiResponse<WordBookItem>> {
+  return post<WordBookItem>('/wordbooks/custom', body)
 }

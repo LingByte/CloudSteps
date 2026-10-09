@@ -12,6 +12,7 @@
  *  - 用 Taro.switchTab 跳转 tabBar 页(替代 react-router navigate)
  *  - timezone 用 Intl.DateTimeFormat(小程序环境支持)
  */
+import { useEffect, useRef, useState } from 'react'
 import { formatAuthErrorMessage } from '../../utils/authErrors'
 import { View, Text, Input, Image, ScrollView } from '@tarojs/components'
 import Taro from '@tarojs/taro'
@@ -314,7 +315,7 @@ export default function Login() {
                   onInput={(e) => setCode(e.detail.value)}
                   placeholder="6 位验证码"
                   placeholderClass="login__placeholder"
-                  maxLength={6}
+                  maxlength={6}
                 />
                 <View
                   className={`login__send-btn ${codeWait > 0 ? 'login__send-btn--disabled' : ''}`}
