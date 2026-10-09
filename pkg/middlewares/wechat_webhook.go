@@ -5,16 +5,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// WeChat 公众号服务器回调必须稳定返回明文 200，不能走熔断/超时包装。
-func isWechatWebhookPath(path string) bool {
-	return path == "/api/auth/wechat/mp/message"
+// skipTimeoutCircuitPath 这些路径不能进熔断：
+// 公众号回调必须稳定 200；登录状态是 2s 轮询，429/瞬时失败会把整条登录链路掐死。
+func skipTimeoutCircuitPath(path string) bool {
+	switch path {
+	case "/api/auth/wechat/mp/message",
+		"/api/auth/wechat/login/status":
+		return true
+	default:
+		return false
+	}
 }
 
-// CircuitBreakerMiddleware 包装 ling-base 熔断器，微信回调路径跳过。
+// CircuitBreakerMiddleware 包装 ling-base 熔断器，微信登录相关路径跳过。
 func CircuitBreakerMiddleware() gin.HandlerFunc {
 	inner := lbmw.CircuitBreakerMiddleware()
 	return func(c *gin.Context) {
-		if isWechatWebhookPath(c.Request.URL.Path) {
+		if skipTimeoutCircuitPath(c.Request.URL.Path) {
 			c.Next()
 			return
 		}
@@ -22,11 +29,11 @@ func CircuitBreakerMiddleware() gin.HandlerFunc {
 	}
 }
 
-// CombinedTimeoutCircuitMiddleware 包装组合中间件，微信回调路径跳过。
+// CombinedTimeoutCircuitMiddleware 包装组合中间件，微信登录相关路径跳过。
 func CombinedTimeoutCircuitMiddleware() gin.HandlerFunc {
 	inner := lbmw.CombinedTimeoutCircuitMiddleware()
 	return func(c *gin.Context) {
-		if isWechatWebhookPath(c.Request.URL.Path) {
+		if skipTimeoutCircuitPath(c.Request.URL.Path) {
 			c.Next()
 			return
 		}

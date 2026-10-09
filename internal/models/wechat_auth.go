@@ -43,6 +43,13 @@ func WechatLoginCodeKey(code string) string {
 	return "wechat:login:code:" + strings.ToUpper(strings.TrimSpace(code))
 }
 
+func WechatLoginMsgIDKey(msgID int64) string {
+	if msgID == 0 {
+		return ""
+	}
+	return fmt.Sprintf("wechat:login:msgid:%d", msgID)
+}
+
 func NewWechatLoginSessionID() (string, error) {
 	buf := make([]byte, 16)
 	if _, err := rand.Read(buf); err != nil {

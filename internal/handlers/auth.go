@@ -59,7 +59,8 @@ func (h *Handlers) registerAuthRoutes(r *humax.Group) {
 
 		// WeChat official account login (follow + verification code + poll)
 		authG.POST("/wechat/login/session", authLimit, h.handleWechatLoginStartSession)
-		authG.GET("/wechat/login/status", authLimit, h.handleWechatLoginStatus)
+		// 网页每 2s 轮询一次，不能走 30次/分钟 的登录限流，否则会 429 并把熔断打开。
+		authG.GET("/wechat/login/status", h.handleWechatLoginStatus)
 		authG.POST("/wechat/login/verify", authLimit, h.handleWechatLoginVerify)
 		authG.GET("/wechat/mp/message", h.handleWechatMPMessageVerify)
 		authG.POST("/wechat/mp/message", h.handleWechatMPMessage)

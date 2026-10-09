@@ -16,7 +16,6 @@ import (
 	"github.com/LingByte/CloudStepsGo/pkg/utils"
 	"github.com/LingByte/CloudStepsGo/pkg/wechat"
 	lbconstants "github.com/LingByte/ling-base/common/constants"
-	"github.com/LingByte/ling-base/common/geoip"
 	"github.com/LingByte/ling-base/common/logger"
 	response "github.com/LingByte/ling-base/common/response/gin"
 	"github.com/gin-gonic/gin"
@@ -140,6 +139,31 @@ func (h *Handlers) consumeWechatLoginCode(ctx context.Context, code string) (*mo
 	}
 	h.cache.Delete(ctx, models.WechatLoginCodeKey(code))
 	return item, true
+}
+
+func (h *Handlers) handleWechatLoginCodeText(c *gin.Context, ctx context.Context, openID, text string) string {
+	codeItem, ok := h.getWechatLoginCode(ctx, text)
+	if !ok || codeItem == nil || codeItem.SessionID == "" {
+		return "验证码无效或已过期，请刷新网页重新获取。"
+	}
+	sess, ok := h.getWechatLoginSession(ctx, codeItem.SessionID)
+	if !ok || sess == nil {
+		return "登录会话已失效，请刷新网页重试。"
+	}
+	if sess.Status == models.WechatLoginSessionConfirmed {
+		h.cache.Delete(ctx, models.WechatLoginCodeKey(text))
+		return "登录成功，请回到网页继续。"
+	}
+	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
+	if err := h.completeWechatSessionLogin(c, db, sess, openID); err != nil {
+		if strings.Contains(err.Error(), "expired") {
+			h.cache.Delete(ctx, models.WechatLoginCodeKey(text))
+			return "登录会话已过期，请刷新网页重新获取验证码。"
+		}
+		return "登录失败，请刷新网页重新获取验证码后再试。"
+	}
+	h.cache.Delete(ctx, models.WechatLoginCodeKey(text))
+	return "登录成功，请回到网页继续。"
 }
 
 // handleWechatLoginStartSession POST /auth/wechat/login/session
@@ -269,10 +293,8 @@ func (h *Handlers) completeWechatWebLogin(c *gin.Context, db *gorm.DB, user *mod
 
 	clientIP := c.ClientIP()
 	userAgent := c.Request.UserAgent()
+	// 公众号回调来自微信机房 IP，GeoIP 慢且不准；超时还会拖过微信 5s 重试窗口。
 	country, city, location := "Unknown", "Unknown", "Unknown"
-	if c2, ci, l, err := geoip.GetIPLocation(clientIP); err == nil {
-		country, city, location = c2, ci, l
-	}
 	deviceType, os, browser := utils.ParseUserAgent(userAgent)
 	deviceID := utils.GetDeviceID(userAgent, clientIP)
 	if _, err := models.CreateOrUpdateUserDevice(db, user.ID, deviceID, fmt.Sprintf("%s on %s", browser, os), deviceType, os, browser, userAgent, clientIP, location); err != nil {
@@ -373,6 +395,31 @@ func (h *Handlers) handleWechatMPMessage(c *gin.Context) {
 	h.dispatchWechatInboundMessage(c, body, ts, nonce)
 }
 
+func (h *Handlers) wechatMsgReplyTTL() time.Duration {
+	return h.wechatLoginCodeTTL()
+}
+
+func (h *Handlers) getWechatMsgReply(ctx context.Context, msgID int64) (string, bool) {
+	key := models.WechatLoginMsgIDKey(msgID)
+	if key == "" {
+		return "", false
+	}
+	raw, err := h.cache.Get(ctx, key)
+	if err != nil || raw == nil {
+		return "", false
+	}
+	s, ok := raw.(string)
+	return s, ok && s != ""
+}
+
+func (h *Handlers) setWechatMsgReply(ctx context.Context, msgID int64, reply string) {
+	key := models.WechatLoginMsgIDKey(msgID)
+	if key == "" || reply == "" {
+		return
+	}
+	h.cache.Set(ctx, key, reply, h.wechatMsgReplyTTL())
+}
+
 func (h *Handlers) dispatchWechatInboundMessage(c *gin.Context, body []byte, ts, nonce string) {
 	msg, err := wechat.ParseInboundMessage(body)
 	if err != nil {
@@ -394,32 +441,13 @@ func (h *Handlers) dispatchWechatInboundMessage(c *gin.Context, body []byte, ts,
 		h.writeWechatReply(c, out, ts, nonce)
 		return
 	case strings.EqualFold(msg.MsgType, "text"):
-		text := strings.TrimSpace(msg.Content)
-		codeItem, ok := h.consumeWechatLoginCode(ctx, text)
-		if !ok || codeItem == nil || codeItem.SessionID == "" {
-			reply := "验证码无效或已过期，请刷新网页重新获取。"
-			out := wechat.BuildTextReply(msg.FromUserName, msg.ToUserName, reply, time.Now().Unix())
+		if cached, ok := h.getWechatMsgReply(ctx, msg.MsgID); ok {
+			out := wechat.BuildTextReply(msg.FromUserName, msg.ToUserName, cached, time.Now().Unix())
 			h.writeWechatReply(c, out, ts, nonce)
 			return
 		}
-		sess, ok := h.getWechatLoginSession(ctx, codeItem.SessionID)
-		if !ok || sess == nil {
-			reply := "登录会话已失效，请刷新网页重试。"
-			out := wechat.BuildTextReply(msg.FromUserName, msg.ToUserName, reply, time.Now().Unix())
-			h.writeWechatReply(c, out, ts, nonce)
-			return
-		}
-		db := c.MustGet(lbconstants.DbField).(*gorm.DB)
-		if err := h.completeWechatSessionLogin(c, db, sess, openID); err != nil {
-			reply := "登录失败，请刷新网页重新获取验证码后再试。"
-			if strings.Contains(err.Error(), "expired") {
-				reply = "登录会话已过期，请刷新网页重新获取验证码。"
-			}
-			out := wechat.BuildTextReply(msg.FromUserName, msg.ToUserName, reply, time.Now().Unix())
-			h.writeWechatReply(c, out, ts, nonce)
-			return
-		}
-		reply := "登录成功，请回到网页继续。"
+		reply := h.handleWechatLoginCodeText(c, ctx, openID, strings.TrimSpace(msg.Content))
+		h.setWechatMsgReply(ctx, msg.MsgID, reply)
 		out := wechat.BuildTextReply(msg.FromUserName, msg.ToUserName, reply, time.Now().Unix())
 		h.writeWechatReply(c, out, ts, nonce)
 		return
