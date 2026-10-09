@@ -1938,7 +1938,7 @@
   "student_detail.loading_vocab": "Loading test records…",
   "student_detail.no_vocab": "No vocabulary test records",
   "student_detail.add_wordbook_title": "Add wordbook",
-  "student_detail.add_wordbook_desc": "Assign from global wordbook catalog",
+  "student_detail.add_wordbook_desc": "Assign from the global catalog or your custom wordbooks",
   "student_detail.search_wordbooks": "Search wordbooks…",
   "student_detail.catalog_loading": "Loading…",
   "student_detail.catalog_search_hint": "Search by name, or browse suggested wordbooks below",

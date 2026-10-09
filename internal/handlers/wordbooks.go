@@ -215,12 +215,9 @@ func (h *Handlers) handleGetWordBook(c *gin.Context) {
 		response.FailI18n(c, "wordbook.not_found", err)
 		return
 	}
-	if book.OwnerUserID > 0 {
-		u := auth.CurrentUser(c)
-		if u == nil || u.ID != book.OwnerUserID {
-			response.FailI18n(c, "wordbook.no_access", nil)
-			return
-		}
+	if !canReadWordBook(db, auth.CurrentUser(c), book) {
+		response.FailI18n(c, "wordbook.no_access", nil)
+		return
 	}
 	response.SuccessI18n(c, "common.success", models.ToPublicWordBook(*book))
 }
@@ -254,12 +251,9 @@ func (h *Handlers) handleListWordBookWords(c *gin.Context) {
 		response.FailI18n(c, "wordbook.not_found", nil)
 		return
 	}
-	if book.OwnerUserID > 0 {
-		u := auth.CurrentUser(c)
-		if u == nil || u.ID != book.OwnerUserID {
-			response.FailI18n(c, "wordbook.no_access", nil)
-			return
-		}
+	if !canReadWordBook(db, auth.CurrentUser(c), book) {
+		response.FailI18n(c, "wordbook.no_access", nil)
+		return
 	}
 	if !book.IsActive {
 		response.FailI18n(c, "msg.ebaf41ad", nil)
@@ -792,6 +786,22 @@ func (h *Handlers) adminCreateWord(c *gin.Context) {
 		return
 	}
 	response.SuccessI18n(c, "common.created", word)
+}
+
+func canReadWordBook(db *gorm.DB, user *models.User, book *models.WordBook) bool {
+	if book == nil {
+		return false
+	}
+	if book.OwnerUserID == 0 {
+		return true
+	}
+	if user == nil {
+		return false
+	}
+	if user.ID == book.OwnerUserID {
+		return true
+	}
+	return models.UserHasActiveWordBook(db, user.ID, book.ID)
 }
 
 func canManageWordBookWords(user *models.User, book *models.WordBook) bool {

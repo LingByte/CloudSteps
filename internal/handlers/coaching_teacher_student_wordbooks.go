@@ -115,14 +115,19 @@ func (h *Handlers) coachingTeacherAddStudentWordBook(c *gin.Context) {
 		return
 	}
 	wbID := body.WordBookID.Uint()
-	if _, err := models.GetWordBookByID(db, wbID); err != nil {
+	book, err := models.GetWordBookByID(db, wbID)
+	if err != nil {
 		response.FailI18n(c, "wordbook.not_found", err.Error())
+		return
+	}
+	if book.OwnerUserID > 0 && book.OwnerUserID != tid {
+		response.FailI18n(c, "wordbook.no_access", nil)
 		return
 	}
 
 	now := time.Now().UTC()
 	var uwb models.UserWordBook
-	err := db.Where("user_id = ? AND word_book_id = ?", sid, wbID).First(&uwb).Error
+	err = db.Where("user_id = ? AND word_book_id = ?", sid, wbID).First(&uwb).Error
 	if err == gorm.ErrRecordNotFound {
 		uwb = models.UserWordBook{
 			UserID:     sid,

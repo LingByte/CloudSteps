@@ -1648,7 +1648,7 @@
   "student_detail.loading_vocab": "加载测评记录…",
   "student_detail.no_vocab": "暂无词汇测评记录",
   "student_detail.add_wordbook_title": "添加词库",
-  "student_detail.add_wordbook_desc": "从全局词库目录为学员分配",
+  "student_detail.add_wordbook_desc": "从全局词库或我的自定义词库为学员分配",
   "student_detail.search_wordbooks": "搜索词库名称…",
   "student_detail.catalog_loading": "加载中…",
   "student_detail.catalog_search_hint": "输入词库名称搜索，或浏览下方推荐词库",

@@ -37,6 +37,7 @@ import { showToast } from "../utils/toast";
 import { cn } from "../utils/cn";
 import { useTranslation } from "react-i18next";
 import { formatApiMessage } from "../utils/apiMessage";
+import { isValidSnowflakeId, normalizeSnowflakeId } from "../utils/json-snowflake";
 
 type MaskMode = "none" | "meaning" | "word";
 
@@ -103,7 +104,9 @@ function readMaskMode(): MaskMode {
 export default function WordBookWords() {
   const { t } = useTranslation();
   const { id: idParam } = useParams<{ id: string }>();
-  const bookId = Number(idParam);
+  // 雪花 ID 超过 Number.MAX_SAFE_INTEGER，Number() 会把末尾精度抹掉，请求打到不存在的词库。
+  const bookId = normalizeSnowflakeId(idParam);
+  const bookIdOk = isValidSnowflakeId(bookId);
 
   const [bookName, setBookName] = useState("");
   const [isCustom, setIsCustom] = useState(false);
@@ -143,7 +146,7 @@ export default function WordBookWords() {
   }, []);
 
   const load = useCallback(async () => {
-    if (!Number.isFinite(bookId) || bookId <= 0) return;
+    if (!bookIdOk) return;
     setLoading(true);
     setErr(null);
     try {
@@ -171,7 +174,7 @@ export default function WordBookWords() {
     } finally {
       setLoading(false);
     }
-  }, [bookId, page, debouncedKw, pageSize]);
+  }, [bookId, bookIdOk, page, debouncedKw, pageSize]);
 
   useEffect(() => {
     void load();
@@ -283,7 +286,7 @@ export default function WordBookWords() {
   };
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const title = bookName || (Number.isFinite(bookId) ? t("word_book_words.fallback_title", { id: bookId }) : t("word_book_words.fallback"));
+  const title = bookName || (bookIdOk ? t("word_book_words.fallback_title", { id: bookId }) : t("word_book_words.fallback"));
 
   const [tappedReveal, setTappedReveal] = useState<Set<number>>(new Set());
   useEffect(() => {
@@ -300,7 +303,7 @@ export default function WordBookWords() {
     });
   };
 
-  if (!Number.isFinite(bookId) || bookId <= 0) {
+  if (!bookIdOk) {
     return (
       <div className="px-4 py-8 text-muted-foreground">
         {t("word_book_words.invalid")}{" "}

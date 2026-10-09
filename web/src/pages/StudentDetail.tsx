@@ -92,7 +92,7 @@ export default function StudentDetail() {
   const [wordBooks, setWordBooks] = useState<StudentWordBookItem[]>([]);
   const [loadingBooks, setLoadingBooks] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  const [catalog, setCatalog] = useState<CachedWordBook[]>([]);
+  const [catalog, setCatalog] = useState<Array<CachedWordBook & { custom?: boolean }>>([]);
   const [catalogQ, setCatalogQ] = useState("");
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
@@ -309,25 +309,29 @@ export default function StudentDetail() {
   const loadCatalog = useCallback(async (keyword: string) => {
     setCatalogLoading(true);
     try {
-      const res = await listWordBooks({
-        page: 1,
-        pageSize: 40,
-        keyword: keyword.trim() || undefined,
-      });
-      if (res.code !== 200) {
-        setCatalog([]);
-        return;
-      }
-      const list = Array.isArray(res.data?.list) ? res.data.list : [];
-      setCatalog(
-        list.map((b) => ({
+      const kw = keyword.trim() || undefined;
+      const [systemRes, customRes] = await Promise.all([
+        listWordBooks({ page: 1, pageSize: 40, keyword: kw }),
+        listWordBooks({ page: 1, pageSize: 100, keyword: kw, group: "custom" }),
+      ]);
+      const system = systemRes.code === 200 && Array.isArray(systemRes.data?.list) ? systemRes.data.list : [];
+      const custom = customRes.code === 200 && Array.isArray(customRes.data?.list) ? customRes.data.list : [];
+      const seen = new Set<string>();
+      const merged: Array<CachedWordBook & { custom?: boolean }> = [];
+      for (const b of [...custom, ...system]) {
+        const id = normalizeSnowflakeId(b.id);
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        merged.push({
           id: b.id,
           name: b.name,
           wordCount: b.wordCount,
           level: b.level,
           category: b.category,
-        }))
-      );
+          custom: custom.some((c) => sameSnowflakeId(c.id, b.id)) || b.category === "custom",
+        });
+      }
+      setCatalog(merged);
     } catch {
       setCatalog([]);
     } finally {
@@ -897,7 +901,14 @@ export default function StudentDetail() {
                   className="flex items-center gap-3 rounded-xl border border-border px-3 py-2.5"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-foreground truncate">{b.name}</div>
+                    <div className="text-sm font-medium text-foreground truncate">
+                      {b.name}
+                      {b.custom ? (
+                        <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">
+                          {t("shelf.group_custom")}
+                        </span>
+                      ) : null}
+                    </div>
                     <div className="text-[11px] text-muted-foreground">
                       {b.wordCount ? t("create_wordbook.words_count", { count: b.wordCount }) : "—"}
                       {b.level ? ` · ${b.level}` : ""}

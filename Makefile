@@ -24,12 +24,7 @@ GCFLAGS  :=
 
 # 目标平台: GOOS/GOARCH
 PLATFORMS := \
-  linux/amd64 \
-  linux/arm64 \
-  darwin/amd64 \
-  darwin/arm64 \
-  windows/amd64 \
-  windows/arm64
+  linux/amd64
 
 # 前端目录
 WEB_DIR   := web

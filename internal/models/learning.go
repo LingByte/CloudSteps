@@ -5,6 +5,7 @@ import (
 
 	"github.com/LingByte/CloudStepsGo/internal/constants"
 	common "github.com/LingByte/ling-base/common"
+	"gorm.io/gorm"
 )
 
 // UserWordBook 用户选择的词库
@@ -20,6 +21,18 @@ type UserWordBook struct {
 }
 
 func (UserWordBook) TableName() string { return constants.TABLE_USER_WORD_BOOKS }
+
+// UserHasActiveWordBook 用户是否仍持有该词库（含老师分配给学员的自定义词库）。
+func UserHasActiveWordBook(db *gorm.DB, userID, wordBookID uint) bool {
+	if userID == 0 || wordBookID == 0 {
+		return false
+	}
+	var n int64
+	err := db.Model(&UserWordBook{}).
+		Where("user_id = ? AND word_book_id = ? AND status = ?", userID, wordBookID, "active").
+		Count(&n).Error
+	return err == nil && n > 0
+}
 
 // UserWordState 用户-单词学习状态（核心）
 type UserWordState struct {

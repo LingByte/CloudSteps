@@ -44,7 +44,7 @@ export const listWordBooks = async (params?: {
 
 export interface WordBookDetail extends WordBookItem {}
 
-export const getWordBook = async (id: number): Promise<ApiResponse<WordBookDetail>> => {
+export const getWordBook = async (id: string | number): Promise<ApiResponse<WordBookDetail>> => {
   return get<WordBookDetail>(`/wordbooks/${id}`)
 }
 
@@ -65,7 +65,7 @@ export interface WordBookWord {
 }
 
 export const listWordBookWords = async (
-  wordBookId: number,
+  wordBookId: string | number,
   params: { page: number; pageSize: number; keyword?: string }
 ): Promise<ApiResponse<{ list: WordBookWord[]; total: number; page: number; pageSize: number }>> => {
   return get<{ list: WordBookWord[]; total: number; page: number; pageSize: number }>(
@@ -75,8 +75,8 @@ export const listWordBookWords = async (
 }
 
 export const updateWordBookWord = async (
-  wordBookId: number,
-  wordId: number,
+  wordBookId: string | number,
+  wordId: string | number,
   body: {
     word?: string
     phonetic?: string
@@ -88,8 +88,8 @@ export const updateWordBookWord = async (
 }
 
 export const deleteWordBookWord = async (
-  wordBookId: number,
-  wordId: number
+  wordBookId: string | number,
+  wordId: string | number
 ): Promise<ApiResponse<null>> => {
   return del<null>(`/wordbooks/${wordBookId}/words/${wordId}`)
 }
