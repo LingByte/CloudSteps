@@ -111,8 +111,11 @@ function colAlign(header: string): CanvasTextAlign {
   const leftHeaders = new Set([
     i18n.t("export.col_chinese"),
     i18n.t("export.col_meaning"),
+    i18n.t("training_records.header_note"),
     "Chinese",
     "Meaning",
+    "Notes",
+    "笔记",
   ]);
   if (leftHeaders.has(header)) return "left";
   return "center";
@@ -226,12 +229,19 @@ function buildPdfFromJpegPages(
  * 将表格渲染为打印风格 PDF：居中标题、右上角 logo、细黑框表格。
  * 序号 / 英文 / 音标居中，中文左对齐。
  */
+export type PdfAttachment = {
+  title: string;
+  text?: string;
+  image?: HTMLImageElement | null;
+};
+
 export async function downloadPdfTable(opts: {
   filename: string;
   title: string;
   headers: string[];
   rows: Array<Array<string | number>>;
   logoUrl?: string;
+  attachments?: PdfAttachment[];
 }) {
   const { headers, rows } = opts;
   const filename = opts.filename.endsWith(".pdf") ? opts.filename : `${opts.filename}.pdf`;
@@ -250,6 +260,11 @@ export async function downloadPdfTable(opts: {
     const indexHeader = i18n.t("export.col_index");
     const phoneticHeader = i18n.t("export.col_phonetic");
     const hasIndex = headers[0] === indexHeader || headers[0] === "序号";
+    if (hasIndex && n === 5) {
+      const idx = 36;
+      const rest = usable - idx;
+      return [idx, rest * 0.2, rest * 0.2, rest * 0.24, rest * 0.36];
+    }
     if (hasIndex && n === 4) {
       const idx = 36;
       const rest = usable - idx;
@@ -383,6 +398,46 @@ export async function downloadPdfTable(opts: {
     });
 
     if (rowIdx >= rows.length) break;
+  }
+
+  for (const attachment of opts.attachments || []) {
+    if (!attachment.image && !attachment.text?.trim()) continue;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(pageW * scale);
+    canvas.height = Math.round(pageH * scale);
+    const ctx = canvas.getContext("2d")!;
+    ctx.scale(scale, scale);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, pageW, pageH);
+    ctx.fillStyle = "#111111";
+    ctx.font = titleFont;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(attachment.title || heading, pageW / 2, margin + 16, usable);
+    const top = margin + 40;
+    const boxH = pageH - margin - top;
+    if (attachment.image && attachment.image.width > 0 && attachment.image.height > 0) {
+      const ratio = Math.min(usable / attachment.image.width, boxH / attachment.image.height);
+      const dw = attachment.image.width * ratio;
+      const dh = attachment.image.height * ratio;
+      ctx.drawImage(attachment.image, margin + (usable - dw) / 2, top, dw, dh);
+    } else if (attachment.text) {
+      ctx.font = font;
+      ctx.textAlign = "left";
+      const lines = wrapText(ctx, attachment.text, usable);
+      lines.forEach((line, index) => {
+        const y = top + index * lineH;
+        if (y < pageH - margin) ctx.fillText(line, margin, y);
+      });
+    }
+    const bytes = await canvasToJpegBytes(canvas, 0.95);
+    pages.push({
+      bytes,
+      width: canvas.width,
+      height: canvas.height,
+      pageWidth: pageW,
+      pageHeight: pageH,
+    });
   }
 
   const blob = buildPdfFromJpegPages(pages);

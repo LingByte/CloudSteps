@@ -26,7 +26,7 @@ import { useTranslation } from "react-i18next";
 import { requestPracticePauseMenu } from "../utils/practiceFlowLock";
 
 type ListenWord = {
-  id: number;
+  id: string;
   word: string;
   phonetic?: string;
   translation?: string;
@@ -80,7 +80,7 @@ export default function ListenIdentify() {
     }
   }, [mode]);
 
-  const [playingId, setPlayingId] = useState<number | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
   const [fullMeaning, setFullMeaning] = useState(false);
   const abortRef = useRef<(() => void) | null>(null);
 
@@ -97,7 +97,7 @@ export default function ListenIdentify() {
       const start = batchIdx * 5;
       const slice = all.slice(start, start + 5);
       const mapped: ListenWord[] = slice.map((w: any) => ({
-        id: Number(w.id),
+        id: normalizeSnowflakeId(w.id),
         word: String(w.word || ""),
         phonetic: pickPhoneticDisplay(w),
         translation: displayTranslationFull(w.translation),
@@ -273,10 +273,11 @@ export default function ListenIdentify() {
       />
 
       <NoteSplitLayout
+        activeWordIds={words.map((word) => word.id)}
         defaultStorageKey={`study-note:global:${wordBookId}`}
         defaultTitle={t("practice.free_note")}
       >
-      <div className="px-4 mt-6 max-w-5xl mx-auto w-full pb-28">
+      <div className="w-full pb-28">
         <div className="text-center text-sm text-[#718096] mb-6">{t("practice.batch_group", { current: batchIdx + 1, total: totalBatches })}</div>
 
         {viewMode === "card" && cardWord ? (
@@ -393,7 +394,7 @@ export default function ListenIdentify() {
       </NoteSplitLayout>
 
       <div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-[#E2E8F0] px-3 sm:px-4 py-1.5 sm:py-2 shadow-lg">
-        <div className="max-w-5xl mx-auto w-full">
+        <div className="mx-auto w-full max-w-2xl lg:max-w-5xl">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 overflow-x-auto">
               <WordViewModeToggle mode={viewMode} onChange={setViewMode} />

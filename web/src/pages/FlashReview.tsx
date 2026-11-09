@@ -34,7 +34,7 @@ const CHECK_PHASE_KEY = "lb_study_check_phase";
 
 type FlashWord = {
   uid: string;
-  id: number;
+  id: string;
   word: string;
   phonetic: string;
   translation: string;
@@ -45,12 +45,12 @@ type FlashWord = {
   heard: boolean;
 };
 
-function newUid(id: number): string {
+function newUid(id: string): string {
   return `${id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function mapToFlashWord(w: Record<string, unknown>): FlashWord {
-  const id = Number(w.id);
+  const id = normalizeSnowflakeId(w.id);
   return {
     uid: newUid(id),
     id,
@@ -124,7 +124,7 @@ export default function FlashReview() {
     }
   }, [batchIdx, mode, isRetryMode]);
 
-  const [playingId, setPlayingId] = useState<number | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
   const abortRef = useRef<(() => void) | null>(null);
 
   const handleScissorClick = (word: FlashWord, action: "red" | "green") => {
@@ -351,6 +351,7 @@ export default function FlashReview() {
       <NoteSplitLayout
         defaultStorageKey={`study-note:global:${wordBookId}`}
         defaultTitle="随心记"
+        activeWordIds={words.map((word) => word.id)}
       >
         <p className="text-center text-sm text-[#718096] mb-6">
           {isRetryMode

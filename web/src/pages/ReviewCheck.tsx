@@ -101,7 +101,7 @@ export default function ReviewCheck() {
         setSessionId(sid);
         setWords(
           ws.map((w) => ({
-            id: Number(w.id),
+            id: normalizeSnowflakeId(w.id),
             word: String(w.word || ""),
             phonetic: w.phonetic ? String(w.phonetic) : undefined,
             phoneticUk: w.phoneticUk ? String(w.phoneticUk) : undefined,
@@ -249,6 +249,7 @@ export default function ReviewCheck() {
       <NoteSplitLayout
         defaultStorageKey={`study-note:global:${wordBookId}`}
         defaultTitle="随心记"
+        activeWordIds={words.map((word) => word.id)}
       >
         {loading && (
           <p className="text-center text-[#718096] py-12">{t("practice.loading")}</p>

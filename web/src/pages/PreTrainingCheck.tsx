@@ -523,6 +523,7 @@ export default function PreTrainingCheck() {
       <NoteSplitLayout
         defaultStorageKey={`study-note:global:${wordBookId}`}
         defaultTitle="随心记"
+        activeWordIds={words.map((word) => word.id)}
       >
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-600 text-sm mb-4">

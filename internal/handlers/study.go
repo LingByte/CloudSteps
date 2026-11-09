@@ -426,8 +426,8 @@ func (h *Handlers) handleStudySessionComplete(c *gin.Context) {
 
 	var body struct {
 		Results []struct {
-			WordID     uint `json:"wordId"`
-			Remembered bool `json:"remembered"`
+			WordID     utils.JSONUint `json:"wordId"`
+			Remembered bool           `json:"remembered"`
 		} `json:"results" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -456,10 +456,14 @@ func (h *Handlers) handleStudySessionComplete(c *gin.Context) {
 	rememberedIDs := make([]uint, 0)
 	forgotIDs := make([]uint, 0)
 	for _, r := range body.Results {
+		wordID := r.WordID.Uint()
+		if wordID == 0 {
+			continue
+		}
 		if r.Remembered {
-			rememberedIDs = append(rememberedIDs, r.WordID)
+			rememberedIDs = append(rememberedIDs, wordID)
 		} else {
-			forgotIDs = append(forgotIDs, r.WordID)
+			forgotIDs = append(forgotIDs, wordID)
 		}
 	}
 
@@ -885,6 +889,7 @@ func (h *Handlers) handleStudySessionsExportWords(c *gin.Context) {
 
 	type exportRow struct {
 		ID           uint   `json:"id" gorm:"column:id"`
+		WordBookID   uint   `json:"wordBookId" gorm:"column:word_book_id"`
 		Word         string `json:"word" gorm:"column:word"`
 		Phonetic     string `json:"phonetic" gorm:"column:phonetic"`
 		PhoneticUK   string `json:"phoneticUk" gorm:"column:phonetic_uk"`
@@ -896,11 +901,11 @@ func (h *Handlers) handleStudySessionsExportWords(c *gin.Context) {
 
 	var rows []exportRow
 	err := db.Raw(`
-		SELECT w.id, w.word, w.phonetic, w.phonetic_uk, w.phonetic_us, w.translation, w.part_of_speech, w.audio_url
+		SELECT w.id, w.word_book_id, w.word, w.phonetic, w.phonetic_uk, w.phonetic_us, w.translation, w.part_of_speech, w.audio_url
 		FROM session_words sw
 		JOIN words w ON w.id = sw.word_id
 		WHERE sw.session_id IN ?
-		GROUP BY w.id, w.word, w.phonetic, w.phonetic_uk, w.phonetic_us, w.translation, w.part_of_speech, w.audio_url
+		GROUP BY w.id, w.word_book_id, w.word, w.phonetic, w.phonetic_uk, w.phonetic_us, w.translation, w.part_of_speech, w.audio_url
 		ORDER BY w.word ASC
 	`, sessionIDs).Scan(&rows).Error
 	if err != nil {

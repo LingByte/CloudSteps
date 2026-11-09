@@ -4,6 +4,7 @@ import { getStoredLocale } from '../i18n'
 
 export interface StudyWordItem {
   id: string | number
+  wordBookId?: string | number
   word: string
   translation?: string
   phonetic?: string
@@ -373,6 +374,7 @@ export const updateStudySessionsPracticeTime = async (
 
 export type StudyExportWord = {
   id: number
+  wordBookId?: string | number
   word: string
   phonetic?: string
   phoneticUk?: string

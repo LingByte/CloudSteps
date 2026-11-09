@@ -35,9 +35,10 @@ export function StudyNoteSplitLayout({
       <div
         className={`box-border w-full ${
           split
-            ? "min-h-0 flex-1 lg:flex lg:items-start lg:gap-2 lg:max-w-none lg:px-2 lg:py-2"
+            ? "flex min-h-0 flex-1 items-stretch gap-2 max-w-none px-2 py-2"
             : "mt-6 pb-20 min-h-[calc(100dvh-11rem)] max-w-2xl lg:max-w-5xl mx-auto px-4"
         }`}
+        style={split ? { height: "calc(100dvh - 3.5rem - 7.5rem)" } : undefined}
       >
         <div
           className={`${

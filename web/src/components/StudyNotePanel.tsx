@@ -135,28 +135,38 @@ export function StudyNotePanel({ open, onClose, storageKey, title, subtitle = ""
     setOpen(true);
   };
 
-  // ---- Load saved note on open ----
+  // 笔记只写回「当前画板打开时」的那一个单词。换词后的重绘不能把上一份笔记写到新单词上。
+  const boundKeyRef = useRef(storageKey);
+  const acceptPersistRef = useRef(false);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      acceptPersistRef.current = false;
+      return;
+    }
+    acceptPersistRef.current = false;
+    boundKeyRef.current = storageKey;
     const stored = loadNote(storageKey);
     const saved = stored.background === "#175b37" ? { ...stored, background: "#fff8e8" } : stored;
     setNote(saved);
     setColor(saved.color);
     setFill(saved.background);
-    // Import JSON into Leafer canvas after it mounts
     if (saved.json && leaferRef.current) {
       leaferRef.current.importJSON(saved.json);
+    } else {
+      leaferRef.current?.clear();
     }
+    acceptPersistRef.current = true;
   }, [open, storageKey]);
 
-  // ---- Persist to localStorage ----
   const persist = useCallback(() => {
-    if (!leaferRef.current) return;
+    const key = boundKeyRef.current;
+    if (!acceptPersistRef.current || !key || !leaferRef.current) return;
     const json = leaferRef.current.exportJSON();
     const next = { ...note, json, text: "", color, background: fill };
     setNote(next);
-    localStorage.setItem(storageKey, JSON.stringify(next));
-  }, [note, storageKey, color, fill]);
+    localStorage.setItem(key, JSON.stringify(next));
+  }, [note, color, fill]);
 
   const setBackground = (value: string) => {
     setFill(value);
