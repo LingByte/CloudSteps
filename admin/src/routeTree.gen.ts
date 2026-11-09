@@ -37,6 +37,7 @@ import { Route as AuthenticatedUserReadingPassagesIndexRouteImport } from './rou
 import { Route as AuthenticatedUserFeedbackIndexRouteImport } from './routes/_authenticated/user-feedback/index'
 import { Route as AuthenticatedUserClozePassagesIndexRouteImport } from './routes/_authenticated/user-cloze-passages/index'
 import { Route as AuthenticatedTasksIndexRouteImport } from './routes/_authenticated/tasks/index'
+import { Route as AuthenticatedSubscriptionsIndexRouteImport } from './routes/_authenticated/subscriptions/index'
 import { Route as AuthenticatedStorageIndexRouteImport } from './routes/_authenticated/storage/index'
 import { Route as AuthenticatedStorageStatsIndexRouteImport } from './routes/_authenticated/storage-stats/index'
 import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
@@ -223,6 +224,12 @@ const AuthenticatedTasksIndexRoute = AuthenticatedTasksIndexRouteImport.update({
   path: '/tasks/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSubscriptionsIndexRoute =
+  AuthenticatedSubscriptionsIndexRouteImport.update({
+    id: '/subscriptions/',
+    path: '/subscriptions/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedStorageIndexRoute =
   AuthenticatedStorageIndexRouteImport.update({
     id: '/storage/',
@@ -507,6 +514,7 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/storage-stats/': typeof AuthenticatedStorageStatsIndexRoute
   '/storage/': typeof AuthenticatedStorageIndexRoute
+  '/subscriptions/': typeof AuthenticatedSubscriptionsIndexRoute
   '/tasks/': typeof AuthenticatedTasksIndexRoute
   '/user-cloze-passages/': typeof AuthenticatedUserClozePassagesIndexRoute
   '/user-feedback/': typeof AuthenticatedUserFeedbackIndexRoute
@@ -572,6 +580,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/storage-stats': typeof AuthenticatedStorageStatsIndexRoute
   '/storage': typeof AuthenticatedStorageIndexRoute
+  '/subscriptions': typeof AuthenticatedSubscriptionsIndexRoute
   '/tasks': typeof AuthenticatedTasksIndexRoute
   '/user-cloze-passages': typeof AuthenticatedUserClozePassagesIndexRoute
   '/user-feedback': typeof AuthenticatedUserFeedbackIndexRoute
@@ -642,6 +651,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/storage-stats/': typeof AuthenticatedStorageStatsIndexRoute
   '/_authenticated/storage/': typeof AuthenticatedStorageIndexRoute
+  '/_authenticated/subscriptions/': typeof AuthenticatedSubscriptionsIndexRoute
   '/_authenticated/tasks/': typeof AuthenticatedTasksIndexRoute
   '/_authenticated/user-cloze-passages/': typeof AuthenticatedUserClozePassagesIndexRoute
   '/_authenticated/user-feedback/': typeof AuthenticatedUserFeedbackIndexRoute
@@ -710,6 +720,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/storage-stats/'
     | '/storage/'
+    | '/subscriptions/'
     | '/tasks/'
     | '/user-cloze-passages/'
     | '/user-feedback/'
@@ -775,6 +786,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/storage-stats'
     | '/storage'
+    | '/subscriptions'
     | '/tasks'
     | '/user-cloze-passages'
     | '/user-feedback'
@@ -844,6 +856,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/'
     | '/_authenticated/storage-stats/'
     | '/_authenticated/storage/'
+    | '/_authenticated/subscriptions/'
     | '/_authenticated/tasks/'
     | '/_authenticated/user-cloze-passages/'
     | '/_authenticated/user-feedback/'
@@ -1071,6 +1084,13 @@ declare module '@tanstack/react-router' {
       path: '/tasks'
       fullPath: '/tasks/'
       preLoaderRoute: typeof AuthenticatedTasksIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/subscriptions/': {
+      id: '/_authenticated/subscriptions/'
+      path: '/subscriptions'
+      fullPath: '/subscriptions/'
+      preLoaderRoute: typeof AuthenticatedSubscriptionsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/storage/': {
@@ -1412,6 +1432,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedScenariosIndexRoute: typeof AuthenticatedScenariosIndexRoute
   AuthenticatedStorageStatsIndexRoute: typeof AuthenticatedStorageStatsIndexRoute
   AuthenticatedStorageIndexRoute: typeof AuthenticatedStorageIndexRoute
+  AuthenticatedSubscriptionsIndexRoute: typeof AuthenticatedSubscriptionsIndexRoute
   AuthenticatedTasksIndexRoute: typeof AuthenticatedTasksIndexRoute
   AuthenticatedUserClozePassagesIndexRoute: typeof AuthenticatedUserClozePassagesIndexRoute
   AuthenticatedUserFeedbackIndexRoute: typeof AuthenticatedUserFeedbackIndexRoute
@@ -1464,6 +1485,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedScenariosIndexRoute: AuthenticatedScenariosIndexRoute,
   AuthenticatedStorageStatsIndexRoute: AuthenticatedStorageStatsIndexRoute,
   AuthenticatedStorageIndexRoute: AuthenticatedStorageIndexRoute,
+  AuthenticatedSubscriptionsIndexRoute: AuthenticatedSubscriptionsIndexRoute,
   AuthenticatedTasksIndexRoute: AuthenticatedTasksIndexRoute,
   AuthenticatedUserClozePassagesIndexRoute:
     AuthenticatedUserClozePassagesIndexRoute,

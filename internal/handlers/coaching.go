@@ -1824,12 +1824,28 @@ func (h *Handlers) coachingAdminListSubscriptions(c *gin.Context) {
 	response.SuccessI18n(c, "common.ok", list)
 }
 
+// flexID 同时接受 JSON 数字和字符串，避免雪花 ID 在前端丢精度。
+type flexID uint
+
+func (f *flexID) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(strings.TrimSpace(string(b)), `"`)
+	if s == "" || s == "null" {
+		return errors.New("missing id")
+	}
+	v, err := strconv.ParseUint(s, 10, 64)
+	if err != nil {
+		return err
+	}
+	*f = flexID(v)
+	return nil
+}
+
 type subscriptionUpsertBody struct {
-	UserID    uint   `json:"userId" binding:"required"`
-	Type      string `json:"type" binding:"required"`     // monthly | yearly | lifetime
-	StartedAt string `json:"startedAt"`                    // RFC3339，默认当前时间
-	Duration  int    `json:"duration"`                     // 月数（monthly=1, yearly=12, lifetime 忽略）；若 >0 则覆盖
-	Status    string `json:"status"`                       // 默认 active
+	UserID    flexID `json:"userId" binding:"required"`
+	Type      string `json:"type" binding:"required"` // monthly | quarterly | yearly | lifetime
+	StartedAt string `json:"startedAt"`               // RFC3339，默认当前时间
+	Duration  int    `json:"duration"`                // 月数（monthly/quarterly）或年数（yearly）；若 >0 则覆盖
+	Status    string `json:"status"`                  // 默认 active
 }
 
 func (h *Handlers) coachingAdminUpsertSubscription(c *gin.Context) {
@@ -1840,9 +1856,10 @@ func (h *Handlers) coachingAdminUpsertSubscription(c *gin.Context) {
 		return
 	}
 	validTypes := map[string]bool{
-		models.SubscriptionTypeMonthly: true,
-		models.SubscriptionTypeYearly:  true,
-		models.SubscriptionTypeLifetime: true,
+		models.SubscriptionTypeMonthly:   true,
+		models.SubscriptionTypeQuarterly: true,
+		models.SubscriptionTypeYearly:    true,
+		models.SubscriptionTypeLifetime:  true,
 	}
 	if !validTypes[body.Type] {
 		response.FailI18n(c, "common.invalid_params", errors.New("invalid subscription type"))
@@ -1850,7 +1867,7 @@ func (h *Handlers) coachingAdminUpsertSubscription(c *gin.Context) {
 	}
 
 	var user models.User
-	if err := db.Where("id = ?", body.UserID).First(&user).Error; err != nil {
+	if err := db.Where("id = ?", uint(body.UserID)).First(&user).Error; err != nil {
 		response.FailI18n(c, "auth.user_not_found", err)
 		return
 	}
@@ -1866,6 +1883,13 @@ func (h *Handlers) coachingAdminUpsertSubscription(c *gin.Context) {
 	switch body.Type {
 	case models.SubscriptionTypeMonthly:
 		months := 1
+		if body.Duration > 0 {
+			months = body.Duration
+		}
+		e := startedAt.AddDate(0, months, 0)
+		expiredAt = &e
+	case models.SubscriptionTypeQuarterly:
+		months := 3
 		if body.Duration > 0 {
 			months = body.Duration
 		}
@@ -1889,7 +1913,7 @@ func (h *Handlers) coachingAdminUpsertSubscription(c *gin.Context) {
 
 	// 查找已有活跃订阅，有则更新
 	var existing models.UserSubscription
-	hasExisting := db.Where("user_id = ? AND status = ?", body.UserID, models.SubscriptionStatusActive).
+	hasExisting := db.Where("user_id = ? AND status = ?", uint(body.UserID), models.SubscriptionStatusActive).
 		First(&existing).Error == nil
 
 	if hasExisting {
@@ -1913,7 +1937,7 @@ func (h *Handlers) coachingAdminUpsertSubscription(c *gin.Context) {
 	}
 
 	sub := models.UserSubscription{
-		UserID:    body.UserID,
+		UserID:    uint(body.UserID),
 		Type:      body.Type,
 		StartedAt: startedAt,
 		ExpiredAt: expiredAt,

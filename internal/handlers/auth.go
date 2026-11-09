@@ -1489,8 +1489,8 @@ func (h *Handlers) handleAdminListUsers(c *gin.Context) {
 	}
 	if search != "" {
 		like := "%" + search + "%"
-		base = base.Where("username LIKE ? OR display_name LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR email LIKE ?",
-			like, like, like, like, like)
+		base = base.Where("username LIKE ? OR display_name LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR email LIKE ? OR phone LIKE ?",
+			like, like, like, like, like, like)
 	}
 	if role != "" {
 		base = base.Where("role = ?", role)
