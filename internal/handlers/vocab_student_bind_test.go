@@ -135,7 +135,8 @@ func submitVocabAs(t *testing.T, db *gorm.DB, user *models.User, q models.VocabT
 func submitVocabRaw(t *testing.T, db *gorm.DB, user *models.User, q models.VocabTestQuestion, studentID uint, answer string) *httptest.ResponseRecorder {
 	t.Helper()
 	body, err := json.Marshal(map[string]any{
-		"studentId": studentID,
+		// studentId 与线上一致：雪花 ID 以字符串传递，避免 JSON number 精度/类型问题
+		"studentId": fmt.Sprintf("%d", studentID),
 		"answers": []map[string]any{{
 			"questionId": q.ID,
 			"answer":     answer,

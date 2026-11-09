@@ -138,7 +138,7 @@ function articlePreviewText(row: WechatMpArticle): string {
   const plain = row.content
     .replace(/```[\s\S]*?```/g, '')
     .replace(/`[^`]*`/g, '')
-    .replace(/[#>*_\[\]()!-]/g, '')
+    .replace(/[#>*_[\]()!-]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
   return plain.slice(0, 160)

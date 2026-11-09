@@ -20,6 +20,7 @@ import (
 	"github.com/LingByte/CloudStepsGo/internal/models"
 	"github.com/LingByte/CloudStepsGo/pkg/stores"
 	"github.com/LingByte/ling-base/common/logger"
+	lbresponse "github.com/LingByte/ling-base/common/response"
 	response "github.com/LingByte/ling-base/common/response/gin"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -206,9 +207,10 @@ func failVocabTestAccess(c *gin.Context, err error) {
 	case "未登录":
 		response.FailI18n(c, "common.login_required", nil)
 	case "coaching.no_student_access", "无权查看该学员或尚未建立陪练关系", "无权为其他学员提交测评":
-		response.FailI18n(c, "coaching.no_student_access", nil)
+		// FailI18n 对未知 key 默认 INTERNAL；无学员权限应返回 FORBIDDEN
+		response.FailAppError(c, lbresponse.NewI18n(lbresponse.CodeForbidden, "coaching.no_student_access"))
 	default:
-		response.FailI18n(c, "coaching.relation_required", nil)
+		response.AbortWithStatusJSON(c, http.StatusForbidden, err)
 	}
 }
 

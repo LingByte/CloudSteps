@@ -395,34 +395,34 @@ func DeleteWordBook(db *gorm.DB, id uint, operator string) error {
 	}
 	// Include soft-deleted rows so admin can purge books that still appear after partial deletes.
 	var book WordBook
-	if err := db.Unscoped().First(&book, id).Error; err != nil {
+	if err := db.Unscoped().Where("id = ?", id).First(&book).Error; err != nil {
 		return err
 	}
 
-	tx := db.Unscoped()
+	// 每次用新的 Unscoped 会话删子表，避免链式 Where 条件残留
+	delByBook := func(model any) error {
+		return db.Unscoped().Where("word_book_id = ?", id).Delete(model).Error
+	}
+	if err := delByBook(&Word{}); err != nil {
+		return err
+	}
+	if err := delByBook(&UserWordBook{}); err != nil {
+		return err
+	}
+	if err := delByBook(&UserWordState{}); err != nil {
+		return err
+	}
+	if err := delByBook(&ReviewQueue{}); err != nil {
+		return err
+	}
+	if err := delByBook(&WordBookProgress{}); err != nil {
+		return err
+	}
+	if err := delByBook(&UserWordProgress{}); err != nil {
+		return err
+	}
 
-	// 先删除子表，避免外键约束导致删除失败
-	if err := tx.Where("word_book_id = ?", id).Delete(&Word{}).Error; err != nil {
-		return err
-	}
-	if err := tx.Where("word_book_id = ?", id).Delete(&UserWordBook{}).Error; err != nil {
-		return err
-	}
-	if err := tx.Where("word_book_id = ?", id).Delete(&UserWordState{}).Error; err != nil {
-		return err
-	}
-	if err := tx.Where("word_book_id = ?", id).Delete(&ReviewQueue{}).Error; err != nil {
-		return err
-	}
-	if err := tx.Where("word_book_id = ?", id).Delete(&WordBookProgress{}).Error; err != nil {
-		return err
-	}
-	if err := tx.Where("word_book_id = ?", id).Delete(&UserWordProgress{}).Error; err != nil {
-		return err
-	}
-
-	// 最后删除词库主表
-	res := tx.Where("id = ?", id).Delete(&WordBook{})
+	res := db.Unscoped().Where("id = ?", id).Delete(&WordBook{})
 	if res.Error != nil {
 		return res.Error
 	}
