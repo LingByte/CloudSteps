@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// 内存词条补全缓存：启动时从 words 表抽取去重词条，enrich 只读缓存，未命中则不填。
+// 内存词条补全缓存：启动时从 words 表抽取去重词条。enrich 先读缓存，缺音标或读音时再按本次单词查库。
 const (
 	enrichCacheMaxEntries = 250_000
 	enrichScanBatch       = 5_000
@@ -24,8 +24,10 @@ const (
 type EnrichEntry struct {
 	Phonetic         string
 	PhoneticUS       string
+	PhoneticUK       string
 	Translation      string
 	TranslationShort string
+	AudioURL         string
 }
 
 var (
@@ -72,24 +74,156 @@ func EnrichFromCache(items []ParsedWord) []ParsedWord {
 		if !ok {
 			continue
 		}
-		if items[i].Phonetic == "" {
-			if e.Phonetic != "" {
-				items[i].Phonetic = e.Phonetic
-			} else {
-				items[i].Phonetic = e.PhoneticUS
-			}
-		}
-		if items[i].Translation == "" {
-			items[i].Translation = e.Translation
-		}
-		if items[i].TranslationShort == "" {
-			items[i].TranslationShort = e.TranslationShort
-			if items[i].TranslationShort == "" {
-				items[i].TranslationShort = e.Translation
-			}
-		}
+		items[i] = fillParsedFromEntry(items[i], e)
 	}
 	return items
+}
+
+// EnrichMissingFromDB 只查本次词表里缓存没补全的单词，避免扫整张词库。
+func EnrichMissingFromDB(db *gorm.DB, items []ParsedWord) []ParsedWord {
+	if db == nil || len(items) == 0 {
+		return items
+	}
+	need := make([]string, 0, len(items))
+	seen := make(map[string]struct{}, len(items))
+	for _, it := range items {
+		if it.Phonetic != "" && (it.Translation != "" || it.TranslationShort != "") && it.AudioURL != "" {
+			continue
+		}
+		word := strings.TrimSpace(it.Word)
+		if word == "" {
+			continue
+		}
+		key := strings.ToLower(word)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		need = append(need, word)
+	}
+	if len(need) == 0 {
+		return items
+	}
+
+	found := map[string]EnrichEntry{}
+	const chunk = 200
+	for start := 0; start < len(need); start += chunk {
+		end := start + chunk
+		if end > len(need) {
+			end = len(need)
+		}
+		var rows []Word
+		err := db.Model(&Word{}).
+			Select("word, phonetic, phonetic_us, phonetic_uk, translation, translation_short, audio_url").
+			Where("word IN ?", need[start:end]).
+			Find(&rows).Error
+		if err != nil {
+			logger.Lg.Warn("custom word enrich db lookup failed", zap.Error(err), zap.Int("words", len(need)))
+			return items
+		}
+		for _, row := range rows {
+			key := strings.ToLower(strings.TrimSpace(row.Word))
+			if key == "" {
+				continue
+			}
+			found[key] = mergeEnrichEntry(found[key], EnrichEntry{
+				Phonetic:         strings.TrimSpace(row.Phonetic),
+				PhoneticUS:       strings.TrimSpace(row.PhoneticUS),
+				PhoneticUK:       strings.TrimSpace(row.PhoneticUK),
+				Translation:      strings.TrimSpace(row.Translation),
+				TranslationShort: strings.TrimSpace(row.TranslationShort),
+				AudioURL:         strings.TrimSpace(row.AudioURL),
+			})
+		}
+	}
+	if len(found) == 0 {
+		return items
+	}
+	for i := range items {
+		key := strings.ToLower(strings.TrimSpace(items[i].Word))
+		entry, ok := found[key]
+		if !ok {
+			continue
+		}
+		items[i] = fillParsedFromEntry(items[i], entry)
+	}
+	return items
+}
+
+// BackfillCustomBookPronunciation 给已保存的自定义词库补上库里已有的音标和读音。
+func BackfillCustomBookPronunciation(db *gorm.DB, bookID uint) {
+	if db == nil || bookID == 0 {
+		return
+	}
+	var rows []Word
+	err := db.Select("id, word, phonetic, phonetic_us, phonetic_uk, audio_url").
+		Where("word_book_id = ?", bookID).
+		Where("(COALESCE(phonetic, '') = '' AND COALESCE(phonetic_us, '') = '' AND COALESCE(phonetic_uk, '') = '') OR COALESCE(audio_url, '') = ''").
+		Limit(MaxWords).
+		Find(&rows).Error
+	if err != nil || len(rows) == 0 {
+		return
+	}
+	items := make([]ParsedWord, len(rows))
+	for i, row := range rows {
+		items[i] = ParsedWord{
+			Word:     row.Word,
+			Phonetic: firstNonEmpty(row.Phonetic, row.PhoneticUS, row.PhoneticUK),
+			AudioURL: row.AudioURL,
+		}
+	}
+	filled := EnrichMissingFromDB(db, items)
+	for i, item := range filled {
+		updates := map[string]any{}
+		if rows[i].Phonetic == "" && rows[i].PhoneticUS == "" && rows[i].PhoneticUK == "" && item.Phonetic != "" {
+			updates["phonetic"] = item.Phonetic
+		}
+		if rows[i].AudioURL == "" && item.AudioURL != "" {
+			updates["audio_url"] = item.AudioURL
+		}
+		if len(updates) == 0 {
+			continue
+		}
+		if err := db.Model(&Word{}).Where("id = ? AND word_book_id = ?", rows[i].ID, bookID).Updates(updates).Error; err != nil {
+			logger.Lg.Warn("custom wordbook pronunciation backfill failed", zap.Error(err), zap.Uint("wordId", rows[i].ID))
+			return
+		}
+	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func fillParsedFromEntry(item ParsedWord, entry EnrichEntry) ParsedWord {
+	if item.Phonetic == "" {
+		switch {
+		case entry.Phonetic != "":
+			item.Phonetic = entry.Phonetic
+		case entry.PhoneticUS != "":
+			item.Phonetic = entry.PhoneticUS
+		default:
+			item.Phonetic = entry.PhoneticUK
+		}
+	}
+	if item.Translation == "" {
+		item.Translation = entry.Translation
+	}
+	if item.TranslationShort == "" {
+		item.TranslationShort = entry.TranslationShort
+		if item.TranslationShort == "" {
+			item.TranslationShort = entry.Translation
+		}
+	}
+	if item.AudioURL == "" {
+		item.AudioURL = entry.AudioURL
+	}
+	return item
 }
 
 // EnrichCacheSize 当前缓存词条数（测试/诊断用）
@@ -128,8 +262,10 @@ func loadEnrichCache(db *gorm.DB) {
 		Word             string
 		Phonetic         string
 		PhoneticUS       string
+		PhoneticUK       string
 		Translation      string
 		TranslationShort string
+		AudioURL         string
 	}
 
 	var lastID uint
@@ -159,9 +295,9 @@ func loadEnrichCache(db *gorm.DB) {
 		}
 		var part []row
 		err := db.WithContext(ctx).Model(&Word{}).
-			Select("id, word, phonetic, phonetic_us, translation, translation_short").
+			Select("id, word, phonetic, phonetic_us, phonetic_uk, translation, translation_short, audio_url").
 			Where("id > ?", lastID).
-			Where("(phonetic <> '' OR phonetic_us <> '' OR translation <> '' OR translation_short <> '')").
+			Where("(phonetic <> '' OR phonetic_us <> '' OR phonetic_uk <> '' OR audio_url <> '' OR translation <> '' OR translation_short <> '')").
 			Order("id ASC").
 			Limit(enrichScanBatch).
 			Find(&part).Error
@@ -183,8 +319,10 @@ func loadEnrichCache(db *gorm.DB) {
 			merged := mergeEnrichEntry(cur, EnrichEntry{
 				Phonetic:         strings.TrimSpace(r.Phonetic),
 				PhoneticUS:       strings.TrimSpace(r.PhoneticUS),
+				PhoneticUK:       strings.TrimSpace(r.PhoneticUK),
 				Translation:      strings.TrimSpace(r.Translation),
 				TranslationShort: strings.TrimSpace(r.TranslationShort),
+				AudioURL:         strings.TrimSpace(r.AudioURL),
 			})
 			if !exists || enrichScore(merged) > enrichScore(cur) {
 				next[key] = merged
@@ -224,6 +362,12 @@ func mergeEnrichEntry(a, b EnrichEntry) EnrichEntry {
 	if out.PhoneticUS == "" {
 		out.PhoneticUS = b.PhoneticUS
 	}
+	if out.PhoneticUK == "" {
+		out.PhoneticUK = b.PhoneticUK
+	}
+	if out.AudioURL == "" {
+		out.AudioURL = b.AudioURL
+	}
 	if out.Translation == "" {
 		out.Translation = b.Translation
 	}
@@ -235,8 +379,11 @@ func mergeEnrichEntry(a, b EnrichEntry) EnrichEntry {
 
 func enrichScore(e EnrichEntry) int {
 	n := 0
-	if e.Phonetic != "" || e.PhoneticUS != "" {
+	if e.Phonetic != "" || e.PhoneticUS != "" || e.PhoneticUK != "" {
 		n += 2
+	}
+	if e.AudioURL != "" {
+		n++
 	}
 	if e.TranslationShort != "" {
 		n += 2

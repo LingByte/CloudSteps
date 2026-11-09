@@ -179,6 +179,7 @@ export type CustomParsedWord = {
   phonetic?: string
   translation?: string
   translationShort?: string
+  audioUrl?: string
 }
 
 /** 用词库内存缓存回填缺失释义/音标（前端本地解析后调用） */

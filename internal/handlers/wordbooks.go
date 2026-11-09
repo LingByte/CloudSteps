@@ -272,6 +272,9 @@ func (h *Handlers) handleListWordBookWords(c *gin.Context) {
 		}
 	}
 	keyword := strings.TrimSpace(c.Query("keyword"))
+	if book.OwnerUserID > 0 {
+		models.BackfillCustomBookPronunciation(db, book.ID)
+	}
 	words, total, err := models.ListWordsLite(db, id, keyword, page, pageSize)
 	if err != nil {
 		response.FailI18n(c, "common.query_failed", err)
