@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -25,6 +26,18 @@ func TestDeriveTemplateVariables(t *testing.T) {
 func TestCreateMailTemplate_nil(t *testing.T) {
 	if err := CreateMailTemplate(nil, nil); err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestIsMySQLDuplicateIndex(t *testing.T) {
+	if !isMySQLDuplicateIndex(errors.New("Error 1061 (42000): Duplicate key name 'idx_mail_templates_deleted_at'")) {
+		t.Fatal("expected duplicate index match")
+	}
+	if isMySQLDuplicateIndex(errors.New("Error 1054 (42S22): Unknown column")) {
+		t.Fatal("should not match unrelated mysql errors")
+	}
+	if isMySQLDuplicateIndex(nil) {
+		t.Fatal("nil should be false")
 	}
 }
 
