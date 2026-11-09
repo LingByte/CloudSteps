@@ -22,9 +22,9 @@ LDFLAGS  := -s -w \
 
 GCFLAGS  :=
 
-# 目标平台: GOOS/GOARCH
-PLATFORMS := \
-  linux/amd64
+# 交叉编译目标，写成 os-arch，避免 make 把 linux/amd64 当成目录
+PLATFORMS := linux-amd64 linux-arm64
+LINUX_AMD64 := $(DIST_DIR)/$(APP_NAME)-server-linux-amd64
 
 # 前端目录
 WEB_DIR   := web
@@ -93,27 +93,38 @@ backend-clean: ## 清理后端构建产物
 	rm -rf $(DIST_DIR)/$(APP_NAME)-server-*
 
 # ============================================================
-# 后端构建 — 全平台交叉编译
+# 后端构建 — Linux / 交叉编译
+# CGO_ENABLED=0 产出静态 ELF，拷到 Linux 服务器即可运行，不依赖本机 glibc。
 # ============================================================
-.PHONY: backend-all backend-all-zip
+.PHONY: linux linux-arm64 backend-all backend-all-zip
+
+linux: build-linux-amd64 ## 交叉编译 Linux amd64 静态二进制（可直接在服务器运行）
+
+linux-arm64: build-linux-arm64 ## 交叉编译 Linux arm64 静态二进制
 
 backend-all: $(addprefix build-,$(PLATFORMS)) ## 交叉编译所有平台后端
 
-# 通用交叉编译模板
+# $(1)=linux-amd64 这类 os-arch
 define build_platform
-.PHONY: build-$(1)/$(2)
-build-$(1)/$(2):
-	@echo "$(COLOR_CYAN)==> 构建 $(APP_NAME) [$(1)/$(2)]$(COLOR_RESET)"
+.PHONY: build-$(1)
+build-$(1):
+	@echo "$(COLOR_CYAN)==> 构建 $(APP_NAME) [$(word 1,$(subst -, ,$(1)))/$(word 2,$(subst -, ,$(1)))]$(COLOR_RESET)"
 	@mkdir -p $(DIST_DIR)
-	GOFLAGS=-mod=mod CGO_ENABLED=0 GOOS=$(1) GOARCH=$(2) go build \
+	GOTOOLCHAIN=auto GOFLAGS=-mod=mod CGO_ENABLED=0 \
+		GOOS=$(word 1,$(subst -, ,$(1))) GOARCH=$(word 2,$(subst -, ,$(1))) \
+		go build \
+		-trimpath \
 		-ldflags "$(LDFLAGS)" \
 		-gcflags "$(GCFLAGS)" \
-		-o $(DIST_DIR)/$(APP_NAME)-server-$(1)-$(2)$(shell [ $(1) = windows ] && echo .exe) \
+		-o $(DIST_DIR)/$(APP_NAME)-server-$(1) \
 		./cmd/server
-	@echo "$(COLOR_GREEN)==> 完成: $(DIST_DIR)/$(APP_NAME)-server-$(1)-$(2)$(shell [ $(1) = windows ] && echo .exe)$(COLOR_RESET)"
+	@file $(DIST_DIR)/$(APP_NAME)-server-$(1) | grep -q 'ELF' \
+		|| { echo "$(COLOR_YELL)产物不是 Linux ELF: $(DIST_DIR)/$(APP_NAME)-server-$(1)$(COLOR_RESET)"; exit 1; }
+	@echo "$(COLOR_GREEN)==> Linux 可执行文件: $(DIST_DIR)/$(APP_NAME)-server-$(1)$(COLOR_RESET)"
+	@file $(DIST_DIR)/$(APP_NAME)-server-$(1)
 endef
 
-$(foreach p,$(PLATFORMS),$(eval $(call build_platform,$(word 1,$(subst /, ,$(p))),$(word 2,$(subst /, ,$(p))))))
+$(foreach p,$(PLATFORMS),$(eval $(call build_platform,$(p))))
 
 backend-all-zip: backend-all ## 交叉编译所有平台并打包 zip/tar.gz
 	@echo "$(COLOR_CYAN)==> 打包所有平台$(COLOR_RESET)"

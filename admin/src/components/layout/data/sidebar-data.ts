@@ -23,6 +23,7 @@ import {
   PenLine,
   Mic2,
   Ticket,
+  Crown,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -121,6 +122,11 @@ export const sidebarData: SidebarData = {
           title: '邀请记录',
           url: '/invite-records',
           icon: Ticket,
+        },
+        {
+          title: '会员订阅',
+          url: '/subscriptions',
+          icon: Crown,
         },
       ],
     },

@@ -233,7 +233,7 @@ export default function PostTrainingCheck() {
         }
       }
       const mapped: CheckWord[] = slice.map((w: any) => ({
-        id: Number(w.id),
+        id: normalizeSnowflakeId(w.id),
         word: String(w.word || ""),
         phonetic: pickPhoneticDisplay(w),
         translation: w.translation ? formatTranslation(String(w.translation)) : undefined,
@@ -422,10 +422,10 @@ export default function PostTrainingCheck() {
       const raw = sessionStorage.getItem("lb_study_words") || "[]";
       const all: unknown[] = JSON.parse(raw);
       const list = Array.isArray(all) ? all : [];
-      const wrongIds = new Set(wrongWords.map((w) => Number(w.id)));
+      const wrongIds = new Set(wrongWords.map((w) => normalizeSnowflakeId(w.id)));
       const retryPayload = list.filter((w) => {
-        const id = typeof w === "object" && w && "id" in w ? Number((w as { id?: number | string }).id) : NaN;
-        return wrongIds.has(id);
+        const id = typeof w === "object" && w && "id" in w ? normalizeSnowflakeId((w as { id?: number | string }).id) : "";
+        return id !== "" && wrongIds.has(id);
       });
       if (retryPayload.length === 0) {
         console.error("错词重练列表为空，请检查单词 ID", wrongWords);
@@ -811,6 +811,20 @@ export default function PostTrainingCheck() {
                 type="button"
                 variant="brand"
                 size="pill"
+                onClick={handleSubmit}
+                disabled={!allMarked || submitting}
+                loading={submitting}
+                loadingText={t("practice.submitting")}
+                className="ml-auto min-w-0 flex-1 justify-center max-sm:px-3 max-sm:text-xs sm:hidden"
+                aria-label={t("practice.submit")}
+              >
+                <ArrowRight size={15} />
+                <span className="truncate">{submitLabel}</span>
+              </CloudButton>
+              <CloudButton
+                type="button"
+                variant="brand"
+                size="pill"
                 className="hidden sm:flex flex-1 min-w-0 truncate md:flex-none"
                 onClick={handleSubmit}
                 disabled={!allMarked || submitting}
@@ -823,18 +837,6 @@ export default function PostTrainingCheck() {
           </div>
         </div>
       </div>
-
-      <CloudButton
-        type="button"
-        variant="brand"
-        size="iconRound"
-        onClick={handleSubmit}
-        disabled={!allMarked || submitting}
-        className="fixed right-3 bottom-16 z-50 size-11 shadow-lg sm:hidden"
-        aria-label={t("practice.submit")}
-      >
-        <ArrowRight size={20} />
-      </CloudButton>
 
       {spellTarget && (
         <div

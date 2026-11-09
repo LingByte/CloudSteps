@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { ChevronLeft, Flame, Loader2 } from "lucide-react";
+import { ChevronLeft, Crown, Flame, Loader2 } from "lucide-react";
 import { CloudButton } from "../components/cloudsteps";
 import { CloudCard } from "../components/cloudsteps/arco";
 import { getCheckInStatus, postCheckIn, type CheckInStatus } from "../api/checkin";
+import { getMySubscription } from "../api/pay";
+import type { UserSubscription } from "../api/coaching";
 import { formatTeachingMinutes } from "../utils/formatMinutes";
 import { showToast } from "../utils/toast";
 import { useTranslation } from "react-i18next";
@@ -24,18 +26,20 @@ export default function CheckIn() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [status, setStatus] = useState<CheckInStatus | null>(null);
+  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getCheckInStatus();
+      const [res, subRes] = await Promise.all([getCheckInStatus(), getMySubscription().catch(() => null)]);
       if (res.code === 200 && res.data) {
         setStatus(res.data);
       } else {
         showToast.error(formatApiMessage(res.msg, "common.query_failed"));
       }
+      setSubscription(subRes && subRes.code === 200 ? subRes.data ?? null : null);
     } catch (e: unknown) {
       const msg =
         e && typeof e === "object" && "msg" in e ? String((e as { msg: string }).msg) : formatApiMessage(undefined, "common.query_failed");
@@ -99,8 +103,15 @@ export default function CheckIn() {
   const tiers = status?.rewardPreview?.length ? status.rewardPreview : FALLBACK_TIERS;
   const streak = status?.currentStreak ?? 0;
 
+  const isMember = subscription?.status === "active";
+  const memberValidity = !subscription
+    ? ""
+    : subscription.type === "lifetime" || !subscription.expiredAt
+      ? "永久有效"
+      : `有效期至 ${new Date(subscription.expiredAt).toLocaleDateString("zh-CN")}`;
+
   const onCheckIn = async () => {
-    if (submitting || status?.checkedInToday) return;
+    if (isMember || submitting || status?.checkedInToday) return;
     setSubmitting(true);
     try {
       const res = await postCheckIn();
@@ -148,37 +159,57 @@ export default function CheckIn() {
         </CloudCard>
       ) : (
         <>
-          <section className="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/[0.09] via-card to-transparent px-3.5 py-3.5">
-            <div className="pointer-events-none absolute -right-10 -top-12 size-28 rounded-full bg-primary/10 blur-2xl" />
+          <section
+            className={
+              isMember
+                ? "relative overflow-hidden rounded-xl border border-amber-500/35 bg-gradient-to-br from-amber-400/20 via-card to-amber-700/10 px-3.5 py-3.5"
+                : "relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/[0.09] via-card to-transparent px-3.5 py-3.5"
+            }
+          >
+            <div
+              className={
+                isMember
+                  ? "pointer-events-none absolute -right-10 -top-12 size-28 rounded-full bg-amber-400/25 blur-2xl"
+                  : "pointer-events-none absolute -right-10 -top-12 size-28 rounded-full bg-primary/10 blur-2xl"
+              }
+            />
 
             <div className="relative flex items-end justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                  {t("check_in.teaching_quota")}
+                <p className={`text-[10px] font-medium uppercase tracking-wider ${isMember ? "text-amber-800" : "text-muted-foreground"}`}>
+                  {isMember ? "会员" : t("check_in.teaching_quota")}
                 </p>
-                <p className="mt-1 text-2xl font-bold tabular-nums text-foreground tracking-tight leading-none">
-                  {formatTeachingMinutes(status?.poolRemainingMinutes ?? 0)}
+                <p className={`mt-1 text-2xl font-bold tracking-tight leading-none ${isMember ? "text-amber-950" : "tabular-nums text-foreground"}`}>
+                  {isMember ? memberValidity : formatTeachingMinutes(status?.poolRemainingMinutes ?? 0)}
                 </p>
+                {isMember ? null : (
                 <p className="mt-1.5 text-[10px] text-muted-foreground leading-snug">
                   {status?.checkedInToday
                     ? t("check_in.claimed_today", { n: status.dailyReward })
                     : t("check_in.claimable_today", { n: status?.dailyReward ?? 60 })}
                 </p>
+                )}
               </div>
 
-              <CloudButton
-                type="button"
-                variant="brand"
-                size="sm"
-                className="relative shrink-0 h-9 px-4 text-xs font-semibold shadow-sm"
-                disabled={submitting || !!status?.checkedInToday}
-                onClick={() => void onCheckIn()}
-              >
-                {submitting ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : null}
-                {status?.checkedInToday
-                  ? t("check_in.checked_in")
-                  : t("check_in.check_in_btn", { n: status?.dailyReward ?? 60 })}
-              </CloudButton>
+              {isMember ? (
+                <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-300 to-amber-600 text-amber-950 shadow-sm">
+                  <Crown size={16} />
+                </span>
+              ) : (
+                <CloudButton
+                  type="button"
+                  variant="brand"
+                  size="sm"
+                  className="relative shrink-0 h-9 px-4 text-xs font-semibold shadow-sm"
+                  disabled={submitting || !!status?.checkedInToday}
+                  onClick={() => void onCheckIn()}
+                >
+                  {submitting ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : null}
+                  {status?.checkedInToday
+                    ? t("check_in.checked_in")
+                    : t("check_in.check_in_btn", { n: status?.dailyReward ?? 60 })}
+                </CloudButton>
+              )}
             </div>
 
             <div className="relative mt-3 grid grid-cols-3 gap-1.5">

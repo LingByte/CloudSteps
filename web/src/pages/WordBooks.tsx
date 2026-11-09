@@ -2,16 +2,10 @@ import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import {
-  AlignJustify,
-  BookOpen,
-  ClipboardList,
-  FileText,
-  Library,
-  MessageCircle,
-  PenLine,
-  Users,
-} from "lucide-react";
-import { HomeFeatureCard, HomeSectionHeader } from "../components/HomeFeatureCard";
+  HomeFeatureCard,
+  HomeLetterWatermark,
+  HomeSectionHeader,
+} from "../components/HomeFeatureCard";
 import { CoachOnboarding } from "../components/CoachOnboarding";
 import { MobileSelectSheet } from "../components/cloudsteps/MobileWheelPicker";
 import { useAuthStore } from "../stores/authStore";
@@ -109,13 +103,21 @@ export default function WordBooks() {
     navigate("/word-training");
   };
 
+  let cardIndex = 0;
+  const nextIndex = () => {
+    cardIndex += 1;
+    return cardIndex;
+  };
+
   return (
-    <div className="min-w-0 w-full space-y-5 pb-1">
-      <section>
-        <HomeSectionHeader title={t("home.common")}>
+    <div className="relative min-w-0 w-full space-y-5 pb-2">
+      <HomeLetterWatermark />
+
+      <section className="relative">
+        <HomeSectionHeader title={t("home.common")} subtitle={t("home.common_en")}>
           {isCoach ? (
             <div
-              className="flex shrink-0 items-center gap-2 rounded-xl border border-border/70 bg-card/90 px-2.5 py-1.5 shadow-[var(--shadow-rest)]"
+              className="flex shrink-0 items-center gap-2 rounded-xl border border-border/60 bg-card/90 px-2.5 py-1.5 shadow-[var(--shadow-rest)] backdrop-blur-sm"
               data-coach="picker"
             >
               <span className="text-[11px] font-medium text-muted-foreground">{t("home.student")}</span>
@@ -146,84 +148,93 @@ export default function WordBooks() {
           ) : null}
         </HomeSectionHeader>
 
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <HomeFeatureCard
-            icon={FileText}
-            accent="mint"
+            index={nextIndex()}
             title={t("home.vocab_test")}
-            description={t("home.enter_test")}
+            description={t("home.vocab_test_detail")}
+            meta={t("home.enter_test")}
+            tags={[t("home.tag_level"), t("home.tag_vocab_size"), t("home.tag_report")]}
             onClick={goVocabTest}
           />
           <HomeFeatureCard
-            icon={BookOpen}
-            accent="sky"
+            index={nextIndex()}
             title={t("home.word_training")}
-            description={t("home.select_wordbook")}
+            description={t("home.word_training_detail")}
+            meta={t("home.select_wordbook")}
+            tags={[t("home.tag_memorize"), t("home.tag_dictation"), t("home.tag_review")]}
             onClick={goWordTraining}
             data-coach="training"
           />
         </div>
       </section>
 
-      <section>
-        <HomeSectionHeader title={t("home.training_materials")} />
-        <div className="grid grid-cols-2 gap-2.5">
+      <section className="relative">
+        <HomeSectionHeader title={t("home.training_materials")} subtitle={t("home.training_materials_en")} />
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <HomeFeatureCard
-            icon={PenLine}
-            accent="violet"
+            index={nextIndex()}
             title={t("home.grammar")}
-            description={t("home.grammar_desc")}
+            description={t("home.grammar_detail")}
+            meta={t("home.grammar_desc")}
+            tags={[t("home.tag_morphology"), t("home.tag_syntax"), t("home.tag_drill")]}
             onClick={() => navigate("/grammar-analysis")}
           />
           <HomeFeatureCard
-            icon={BookOpen}
-            accent="amber"
+            index={nextIndex()}
             title={t("home.reading")}
-            description={t("home.reading_desc")}
+            description={t("home.reading_detail")}
+            meta={t("home.reading_desc")}
+            tags={[t("home.tag_passage"), t("home.tag_questions"), t("home.tag_vocab")]}
             onClick={() => navigate("/reading-comprehension")}
           />
           <HomeFeatureCard
-            icon={AlignJustify}
-            accent="rose"
+            index={nextIndex()}
             title={t("home.cloze")}
-            description={t("home.cloze_desc")}
+            description={t("home.cloze_detail")}
+            meta={t("home.cloze_desc")}
+            tags={[t("home.tag_context"), t("home.tag_options"), t("home.tag_drill")]}
             onClick={() => navigate("/cloze-practice")}
           />
           <HomeFeatureCard
-            icon={MessageCircle}
-            accent="teal"
+            index={nextIndex()}
             title={t("home.scenario")}
-            description={t("home.scenario_desc")}
+            description={t("home.scenario_detail")}
+            meta={t("home.scenario_desc")}
+            tags={[t("home.tag_dialogue"), t("home.tag_ai"), t("home.tag_speaking")]}
             onClick={() => navigate("/scenario-dialogues")}
           />
         </div>
       </section>
 
-      <section>
-        <HomeSectionHeader title={t("home.data_management")} />
-        <div className="grid grid-cols-2 gap-2.5">
+      <section className="relative">
+        <HomeSectionHeader title={t("home.data_management")} subtitle={t("home.data_management_en")} />
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <HomeFeatureCard
-            icon={Library}
-            accent="green"
+            index={nextIndex()}
             title={t("home.my_shelf")}
-            description={t("home.browse_wordbook")}
+            description={t("home.shelf_detail")}
+            meta={t("home.browse_wordbook")}
+            tags={[t("home.tag_wordbook"), t("home.tag_collection")]}
             onClick={() => navigate("/word-books")}
           />
           {isCoach ? (
             <HomeFeatureCard
-              icon={Users}
-              accent="sky"
+              index={nextIndex()}
               title={t("home.student_management")}
-              description={t("home.student_and_duration")}
+              description={t("home.students_detail")}
+              meta={t("home.student_and_duration")}
+              tags={[t("home.tag_quota"), t("home.tag_schedule")]}
               onClick={() => navigate("/my-students")}
               data-coach="students"
             />
           ) : null}
           <HomeFeatureCard
-            icon={ClipboardList}
-            accent="slate"
+            index={nextIndex()}
             title={t("home.study_records")}
-            description={t("home.lessons_and_review")}
+            description={t("home.records_detail")}
+            meta={t("home.lessons_and_review")}
+            tags={[t("home.tag_lesson"), t("home.tag_review"), t("home.tag_export")]}
             onClick={() => navigate("/training-records")}
           />
         </div>

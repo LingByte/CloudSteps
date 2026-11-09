@@ -53,6 +53,7 @@ func (h *Handlers) Register(engine *gin.Engine, api huma.API) {
 	middleware.ApplyGlobalMiddlewares(r.Gin())
 
 	h.registerAuthRoutes(r)
+	h.registerWechatPayRoutes(r)
 	h.registerAdminUserRoutes(r)
 	h.registerSecurityRoutes(r)
 	h.registerWordBookRoutes(r)

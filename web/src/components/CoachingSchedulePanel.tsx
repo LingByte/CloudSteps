@@ -37,6 +37,7 @@ import {
   measureCoachTarget,
   type CoachTargetRect,
 } from "../utils/coachOnboarding";
+import { formatApiMessage } from "../utils/apiMessage";
 import { showToast } from "../utils/toast";
 import { useAuthStore } from "../stores/authStore";
 import { useIsMobile } from "./ui/use-mobile";
@@ -524,11 +525,11 @@ export function CoachingSchedulePanel({ nowTs, mode = "coach" }: Props) {
           : await getStudentCoachingWeek(ref);
         setSchedules(Array.isArray(res.data?.schedules) ? res.data!.schedules : []);
       } catch (e: unknown) {
-        const msg =
+        const apiMsg =
           e && typeof e === "object" && "msg" in e
             ? String((e as { msg: string }).msg)
-            : t("coaching.load_schedule_failed");
-        showToast.error(msg);
+            : undefined;
+        showToast.error(formatApiMessage(apiMsg, "coaching.load_schedule_failed"));
         setSchedules([]);
       } finally {
         setLoadingSchedules(false);
@@ -680,18 +681,18 @@ export function CoachingSchedulePanel({ nowTs, mode = "coach" }: Props) {
         try {
           const res = await deleteTeacherCoachingAppointment(id);
           if (res.code !== 200) {
-            showToast.error(res.msg || t("coaching.delete_failed"));
+            showToast.error(formatApiMessage(res.msg, "coaching.delete_failed"));
             return;
           }
           showToast.success(t("coaching.deleted"));
           setSelected(null);
           void loadWeek();
         } catch (e: unknown) {
-          const msg =
+          const apiMsg =
             e && typeof e === "object" && "msg" in e
               ? String((e as { msg: string }).msg)
-              : t("coaching.delete_failed");
-          showToast.error(msg);
+              : undefined;
+          showToast.error(formatApiMessage(apiMsg, "coaching.delete_failed"));
         }
       },
     });
@@ -702,7 +703,7 @@ export function CoachingSchedulePanel({ nowTs, mode = "coach" }: Props) {
     try {
       const res = await startCoachingAppointment(id);
       if (res.code !== 200) {
-        showToast.error(res.msg || t("coaching.cannot_start"));
+        showToast.error(formatApiMessage(res.msg, "coaching.cannot_start"));
         return;
       }
       showToast.success(t("coaching.started"));
@@ -710,11 +711,11 @@ export function CoachingSchedulePanel({ nowTs, mode = "coach" }: Props) {
       void loadWeek();
       navigate("/material-selection");
     } catch (e: unknown) {
-      const msg =
+      const apiMsg =
         e && typeof e === "object" && "msg" in e
           ? String((e as { msg: string }).msg)
-          : t("coaching.start_failed");
-      showToast.error(msg);
+          : undefined;
+      showToast.error(formatApiMessage(apiMsg, "coaching.start_failed"));
     } finally {
       setPendingActionById((prev) => ({ ...prev, [id]: null }));
     }
@@ -725,18 +726,18 @@ export function CoachingSchedulePanel({ nowTs, mode = "coach" }: Props) {
     try {
       const res = await endCoachingAppointment(id);
       if (res.code !== 200) {
-        showToast.error(res.msg || t("coaching.cannot_end"));
+        showToast.error(formatApiMessage(res.msg, "coaching.cannot_end"));
         return;
       }
       showToast.success(t("coaching.ended"));
       setSelected(null);
       void loadWeek();
     } catch (e: unknown) {
-      const msg =
+      const apiMsg =
         e && typeof e === "object" && "msg" in e
           ? String((e as { msg: string }).msg)
-          : t("coaching.end_failed");
-      showToast.error(msg);
+          : undefined;
+      showToast.error(formatApiMessage(apiMsg, "coaching.end_failed"));
     } finally {
       setPendingActionById((prev) => ({ ...prev, [id]: null }));
     }

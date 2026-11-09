@@ -12,6 +12,7 @@ import (
 	lbconstants "github.com/LingByte/ling-base/common/constants"
 
 	"github.com/LingByte/CloudStepsGo/internal/models"
+	"github.com/LingByte/CloudStepsGo/pkg/utils"
 	response "github.com/LingByte/ling-base/common/response/gin"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -697,8 +698,8 @@ func (h *Handlers) handleReviewSessionComplete(c *gin.Context) {
 
 	var body struct {
 		Results []struct {
-			WordID     uint `json:"wordId"`
-			Remembered bool `json:"remembered"`
+			WordID     utils.JSONUint `json:"wordId"`
+			Remembered bool           `json:"remembered"`
 		} `json:"results" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
@@ -738,11 +739,15 @@ func (h *Handlers) handleReviewSessionComplete(c *gin.Context) {
 	rememberedIDs := make([]uint, 0, len(body.Results))
 	forgotIDs := make([]uint, 0, len(body.Results))
 	for _, r := range body.Results {
+		wordID := r.WordID.Uint()
+		if wordID == 0 {
+			continue
+		}
 		if r.Remembered {
-			rememberedIDs = append(rememberedIDs, r.WordID)
+			rememberedIDs = append(rememberedIDs, wordID)
 			correct++
 		} else {
-			forgotIDs = append(forgotIDs, r.WordID)
+			forgotIDs = append(forgotIDs, wordID)
 		}
 	}
 	t := true
@@ -765,8 +770,12 @@ func (h *Handlers) handleReviewSessionComplete(c *gin.Context) {
 	wordIDs := make([]uint, 0, len(body.Results))
 	resMap := make(map[uint]bool, len(body.Results))
 	for _, r := range body.Results {
-		wordIDs = append(wordIDs, r.WordID)
-		resMap[r.WordID] = r.Remembered
+		wordID := r.WordID.Uint()
+		if wordID == 0 {
+			continue
+		}
+		wordIDs = append(wordIDs, wordID)
+		resMap[wordID] = r.Remembered
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {

@@ -85,6 +85,15 @@ export default function WordPractice() {
     setGlobalNoteOpen(true);
   };
 
+  useEffect(() => {
+    if (!activeNoteKey.startsWith("study-note:word:")) return;
+    const wordId = activeNoteKey.slice(activeNoteKey.lastIndexOf(":") + 1);
+    if (words.some((word) => normalizeSnowflakeId(word.id) === wordId)) return;
+    setGlobalNoteOpen(false);
+    setActiveNoteKey(`study-note:global:${wordBookId}`);
+    setActiveNoteTitle(t("practice.free_note"));
+  }, [activeNoteKey, t, wordBookId, words]);
+
   const handlePlayNextAudio = (word: PracticeWord) => {
     if (!word.audioUrl) return;
     const urls = parseAudioUrls(word.audioUrl);

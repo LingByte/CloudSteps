@@ -10,7 +10,8 @@ import (
 func skipTimeoutCircuitPath(path string) bool {
 	switch path {
 	case "/api/auth/wechat/mp/message",
-		"/api/auth/wechat/login/status":
+		"/api/auth/wechat/login/status",
+		"/api/pay/wechat/notify":
 		return true
 	default:
 		return false

@@ -170,3 +170,16 @@ wechat:
   loginSessionTTL: 5m
   loginCodeTTL: 10m
   # 消息推送 URL: https://h5.lingecho.com/api/auth/wechat/mp/message
+
+# 微信支付（支付公众号，和上面的登录公众号分开）。证书放 configs/wechatpay/，不要提交。
+wechatPay:
+  enabled: false
+  mchId: ""
+  appId: ""
+  appSecret: ""          # 支付公众号 AppSecret，用于网页授权拿 openid
+  apiV3Key: ""
+  apiV2Key: ""
+  certFile: "configs/wechatpay/apiclient_cert.pem"
+  keyFile: "configs/wechatpay/apiclient_key.pem"
+  notifyUrl: "https://h5.lingecho.com/api/pay/wechat/notify"
+  oauthRedirectUrl: "https://h5.lingecho.com/recharge"

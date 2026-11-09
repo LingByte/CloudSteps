@@ -37,7 +37,7 @@ type customEnrichBody struct {
 	Words []models.ParsedWord `json:"words" binding:"required"`
 }
 
-// handleEnrichCustomWordBook 根据内存词条缓存回填缺失的释义/音标（前端本地解析后调用）
+// handleEnrichCustomWordBook 回填缺失的释义、音标和读音。先读内存缓存，缺的再按本次单词查库。
 func (h *Handlers) handleEnrichCustomWordBook(c *gin.Context) {
 	user := auth.CurrentUser(c)
 	if user == nil {
@@ -54,7 +54,8 @@ func (h *Handlers) handleEnrichCustomWordBook(c *gin.Context) {
 		response.FailI18n(c, "wordbook.words_empty", nil)
 		return
 	}
-	items = enrichParsedWords(items)
+	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
+	items = enrichParsedWords(db, items)
 	response.SuccessI18n(c, "common.success", gin.H{
 		"list":  items,
 		"total": len(items),
@@ -114,6 +115,7 @@ func (h *Handlers) handleCreateCustomWordBook(c *gin.Context) {
 				Phonetic:         w.Phonetic,
 				Translation:      w.Translation,
 				TranslationShort: w.TranslationShort,
+				AudioURL:         w.AudioURL,
 				SortOrder:        i + 1,
 				Difficulty:       1,
 				Frequency:        1,
@@ -146,7 +148,7 @@ func (h *Handlers) handleCreateCustomWordBook(c *gin.Context) {
 	response.SuccessI18n(c, "common.created", book)
 }
 
-func enrichParsedWords(items []models.ParsedWord) []models.ParsedWord {
-	// 只查内存缓存，未命中不回源 DB
-	return models.EnrichFromCache(items)
+func enrichParsedWords(db *gorm.DB, items []models.ParsedWord) []models.ParsedWord {
+	items = models.EnrichFromCache(items)
+	return models.EnrichMissingFromDB(db, items)
 }

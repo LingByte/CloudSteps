@@ -31,6 +31,20 @@ func TestEnrichFromCacheHit(t *testing.T) {
 	}
 }
 
+func TestFillParsedFromEntryUsesUKPhoneticAndAudio(t *testing.T) {
+	got := fillParsedFromEntry(ParsedWord{Word: "colour", Translation: "颜色"}, EnrichEntry{
+		PhoneticUK: "/ˈkʌlə/",
+		AudioURL:   "https://cdn.example/colour.mp3",
+	})
+	if got.Phonetic != "/ˈkʌlə/" || got.AudioURL != "https://cdn.example/colour.mp3" || got.Translation != "颜色" {
+		t.Fatalf("fill failed: %+v", got)
+	}
+	kept := fillParsedFromEntry(ParsedWord{Word: "colour", Phonetic: "/keep/"}, EnrichEntry{Phonetic: "/ˈkʌlə/"})
+	if kept.Phonetic != "/keep/" {
+		t.Fatalf("existing phonetic overwritten: %+v", kept)
+	}
+}
+
 func TestEnrichScore(t *testing.T) {
 	a := EnrichEntry{Phonetic: "x"}
 	b := EnrichEntry{Phonetic: "x", TranslationShort: "苹果"}

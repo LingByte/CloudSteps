@@ -130,6 +130,7 @@ export type CustomParsedWord = {
   phonetic?: string
   translation?: string
   translationShort?: string
+  audioUrl?: string
 }
 
 export function enrichCustomWordBookWords(

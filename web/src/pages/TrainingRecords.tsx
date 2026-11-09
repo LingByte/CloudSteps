@@ -14,7 +14,8 @@ import {
 import { listAllTeacherCoachingQuotas, type TeacherCoachingQuotaRow } from "../api/coaching";
 import { playFirstWordAudio } from "../utils/audioPlayer";
 import { formatTranslation, formatTranslationShort } from "../utils/wordFormat";
-import { downloadExcelRows, downloadPdfTable } from "../utils/excelExport";
+import { downloadExcelRows, downloadPdfTable, type PdfAttachment } from "../utils/excelExport";
+import { collectStudyNotesForExport } from "../utils/studyNoteExport";
 import { pickPhonetic } from "../utils/wordExportFields";
 import { showToast } from "../utils/toast";
 import { useAuthStore } from "../stores/authStore";
@@ -331,6 +332,7 @@ export default function TrainingRecords() {
 
   const buildExportTable = (
     words: Array<{
+      id?: string | number;
       word: string;
       phonetic?: string;
       phoneticUk?: string;
@@ -358,16 +360,35 @@ export default function TrainingRecords() {
               t("training_records.header_en"),
               t("training_records.header_phonetic"),
             ];
+    // 拓展/笔记不进表格列，统一放到 PDF 末尾附页或 Excel 表尾
     const tableRows: Array<Array<string | number>> = words.map((w, i) => {
       const phonetic = pickPhonetic(w);
       const zh = formatTranslationShort(w.translation) || "";
       const en = w.word || "";
       const no = i + 1;
-      if (content === "both") return [no, en, phonetic, zh];
-      if (content === "zh") return [no, en, zh];
-      return [no, en, phonetic];
+      return content === "both" ? [no, en, phonetic, zh] : content === "zh" ? [no, en, zh] : [no, en, phonetic];
     });
     return { headers, tableRows };
+  };
+
+  const appendExcelNotes = (
+    headers: string[],
+    tableRows: Array<Array<string | number>>,
+    notes: Array<{ title: string; text?: string }>
+  ) => {
+    const usable = notes.filter((n) => (n.text || "").trim());
+    if (usable.length === 0) return [headers, ...tableRows];
+    const colCount = Math.max(1, headers.length);
+    const blank = Array.from({ length: colCount }, () => "");
+    const section = [...blank];
+    section[0] = t("training_records.header_note");
+    const noteRows = usable.map((n) => {
+      const row = Array.from({ length: colCount }, () => "");
+      row[0] = n.title || "";
+      row[Math.min(1, colCount - 1)] = (n.text || "").trim();
+      return row;
+    });
+    return [headers, ...tableRows, blank, section, ...noteRows];
   };
 
   const downloadExportFile = async (opts: {
@@ -375,10 +396,12 @@ export default function TrainingRecords() {
     fileBase: string;
     headers: string[];
     tableRows: Array<Array<string | number>>;
+    attachments?: PdfAttachment[];
   }) => {
     const title = opts.fileBase.replace(/^【|】$/g, "");
     if (opts.format === "excel") {
-      downloadExcelRows(`${opts.fileBase}.xls`, title, [opts.headers, ...opts.tableRows], {
+      const excelRows = appendExcelNotes(opts.headers, opts.tableRows, opts.attachments || []);
+      downloadExcelRows(`${opts.fileBase}.xls`, title, excelRows, {
         equalColumns: true,
       });
     } else {
@@ -387,6 +410,7 @@ export default function TrainingRecords() {
         title,
         headers: opts.headers,
         rows: opts.tableRows,
+        attachments: opts.attachments,
       });
     }
   };
@@ -409,6 +433,9 @@ export default function TrainingRecords() {
         return;
       }
 
+      const notes = await collectStudyNotesForExport(
+        words.map((w) => ({ ...w, wordBookId: w.wordBookId || wordBookId || undefined }))
+      );
       const { headers, tableRows } = buildExportTable(words, exportContent);
       const who = selectedStudentName || t("training_records.student_fallback");
       const contentLabel = exportContentLabel(exportContent, t);
@@ -418,7 +445,13 @@ export default function TrainingRecords() {
           ? `【${who}-${stamp}-${t("training_records.kind_review")}-${contentLabel}】`
           : `【${who}-${stamp}-${contentLabel}】`;
 
-      await downloadExportFile({ format: exportFormat, fileBase, headers, tableRows });
+      await downloadExportFile({
+        format: exportFormat,
+        fileBase,
+        headers,
+        tableRows,
+        attachments: notes.pages,
+      });
       showToast.success(t("training_records.exported_count", { count: words.length }));
       setExportOpen(false);
     } catch (e) {
@@ -469,6 +502,9 @@ export default function TrainingRecords() {
         showToast.error(t("training_records.no_words_export"));
         return;
       }
+      const notes = await collectStudyNotesForExport(
+        words.map((w) => ({ ...w, wordBookId: w.wordBookId || item.wordBookId }))
+      );
       const { headers, tableRows } = buildExportTable(words, exportContent);
       const who = selectedStudentName || t("training_records.student_fallback");
       const day = item.day || todayCompact();
@@ -476,7 +512,13 @@ export default function TrainingRecords() {
       const kind = tab === "review" ? t("training_records.kind_review") : t("training_records.kind_study");
       const contentLabel = exportContentLabel(exportContent, t);
       const fileBase = `【${who}-${day}-${book}-${kind}-${contentLabel}】`;
-      await downloadExportFile({ format, fileBase, headers, tableRows });
+      await downloadExportFile({
+        format,
+        fileBase,
+        headers,
+        tableRows,
+        attachments: notes.pages,
+      });
       showToast.success(t("training_records.exported_count", { count: words.length }));
       setRowExportItem(null);
     } catch (e) {

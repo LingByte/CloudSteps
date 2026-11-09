@@ -19,6 +19,7 @@ type ParsedWord struct {
 	Phonetic         string `json:"phonetic"`
 	Translation      string `json:"translation"`
 	TranslationShort string `json:"translationShort,omitempty"`
+	AudioURL         string `json:"audioUrl,omitempty"`
 }
 
 var (

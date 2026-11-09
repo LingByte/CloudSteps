@@ -70,6 +70,7 @@
   "checkin.already": "今日已签到",
   "checkin.query_failed": "查询失败",
   "checkin.not_logged_in": "未登录",
+  "checkin.member_exempt": "会员无需签到",
   "announcement.not_found": "公告不存在",
   "announcement.marked_read": "已读",
   "announcement.mark_failed": "标记失败",

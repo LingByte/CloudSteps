@@ -18,10 +18,17 @@ import (
 
 // newTestDB opens an in-memory sqlite DB and migrates the models used by the
 // middleware tests. Returns the *gorm.DB and a cleanup func.
+//
+// 使用 shared cache + 单连接：操作日志在 goroutine 里异步写入，
+// 纯 `:memory:` 会按连接隔离库，异步 Create 时出现 no such table。
 func newTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	dsn := "file:middleware_" + t.Name() + "?mode=memory&cache=shared"
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
 	require.NoError(t, db.AutoMigrate(&models.User{}, &OperationLog{}))
 	return db
 }

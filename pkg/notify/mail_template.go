@@ -132,13 +132,30 @@ const (
 	mailTemplateUniqueIdx       = "idx_mail_tpl_code_locale_type"
 )
 
+// isMySQLDuplicateIndex 远端 MySQL 偶发：information_schema 查询超时/不准后，
+// AutoMigrate 会重复 CREATE INDEX，落到 Error 1061。索引已存在时可忽略。
+func isMySQLDuplicateIndex(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "Error 1061") || strings.Contains(msg, "Duplicate key name")
+}
+
+func autoMigrateMailTemplate(db *gorm.DB) error {
+	if err := db.AutoMigrate(&MailTemplate{}); err != nil && !isMySQLDuplicateIndex(err) {
+		return err
+	}
+	return nil
+}
+
 // EnsureMailTemplateSchema migrates mail_templates for per-channel-type templates:
 // backfill channel_type, drop legacy (code, locale) unique index, ensure (code, locale, channel_type).
 func EnsureMailTemplateSchema(db *gorm.DB) error {
 	if db == nil {
 		return nil
 	}
-	if err := db.AutoMigrate(&MailTemplate{}); err != nil {
+	if err := autoMigrateMailTemplate(db); err != nil {
 		return err
 	}
 	_ = db.Model(&MailTemplate{}).
@@ -153,7 +170,7 @@ func EnsureMailTemplateSchema(db *gorm.DB) error {
 	case "sqlite":
 		_ = db.Exec("DROP INDEX IF EXISTS " + mailTemplateLegacyUniqueIdx).Error
 	}
-	if err := db.AutoMigrate(&MailTemplate{}); err != nil {
+	if err := autoMigrateMailTemplate(db); err != nil {
 		return err
 	}
 	if db.Dialector.Name() == "mysql" {
@@ -193,9 +210,13 @@ func ensureMailTemplateUniqueIndexMySQL(db *gorm.DB) error {
 	if count > 0 {
 		return nil
 	}
-	return db.Exec(
+	err = db.Exec(
 		"ALTER TABLE `" + mailTemplateTable + "` ADD UNIQUE INDEX `" + mailTemplateUniqueIdx + "` (`code`, `locale`, `channel_type`)",
 	).Error
+	if isMySQLDuplicateIndex(err) {
+		return nil
+	}
+	return err
 }
 
 // SplitLegacyMailTemplates migrates unified rows into separate email/inbox templates.

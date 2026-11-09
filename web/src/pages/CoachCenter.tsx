@@ -10,12 +10,14 @@ import {
   Loader2,
   Ticket,
   Wallet,
+  Crown,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { CloudButton, CloudImageWithFallback } from "../components/cloudsteps";
 import { CloudCard } from "../components/cloudsteps/arco";
 import { getTeacherTeachingPoolWithSubscription, type UserSubscription } from "../api/coaching";
+import { getMySubscription } from "../api/pay";
 import { getCheckInStatus, postCheckIn } from "../api/checkin";
 import { getFeedbackUnreadCount } from "../api/feedback";
 import { useAuthStore } from "../stores/authStore";
@@ -31,6 +33,21 @@ const tintClass = {
   mint: "bg-primary-soft text-primary",
   primary: "bg-primary-soft text-primary",
 };
+
+function membershipName(type?: string) {
+  if (type === "monthly") return "月度会员";
+  if (type === "quarterly") return "季度会员";
+  if (type === "yearly") return "年度会员";
+  if (type === "lifetime") return "永久会员";
+  return "会员";
+}
+
+function membershipValidity(sub: UserSubscription) {
+  if (sub.type === "lifetime" || !sub.expiredAt) return "永久有效";
+  const exp = new Date(sub.expiredAt);
+  if (Number.isNaN(exp.getTime())) return "有效期待确认";
+  return `有效期至 ${exp.toLocaleDateString("zh-CN")}`;
+}
 
 function GenderMark({ gender }: { gender?: string }) {
   const { t } = useTranslation();
@@ -89,6 +106,15 @@ export default function CoachCenter() {
     }
   }, []);
 
+  const loadSubscription = useCallback(async () => {
+    try {
+      const res = await getMySubscription();
+      if (res.code === 200) setSubscription(res.data ?? null);
+    } catch {
+      setSubscription(null);
+    }
+  }, []);
+
   const loadPool = useCallback(async () => {
     setPoolLoading(true);
     try {
@@ -96,7 +122,6 @@ export default function CoachCenter() {
       if (res.code === 200 && res.data) {
         setPoolMinutes(res.data.remainingMinutes ?? 0);
         setPoolTotal(res.data.totalAllocatedMinutes ?? 0);
-        setSubscription(res.data.subscription ?? null);
       }
     } finally {
       setPoolLoading(false);
@@ -119,6 +144,10 @@ export default function CoachCenter() {
   }, []);
 
   useEffect(() => {
+    void loadSubscription();
+  }, [loadSubscription]);
+
+  useEffect(() => {
     if (!isCoach) return;
     void loadPool();
     void loadCheckInStatus();
@@ -137,7 +166,7 @@ export default function CoachCenter() {
   }, [loadFeedbackUnread]);
 
   const onCheckInToday = async () => {
-    if (checkInSubmitting || checkedInToday) return;
+    if (subscription?.status === "active" || checkInSubmitting || checkedInToday) return;
     setCheckInSubmitting(true);
     try {
       const res = await postCheckIn();
@@ -168,6 +197,7 @@ export default function CoachCenter() {
     }
   };
 
+  const isMember = subscription?.status === "active";
   const name = user?.displayName || user?.email || "";
   const remaining = poolMinutes ?? 0;
   const total = poolTotal ?? 0;
@@ -182,13 +212,13 @@ export default function CoachCenter() {
         : t("coach_center.not_checked_in_today");
 
   const featureList = useMemo(() => {
-    const showRechargeEntry = isCoach;
+    const showRechargeEntry = isCoach || subscription?.status === "active";
     const recharge = {
       id: 6,
       icon: Wallet,
       label: subscription?.status === "active" ? "会员中心" : "开通会员",
       description: subscription?.status === "active"
-        ? subscription.type === "lifetime" ? "买断会员 · 永久有效" : `会员有效中 · 到期 ${new Date(subscription.expiredAt || "").toLocaleDateString("zh-CN")}`
+        ? `${membershipName(subscription.type)} · ${membershipValidity(subscription)}`
         : "开通包月/包年/买断，畅享全部功能",
       tint: "mint" as const,
       path: "/recharge",
@@ -254,6 +284,12 @@ export default function CoachCenter() {
               <GenderMark gender={user?.gender} />
             </div>
             <p className="text-[11px] text-muted-foreground mt-0.5">{t("coach_center.subtitle")}</p>
+            {isMember && subscription ? (
+              <span className="mt-1 inline-flex max-w-full items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-800">
+                <Crown size={11} className="shrink-0" />
+                <span className="truncate">{membershipName(subscription.type)} · {membershipValidity(subscription)}</span>
+              </span>
+            ) : null}
           </div>
 
           <CloudButton
@@ -270,51 +306,88 @@ export default function CoachCenter() {
 
       {isCoach ? (
         <CloudCard
-          className="relative overflow-hidden rounded-xl border-primary/25 bg-gradient-to-br from-primary/12 via-card to-secondary-brand/8 px-3.5 py-3 shrink-0 cursor-pointer hover:border-primary/40 transition-colors"
-          onClick={() => navigate("/coach-center/checkin")}
+          className={
+            isMember
+              ? "relative overflow-hidden rounded-xl border-amber-500/35 bg-gradient-to-br from-amber-400/20 via-card to-amber-700/10 px-3.5 py-3 shrink-0 cursor-pointer hover:border-amber-500/55 transition-colors"
+              : "relative overflow-hidden rounded-xl border-primary/25 bg-gradient-to-br from-primary/12 via-card to-secondary-brand/8 px-3.5 py-3 shrink-0 cursor-pointer hover:border-primary/40 transition-colors"
+          }
+          onClick={() => navigate(isMember ? "/recharge" : "/coach-center/checkin")}
         >
-          <div className="pointer-events-none absolute -right-6 -top-8 size-24 rounded-full bg-primary/20 blur-2xl" />
+          <div
+            className={
+              isMember
+                ? "pointer-events-none absolute -right-6 -top-8 size-24 rounded-full bg-amber-400/30 blur-2xl"
+                : "pointer-events-none absolute -right-6 -top-8 size-24 rounded-full bg-primary/20 blur-2xl"
+            }
+          />
           <div className="relative flex items-start gap-3">
-            <div className="size-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-sm">
-              <Flame size={18} />
+            <div
+              className={
+                isMember
+                  ? "size-10 rounded-xl bg-gradient-to-br from-amber-300 to-amber-600 text-amber-950 flex items-center justify-center shrink-0 shadow-sm"
+                  : "size-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 shadow-sm"
+              }
+            >
+              {isMember ? <Crown size={18} /> : <Flame size={18} />}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-2">
-                <span className="text-[11px] font-medium text-primary pt-0.5">
-                  {t("coach_center.teaching_quota")}
+                <span className={`text-[11px] font-medium pt-0.5 ${isMember ? "text-amber-800" : "text-primary"}`}>
+                  {isMember ? membershipName(subscription?.type) : t("coach_center.teaching_quota")}
                 </span>
-                <div
-                  className="flex items-center gap-1 shrink-0 -mt-0.5 -mr-1"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <CloudButton
-                    type="button"
-                    variant="brand"
-                    size="sm"
-                    className="h-7 px-2.5 text-[11px] font-semibold"
-                    disabled={checkInLoading || checkInSubmitting || !!checkedInToday}
-                    onClick={() => void onCheckInToday()}
-                  >
-                    {checkInSubmitting ? <Loader2 className="size-3 animate-spin mr-1" /> : null}
-                    {checkedInToday
-                      ? t("check_in.checked_in")
-                      : t("coach_center.check_in_today")}
-                  </CloudButton>
+                {isMember ? (
                   <CloudButton
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="size-7 text-muted-soft hover:text-primary"
-                    onClick={() => navigate("/coach-center/checkin")}
-                    aria-label={t("coach_center.view_details")}
+                    className="size-7 shrink-0 text-amber-700/70 hover:text-amber-800"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate("/recharge");
+                    }}
+                    aria-label="会员中心"
                   >
                     <ChevronRight size={16} />
                   </CloudButton>
-                </div>
+                ) : (
+                  <div
+                    className="flex items-center gap-1 shrink-0 -mt-0.5 -mr-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <CloudButton
+                      type="button"
+                      variant="brand"
+                      size="sm"
+                      className="h-7 px-2.5 text-[11px] font-semibold"
+                      disabled={checkInLoading || checkInSubmitting || !!checkedInToday}
+                      onClick={() => void onCheckInToday()}
+                    >
+                      {checkInSubmitting ? <Loader2 className="size-3 animate-spin mr-1" /> : null}
+                      {checkedInToday
+                        ? t("check_in.checked_in")
+                        : t("coach_center.check_in_today")}
+                    </CloudButton>
+                    <CloudButton
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-7 text-muted-soft hover:text-primary"
+                      onClick={() => navigate("/coach-center/checkin")}
+                      aria-label={t("coach_center.view_details")}
+                    >
+                      <ChevronRight size={16} />
+                    </CloudButton>
+                  </div>
+                )}
               </div>
-              <div className="mt-0.5 text-base font-bold tabular-nums text-foreground tracking-tight leading-none">
-                {poolLoading ? "…" : formatTeachingMinutes(remaining)}
+              <div className={`mt-0.5 text-base font-bold tracking-tight leading-none ${isMember ? "text-amber-950" : "tabular-nums text-foreground"}`}>
+                {isMember && subscription
+                  ? membershipValidity(subscription)
+                  : poolLoading
+                    ? "…"
+                    : formatTeachingMinutes(remaining)}
               </div>
+              {isMember ? null : (
               <p className="mt-1 text-[10px] text-muted-foreground leading-snug">
                 {total > 0 ? (
                   <>
@@ -326,7 +399,8 @@ export default function CoachCenter() {
                   t("coach_center.checkin_hint")
                 )}
               </p>
-              {total > 0 ? (
+              )}
+              {!isMember && total > 0 ? (
                 <div className="mt-2 h-1 rounded-full bg-muted overflow-hidden">
                   <div
                     className="h-full rounded-full bg-primary transition-[width]"

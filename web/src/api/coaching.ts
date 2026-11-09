@@ -423,7 +423,7 @@ export const getTeacherCoachingCompleted = async (params?: {
 
 // ── 订阅管理（Admin） ──
 
-export type SubscriptionType = 'monthly' | 'yearly' | 'lifetime'
+export type SubscriptionType = 'monthly' | 'quarterly' | 'yearly' | 'lifetime'
 export type SubscriptionStatus = 'active' | 'expired' | 'cancelled'
 
 export type UserSubscription = {

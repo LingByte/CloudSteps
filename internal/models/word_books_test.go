@@ -856,6 +856,9 @@ func TestDeleteWordBook_hardDeletesChildRecords(t *testing.T) {
 	if err := CreateWordBook(db, book); err != nil {
 		t.Fatal(err)
 	}
+	if book.ID == 0 {
+		t.Fatal("expected word book id after create")
+	}
 	w := &Word{WordBookID: book.ID, Word: "a", SortOrder: 1}
 	if err := CreateWord(db, w); err != nil {
 		t.Fatal(err)
@@ -870,7 +873,7 @@ func TestDeleteWordBook_hardDeletesChildRecords(t *testing.T) {
 	}
 
 	if err := DeleteWordBook(db, book.ID, "admin"); err != nil {
-		t.Fatalf("delete book: %v", err)
+		t.Fatalf("delete book id=%d: %v", book.ID, err)
 	}
 	// Word records are hard-deleted by the cascade (Unscoped delete).
 	var wordCount int64
