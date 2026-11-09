@@ -457,14 +457,18 @@ func (c *Config) IsDev() bool {
 	return e == "dev" || e == "development" || e == "test"
 }
 
+// Mode 返回 ling-base 认得的环境名。logger 只在 prod / dev / local 时把日志打到终端，
+// bootstrap 的 profile 同样用 prod / dev，不能返回 production / development。
 func (c *Config) Mode() string {
 	switch strings.ToLower(c.App.Environment) {
 	case "prod", "production":
-		return "production"
+		return "prod"
 	case "test":
 		return "test"
+	case "local":
+		return "local"
 	default:
-		return "development"
+		return "dev"
 	}
 }
 
