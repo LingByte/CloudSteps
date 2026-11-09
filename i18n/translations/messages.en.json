@@ -70,6 +70,7 @@
   "checkin.already": "Already checked in today",
   "checkin.query_failed": "Query failed",
   "checkin.not_logged_in": "Not logged in",
+  "checkin.member_exempt": "Members do not need to check in",
   "announcement.not_found": "Announcement not found",
   "announcement.marked_read": "Marked as read",
   "announcement.mark_failed": "Failed to mark",

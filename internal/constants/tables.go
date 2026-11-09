@@ -82,6 +82,7 @@ const (
 
 	// ── 用户订阅 ──
 	TABLE_USER_SUBSCRIPTIONS = "user_subscriptions"
+	TABLE_PAYMENT_ORDERS     = "payment_orders"
 
 	// ── 系统指标 ──
 	SYS_METRIC_TABLE_NAME = "sys_metrics"

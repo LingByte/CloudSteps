@@ -44,6 +44,10 @@ func (h *Handlers) handleTeacherCheckIn(c *gin.Context) {
 		return
 	}
 	db := c.MustGet(lbconstants.DbField).(*gorm.DB)
+	if models.TeacherHasActiveSubscription(db, tid) {
+		response.FailI18n(c, "checkin.member_exempt", nil)
+		return
+	}
 	res, err := models.DoTeacherCheckIn(db, tid, time.Now())
 	if err != nil {
 		response.FailI18n(c, "checkin.query_failed", err.Error())

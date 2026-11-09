@@ -75,6 +75,7 @@ func Models() []any {
 		&models.CoachingSessionRecord{},
 		&models.CoachingAuditLog{},
 		&models.UserSubscription{},
+		&models.PaymentOrder{},
 		&models.ScenarioDialogueScenario{},
 		&models.ScenarioDialogueSession{},
 		&models.ScenarioDialogueTurn{},

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"time"
 
 	"github.com/LingByte/CloudStepsGo/internal/constants"
@@ -10,11 +11,12 @@ import (
 
 // 订阅类型
 const (
-	SubscriptionTypeMonthly   = "monthly"   // 包月
-	SubscriptionTypeYearly     = "yearly"    // 包年
-	SubscriptionTypeLifetime   = "lifetime"  // 买断
-	SubscriptionStatusActive   = "active"    // 生效中
-	SubscriptionStatusExpired  = "expired"   // 已过期
+	SubscriptionTypeMonthly     = "monthly"   // 包月
+	SubscriptionTypeQuarterly   = "quarterly" // 包季
+	SubscriptionTypeYearly      = "yearly"    // 包年
+	SubscriptionTypeLifetime    = "lifetime"  // 买断
+	SubscriptionStatusActive    = "active"    // 生效中
+	SubscriptionStatusExpired   = "expired"   // 已过期
 	SubscriptionStatusCancelled = "cancelled" // 已取消
 )
 
@@ -23,9 +25,9 @@ const (
 type UserSubscription struct {
 	common.BaseModel
 	UserID    uint       `json:"userId" gorm:"index;not null"`
-	Type      string     `json:"type" gorm:"size:20;not null;index"`            // monthly | yearly | lifetime
+	Type      string     `json:"type" gorm:"size:20;not null;index"` // monthly | yearly | lifetime
 	StartedAt time.Time  `json:"startedAt" gorm:"not null"`
-	ExpiredAt *time.Time `json:"expiredAt,omitempty"`                           // nil 表示买断（永久）
+	ExpiredAt *time.Time `json:"expiredAt,omitempty"`                                   // nil 表示买断（永久）
 	Status    string     `json:"status" gorm:"size:20;not null;default:'active';index"` // active | expired | cancelled
 	User      *User      `json:"user,omitempty" gorm:"foreignKey:UserID"`
 }
@@ -73,4 +75,89 @@ func ExpireOverdueSubscriptions(db *gorm.DB) (int64, error) {
 		Where("status = ? AND expired_at IS NOT NULL AND expired_at <= ?", SubscriptionStatusActive, now).
 		Update("status", SubscriptionStatusExpired)
 	return res.RowsAffected, res.Error
+}
+
+// PlanPriceFen 会员套餐价格（分）。新用户首月月付为 9.9 元。
+func PlanPriceFen(plan string, firstMonth bool) (int, bool) {
+	switch plan {
+	case SubscriptionTypeMonthly:
+		if firstMonth {
+			return 990, true
+		}
+		return 5800, true
+	case SubscriptionTypeQuarterly:
+		return 9800, true
+	case SubscriptionTypeYearly:
+		return 19800, true
+	case SubscriptionTypeLifetime:
+		return 49800, true
+	default:
+		return 0, false
+	}
+}
+
+// GrantPaidPlan 支付成功后开通或顺延会员。已是永久会员时不再缩短。
+func GrantPaidPlan(db *gorm.DB, userID uint, plan string, at time.Time) error {
+	if db == nil || userID == 0 {
+		return errors.New("invalid subscription grant")
+	}
+	if _, ok := PlanPriceFen(plan, false); !ok {
+		return errors.New("invalid plan")
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		var existing UserSubscription
+		err := tx.Where("user_id = ? AND status = ?", userID, SubscriptionStatusActive).
+			Where("expired_at IS NULL OR expired_at > ?", at).
+			First(&existing).Error
+		has := err == nil
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if has && existing.ExpiredAt == nil {
+			return nil
+		}
+		if plan == SubscriptionTypeLifetime {
+			if has {
+				return tx.Model(&existing).Updates(map[string]any{
+					"type":       SubscriptionTypeLifetime,
+					"expired_at": nil,
+					"status":     SubscriptionStatusActive,
+				}).Error
+			}
+			sub := UserSubscription{
+				UserID:    userID,
+				Type:      SubscriptionTypeLifetime,
+				StartedAt: at,
+				Status:    SubscriptionStatusActive,
+			}
+			return tx.Create(&sub).Error
+		}
+		months := 1
+		switch plan {
+		case SubscriptionTypeQuarterly:
+			months = 3
+		case SubscriptionTypeYearly:
+			months = 12
+		}
+		base := at
+		if has && existing.ExpiredAt != nil && existing.ExpiredAt.After(at) {
+			base = *existing.ExpiredAt
+		}
+		exp := base.AddDate(0, months, 0)
+		if has {
+			return tx.Model(&existing).Updates(map[string]any{
+				"type":       plan,
+				"expired_at": exp,
+				"status":     SubscriptionStatusActive,
+			}).Error
+		}
+		sub := UserSubscription{
+			UserID:    userID,
+			Type:      plan,
+			StartedAt: at,
+			ExpiredAt: &exp,
+			Status:    SubscriptionStatusActive,
+		}
+		return tx.Create(&sub).Error
+	})
 }

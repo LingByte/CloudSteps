@@ -37,6 +37,7 @@ type Config struct {
 	Realtime       RealtimeConfig       `yaml:"realtime"`
 	Cache          CacheConfig          `yaml:"cache"`
 	Wechat         WechatConfig         `yaml:"wechat"`
+	WechatPay      WechatPayConfig      `yaml:"wechatPay"`
 }
 
 type AppConfig struct {
@@ -235,14 +236,28 @@ type CacheConfig struct {
 
 // WechatConfig 微信公众号登录（关注 + 验证码 + 网页轮询）。
 type WechatConfig struct {
-	Enabled          bool          `yaml:"enabled"`
-	Token            string        `yaml:"token"`
-	AppID            string        `yaml:"appId"`
-	AppSecret        string        `yaml:"appSecret"`
-	EncodingAESKey   string        `yaml:"encodingAESKey"`
-	EncryptMode      string        `yaml:"encryptMode"` // plain | compatible | safe
-	LoginSessionTTL  time.Duration `yaml:"loginSessionTTL"`
-	LoginCodeTTL     time.Duration `yaml:"loginCodeTTL"`
+	Enabled         bool          `yaml:"enabled"`
+	Token           string        `yaml:"token"`
+	AppID           string        `yaml:"appId"`
+	AppSecret       string        `yaml:"appSecret"`
+	EncodingAESKey  string        `yaml:"encodingAESKey"`
+	EncryptMode     string        `yaml:"encryptMode"` // plain | compatible | safe
+	LoginSessionTTL time.Duration `yaml:"loginSessionTTL"`
+	LoginCodeTTL    time.Duration `yaml:"loginCodeTTL"`
+}
+
+// WechatPayConfig 微信支付（JSAPI）。AppID 是支付公众号，和登录公众号分开。
+type WechatPayConfig struct {
+	Enabled          bool   `yaml:"enabled"`
+	MchID            string `yaml:"mchId"`
+	AppID            string `yaml:"appId"`
+	AppSecret        string `yaml:"appSecret"`
+	APIv3Key         string `yaml:"apiV3Key"`
+	APIv2Key         string `yaml:"apiV2Key"`
+	CertFile         string `yaml:"certFile"`
+	KeyFile          string `yaml:"keyFile"`
+	NotifyURL        string `yaml:"notifyUrl"`
+	OAuthRedirectURL string `yaml:"oauthRedirectUrl"`
 }
 
 // Default 默认配置（无密钥）。

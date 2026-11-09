@@ -1,12 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
+import QRCode from "qrcode";
 import { Check, Crown, LockKeyhole, CheckCircle2, Clock, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { CloudButton } from "../components/cloudsteps";
 import { CloudCard } from "../components/cloudsteps/arco";
 import { PageBackHeader } from "../components/PageBackHeader";
-import { WechatIcon } from "../components/WechatIcon";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog";
-import { getTeacherTeachingPoolWithSubscription, type UserSubscription } from "../api/coaching";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import { type UserSubscription } from "../api/coaching";
+import { createWechatNativePay, createWechatPay, getMySubscription, getWechatPayOrder, type WechatPayParams } from "../api/pay";
+import { showToast } from "../utils/toast";
+import { formatApiMessage } from "../utils/apiMessage";
 
 type Plan = {
   id: string;
@@ -39,15 +43,77 @@ const comparison = [
 
 const money = (value: number) => `¥${value % 1 === 0 ? value.toFixed(0) : value.toFixed(1)}`;
 
+function planLabel(type?: string) {
+  if (type === "monthly") return "月度会员";
+  if (type === "quarterly") return "季度会员";
+  if (type === "yearly") return "年度会员";
+  if (type === "lifetime") return "永久会员";
+  return "会员";
+}
+
+function formatDay(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
+}
+
+function daysRemaining(value?: string | null) {
+  if (!value) return null;
+  const end = new Date(value).getTime();
+  if (Number.isNaN(end)) return null;
+  return Math.max(0, Math.ceil((end - Date.now()) / 86_400_000));
+}
+
+const planRank: Record<string, number> = { monthly: 1, quarterly: 2, yearly: 3, lifetime: 4 };
+
+function invokeWechatPay(pay: WechatPayParams) {
+  return new Promise<void>((resolve, reject) => {
+    const run = () => {
+      const bridge = (window as unknown as { WeixinJSBridge?: { invoke: Function } }).WeixinJSBridge;
+      if (!bridge) {
+        reject(new Error("请在微信中打开"));
+        return;
+      }
+      bridge.invoke(
+        "getBrandWCPayRequest",
+        {
+          appId: pay.appId,
+          timeStamp: pay.timeStamp,
+          nonceStr: pay.nonceStr,
+          package: pay.package,
+          signType: pay.signType,
+          paySign: pay.paySign,
+        },
+        (res: { err_msg?: string }) => {
+          if (res?.err_msg === "get_brand_wcpay_request:ok") resolve();
+          else reject(new Error(res?.err_msg || "支付未完成"));
+        },
+      );
+    };
+    if (typeof (window as unknown as { WeixinJSBridge?: unknown }).WeixinJSBridge === "undefined") {
+      document.addEventListener("WeixinJSBridgeReady", run, { once: true });
+    } else {
+      run();
+    }
+  });
+}
+
 export default function Recharge() {
   const [selectedId, setSelectedId] = useState("yearly");
   const [currentSub, setCurrentSub] = useState<UserSubscription | null | undefined>(undefined);
   const [showFirstMonthDeal, setShowFirstMonthDeal] = useState(false);
-  const [contactOpen, setContactOpen] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [scanPay, setScanPay] = useState<{ outTradeNo: string; qr: string; amount: string } | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const oauthHandled = useRef(false);
   const selected = useMemo(() => plans.find((plan) => plan.id === selectedId) ?? plans[2], [selectedId]);
-  const isNewUser = !currentSub;
-  const isFirstMonth = selectedId === "monthly" && isNewUser && showFirstMonthDeal;
+  const isMember = currentSub?.status === "active";
+  const isFirstMonth = selectedId === "monthly" && currentSub === null && showFirstMonthDeal;
   const finalPrice = isFirstMonth ? FIRST_MONTH_PRICE : selected.price;
+  const currentPlan = plans.find((plan) => plan.id === currentSub?.type);
+  const remainDays = daysRemaining(currentSub?.expiredAt);
+  const currentColumn = isMember ? (planRank[currentSub?.type || ""] ?? 0) + 1 : -1;
 
   useEffect(() => {
     const timer = setTimeout(() => setShowFirstMonthDeal(true), 600);
@@ -57,60 +123,184 @@ export default function Recharge() {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await getTeacherTeachingPoolWithSubscription();
-        if (res.code === 200 && res.data) {
-          setCurrentSub(res.data.subscription ?? null);
-        }
+        const res = await getMySubscription();
+        if (res.code === 200) setCurrentSub(res.data ?? null);
       } catch {
         setCurrentSub(null);
       }
     })();
   }, []);
 
-  const submit = () => {
-    setContactOpen(true);
+  const refreshSub = async () => {
+    const res = await getMySubscription();
+    if (res.code === 200) setCurrentSub(res.data ?? null);
   };
+
+  const startScanPay = async (plan: string) => {
+    setPaying(true);
+    try {
+      const res = await createWechatNativePay({ plan });
+      if (res.code !== 200 || !res.data?.codeUrl || !res.data.outTradeNo) {
+        showToast.error(formatApiMessage(res.msg, "支付失败"));
+        return;
+      }
+      const qr = await QRCode.toDataURL(res.data.codeUrl, { width: 280, margin: 1 });
+      setScanPay({ outTradeNo: res.data.outTradeNo, qr, amount: money(finalPrice) });
+    } catch (e: unknown) {
+      const msg = e && typeof e === "object" && "msg" in e ? String((e as { msg: string }).msg) : e instanceof Error ? e.message : "";
+      showToast.error(formatApiMessage(msg, "支付失败"));
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  const startPay = async (plan: string, code?: string) => {
+    if (!/MicroMessenger/i.test(navigator.userAgent)) {
+      await startScanPay(plan);
+      return;
+    }
+    setPaying(true);
+    try {
+      const res = await createWechatPay({ plan, code });
+      if (res.code !== 200 || !res.data) {
+        showToast.error(formatApiMessage(res.msg, "支付失败"));
+        return;
+      }
+      if (res.data.oauthUrl) {
+        window.location.href = res.data.oauthUrl;
+        return;
+      }
+      if (!res.data.pay || !res.data.outTradeNo) {
+        showToast.error("支付参数缺失");
+        return;
+      }
+      await invokeWechatPay(res.data.pay);
+      const status = await getWechatPayOrder(res.data.outTradeNo);
+      if (status.data?.status === "paid") {
+        showToast.success("支付成功，会员已开通");
+        await refreshSub();
+        return;
+      }
+      showToast.info("支付结果确认中，请稍后刷新查看");
+    } catch (e: unknown) {
+      const msg = e && typeof e === "object" && "msg" in e ? String((e as { msg: string }).msg) : e instanceof Error ? e.message : "";
+      if (/cancel|取消/.test(msg)) showToast.info("已取消支付");
+      else showToast.error(formatApiMessage(msg, "支付失败"));
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!scanPay) return;
+    let stopped = false;
+    const timer = window.setInterval(() => {
+      void (async () => {
+        try {
+          const status = await getWechatPayOrder(scanPay.outTradeNo);
+          if (stopped || status.data?.status !== "paid") return;
+          stopped = true;
+          setScanPay(null);
+          showToast.success("支付成功，会员已开通");
+          await refreshSub();
+        } catch {
+          /* 下一轮继续查 */
+        }
+      })();
+    }, 2000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [scanPay?.outTradeNo]);
+
+  useEffect(() => {
+    const code = searchParams.get("code");
+    const state = searchParams.get("state");
+    if (!code || !state || oauthHandled.current) return;
+    oauthHandled.current = true;
+    setSelectedId(state);
+    setSearchParams({}, { replace: true });
+    void startPay(state, code);
+  }, [searchParams, setSearchParams]);
+
+  const submit = () => {
+    if (isMember && currentSub?.type === "lifetime") return;
+    void startPay(selectedId);
+  };
+
+  const payLabel = !isMember
+    ? "立即开通"
+    : currentSub?.type === "lifetime"
+      ? "已是永久会员"
+      : selectedId === currentSub?.type
+        ? "续费并顺延"
+        : (planRank[selectedId] ?? 0) > (planRank[currentSub?.type || ""] ?? 0)
+          ? `升级为${selected.name}`
+          : `调整为${selected.name}`;
 
   return (
     <div className="flex h-dvh flex-col bg-background text-foreground">
-      <PageBackHeader title="会员中心" subtitle="选择适合你的会员方案" fallbackTo="/coach-center" maxWidthClass="max-w-6xl" />
+      <PageBackHeader
+        title="会员中心"
+        subtitle={isMember ? `${planLabel(currentSub?.type)} · ${currentSub?.type === "lifetime" ? "永久有效" : `有效期至 ${formatDay(currentSub?.expiredAt)}`}` : "选择适合你的会员方案"}
+        fallbackTo="/coach-center"
+        maxWidthClass="max-w-6xl"
+      />
 
       <main className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-7">
-          {/* 当前订阅状态 */}
-          {currentSub && currentSub.status === "active" ? (
-            <CloudCard className="mb-5 border-primary/30 bg-gradient-to-br from-primary/10 via-card to-card p-4 sm:p-5">
-              <div className="flex items-center gap-3">
-                <div className="size-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0">
-                  <Crown size={18} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-foreground">
-                      {currentSub.type === "monthly" ? "包月会员" : currentSub.type === "yearly" ? "包年会员" : "永久会员"}
-                    </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-[10px] font-medium text-primary">
-                      <CheckCircle2 size={11} /> 生效中
-                    </span>
+          {isMember && currentSub ? (
+            <section className="mb-6 overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-400/20 via-card to-card">
+              <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300 to-amber-600 text-amber-950 shadow-sm">
+                    <Crown size={22} />
                   </div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {currentSub.type === "lifetime"
-                      ? "买断会员 · 永久有效"
-                      : `到期时间：${new Date(currentSub.expiredAt || "").toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" })}`}
-                  </p>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-xl font-semibold tracking-tight">{planLabel(currentSub.type)}</h2>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-800">
+                        <CheckCircle2 size={12} /> 生效中
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-foreground/80">
+                      {currentSub.type === "lifetime" ? "永久有效" : `有效期至 ${formatDay(currentSub.expiredAt)}`}
+                    </p>
+                    <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock size={12} />
+                      开通于 {formatDay(currentSub.startedAt)}
+                    </p>
+                  </div>
                 </div>
-                <div className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
-                  <Clock size={13} />
-                  {currentSub.type === "lifetime" ? "永久" : `开通于 ${new Date(currentSub.startedAt).toLocaleDateString("zh-CN")}`}
-                </div>
+                {currentSub.type === "lifetime" ? (
+                  <p className="text-sm font-medium text-amber-800">一次买断，长期可用</p>
+                ) : remainDays != null ? (
+                  <div className="sm:text-right">
+                    <p className="text-xs font-medium text-amber-800">剩余</p>
+                    <p className="text-3xl font-semibold tabular-nums tracking-tight text-amber-950">{remainDays}<span className="ml-1 text-base font-medium">天</span></p>
+                  </div>
+                ) : null}
               </div>
-            </CloudCard>
+              {currentPlan ? (
+                <ul className="grid grid-cols-2 gap-x-4 gap-y-2 border-t border-amber-500/15 px-5 py-4 sm:grid-cols-4 sm:px-6">
+                  {currentPlan.features.slice(0, 4).map((feature) => (
+                    <li key={feature} className="flex items-center gap-1.5 text-xs text-foreground/80">
+                      <Check size={14} className="shrink-0 text-amber-700" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
           ) : null}
           <div className="mb-5 flex items-end justify-between gap-4">
             <div>
               <p className="mb-1 text-xs font-medium uppercase tracking-[0.16em] text-primary">CloudSteps Plus</p>
-              <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">解锁完整学习能力</h2>
-              <p className="mt-1 text-sm text-muted-foreground">一次购买，立即享受全部会员权益。</p>
+              <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">{isMember ? "续费或升级" : "解锁完整学习能力"}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {isMember ? "续费和升级都会从当前到期日往后顺延。" : "一次购买，立即享受全部会员权益。"}
+              </p>
             </div>
             <span className="hidden items-center gap-1.5 rounded-full bg-primary-soft px-3 py-1.5 text-xs font-medium text-primary sm:flex"><LockKeyhole size={13} />安全支付</span>
           </div>
@@ -125,7 +315,7 @@ export default function Recharge() {
                 {plans.map((plan) => (
                   <button key={plan.id} type="button" role="tab" aria-selected={selected.id === plan.id} onClick={() => { setSelectedId(plan.id); }} className={`relative rounded-lg px-1 py-2 text-xs transition-all sm:text-sm ${selected.id === plan.id ? "bg-card font-semibold text-foreground shadow-sm ring-1 ring-border/60" : "text-muted-foreground hover:text-foreground"}`}>
                     {plan.tab}
-                    {plan.id === "yearly" ? <span className="absolute -right-1 -top-2 rounded-full bg-secondary-brand px-1.5 py-0.5 text-[10px] font-medium text-white">推荐</span> : null}
+                    {currentSub?.type === plan.id ? <span className="absolute -right-1 -top-2 rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-medium text-amber-950">当前</span> : plan.id === "yearly" ? <span className="absolute -right-1 -top-2 rounded-full bg-secondary-brand px-1.5 py-0.5 text-[10px] font-medium text-white">推荐</span> : null}
                   </button>
                 ))}
               </div>
@@ -195,38 +385,34 @@ export default function Recharge() {
                     transition={{ duration: 0.3 }}
                     className="text-2xl font-semibold text-primary"
                   >{money(finalPrice)}</motion.span></div>
-                <CloudButton onClick={submit} className="mt-4 h-11 w-full bg-primary text-sm font-semibold text-primary-foreground hover:bg-primary/90 active:scale-[0.99]">立即开通</CloudButton>
+                <CloudButton onClick={submit} loading={paying} disabled={isMember && currentSub?.type === "lifetime"} className="mt-4 h-11 w-full bg-primary text-sm font-semibold text-primary-foreground hover:bg-primary/90 active:scale-[0.99]">{payLabel}</CloudButton>
                 <p className="mt-2 text-center text-xs text-muted-foreground">支付即代表同意会员服务条款</p>
+                {typeof navigator !== "undefined" && !/MicroMessenger/i.test(navigator.userAgent) ? (
+                  <p className="mt-2 text-center text-xs text-muted-foreground">电脑上会弹出微信支付二维码，用微信扫一扫即可付款。</p>
+                ) : null}
               </CloudCard>
             </aside>
           </div>
 
           <CloudCard className="mt-5 overflow-hidden p-4 sm:p-5">
             <div className="mb-4 flex items-end justify-between gap-4"><div><h3 className="flex items-center gap-2 text-base font-semibold"><Sparkles size={17} className="text-primary" />会员权益对比</h3><p className="mt-1 text-xs text-muted-foreground">清晰比较不同方案，选择最适合你的会员</p></div><span className="text-xs text-muted-foreground">左右滑动查看</span></div>
-            <div className="overflow-x-auto"><table className="min-w-[650px] w-full border-collapse text-sm"><caption className="sr-only">会员套餐权益对比表</caption><thead><tr>{comparison[0].map((item, index) => <th key={item} scope="col" className={`border border-border bg-muted/50 px-3 py-2.5 font-medium ${index === 0 ? "w-24 text-left" : "text-center"}`}>{item}</th>)}</tr></thead><tbody>{comparison.slice(1).map((row) => <tr key={row[0]}>{row.map((item, index) => <td key={`${row[0]}-${item}`} className={`border border-border px-3 py-2.5 ${index === 0 ? "font-medium text-foreground" : "text-center text-muted-foreground"}`}>{item}</td>)}</tr>)}</tbody></table></div>
+            <div className="overflow-x-auto"><table className="min-w-[650px] w-full border-collapse text-sm"><caption className="sr-only">会员套餐权益对比表</caption><thead><tr>{comparison[0].map((item, index) => <th key={item} scope="col" className={`border border-border px-3 py-2.5 font-medium ${index === 0 ? "w-24 text-left" : "text-center"} ${index === currentColumn ? "bg-amber-500/15 text-amber-950" : "bg-muted/50"}`}>{item}</th>)}</tr></thead><tbody>{comparison.slice(1).map((row) => <tr key={row[0]}>{row.map((item, index) => <td key={`${row[0]}-${index}`} className={`border border-border px-3 py-2.5 ${index === 0 ? "font-medium text-foreground" : "text-center text-muted-foreground"} ${index === currentColumn ? "bg-amber-500/10 text-foreground" : ""}`}>{item}</td>)}</tr>)}</tbody></table></div>
           </CloudCard>
         </div>
       </main>
 
-      <Dialog open={contactOpen} onOpenChange={setContactOpen}>
-        <DialogContent className="sm:max-w-sm rounded-2xl p-0 gap-0 overflow-hidden">
-          <DialogHeader className="px-5 pt-5 pb-3 border-b border-border text-left">
-            <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-              <WechatIcon className="size-5 text-[#07C160]" />
-              联系客服开通
-            </DialogTitle>
-            <DialogDescription>请扫码添加客服微信，由客服为您手动开通会员</DialogDescription>
+      <Dialog open={scanPay != null} onOpenChange={(open) => { if (!open) setScanPay(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>微信扫码支付</DialogTitle>
+            <DialogDescription>打开微信，扫一扫下面的二维码完成付款。支付成功后此窗口会自动关闭。</DialogDescription>
           </DialogHeader>
-          <div className="px-5 py-5 flex flex-col items-center gap-3">
-            <img
-              src={`${import.meta.env.BASE_URL}wechat-biz-qr.png`}
-              alt="客服微信二维码"
-              className="w-48 h-48 rounded-xl border border-border bg-white object-contain"
-            />
-            <p className="text-[12px] text-muted-foreground text-center">
-              微信扫码添加客服，发送「开通会员」即可处理
-            </p>
-          </div>
+          {scanPay ? (
+            <div className="flex flex-col items-center gap-3 pb-2">
+              <img src={scanPay.qr} alt="微信支付二维码" className="size-56 rounded-lg border border-border bg-white p-2" />
+              <p className="text-sm text-muted-foreground">{selected.name} · <span className="font-semibold text-foreground">{scanPay.amount}</span></p>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>
